@@ -41,35 +41,18 @@ The script is designed to automate the complete installation process while provi
 
 ## Instructions
 
-Boot system from a Arch Linux installation [image](https://archlinux.org/download).
-
-### Using Git
+Boot system from a Arch Linux installation [image](https://archlinux.org/download). Clone repository and execute script.
 
 ```
-loadkeys sv-latin1
 git clone https://github.com/pwyde/arch-install
 cd arch-install
 ./arch-install.sh
 ```
 
-Using parameters.
+### Using Parameters
 
 ```
 ./arch-install.sh --hostname arch-linux --username patrik
-```
-
-### Using Curl
-
-```
-loadkeys sv-latin1
-curl -fsSL https://raw.githubusercontent.com/pwyde/arch-install/main/arch-install.sh | bash
-```
-
-Using parameters.
-
-```
-loadkeys sv-latin1
-curl -fsSL https://raw.githubusercontent.com/pwyde/arch-install/main/arch-install.sh | bash -s -- --hostname arch-linux --username patrik
 ```
 
 ## Usage
