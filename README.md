@@ -49,7 +49,7 @@ cd arch-install
 ./arch-install.sh
 ```
 
-### Using Parameters
+Using script with parameters.
 
 ```
 ./arch-install.sh --hostname arch-linux --username patrik
