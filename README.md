@@ -14,7 +14,7 @@ The script is designed to automate the complete installation process while provi
 
 - Erases existing data on the selected disk.
 - Automatically detects the target disk and CPU vendor.
-- Creates a new GPT partition table.
+- Creates a new GPT partition table:
   - Creates a 2 GiB EFI System Partition formatted with FAT32.
   - Creates A root partition using the remaining disk space.
 - Creates a LUKS2-encrypted root partition.
@@ -24,8 +24,8 @@ The script is designed to automate the complete installation process while provi
   - `/home`
   - `/var/cache`
   - `/var/log`
-  - `/.snapshots`
   - `/root`
+  - `/.snapshots`
 - Installs the Arch Linux base system and configurable additional packages.
 - Automatically installs the appropriate CPU microcode package for Intel or AMD processors.
 - Configures base system, i.e. timezone, hostname, locale and more...
@@ -79,3 +79,21 @@ Options:
                              'partitions', 'format', 'btrfs', 'mount',
                              'base', 'configure', 'users', 'boot', 'verify'
 ```
+
+## References
+
+- [fdmux.dev - A Sealed Deal: TPM2, UKI, and the Arch Install Script That Nearly Broke Me](https://fdmux.dev/posts/sealed-deal-arch-linux-install/#mkinitcpio-vs-dracut-whats-the-difference)
+- [Oliver Daff's GitHub Gist - archtpm-install.sh](https://gist.github.com/oliverdaff/c3c037b0509ba9d961c8c1039a70706e)
+- [Lyle Liu - Arch Linux Secure Boot + Systemd-boot + Btrfs + Full Disk Encryption + TPM Auto-Unlock](https://heylyle.com/en/posts/arch-secure-boot-fde-tpm2)
+- [Lyle Liu - Revisiting TPM2 PCR Selection](https://heylyle.com/en/posts/revisiting-tpm2-pcr-selection)
+- [Lyle Liu - Arch Linux Post-Installation Tasks](https://heylyle.com/en/posts/archlinux-post-installation-task)
+- [Arch Linux Wiki - dm-crypt / Encrypting an entire system / LUKS on a partition with TPM2 and Secure Boot](https://wiki.archlinux.org/title/Dm-crypt/Encrypting_an_entire_system#LUKS_on_a_partition_with_TPM2_and_Secure_Boot)
+- [Arch Linux Wiki - Btrfs](https://wiki.archlinux.org/title/Btrfs)
+- [Arch Linux Wiki - Trusted Platform Module](https://wiki.archlinux.org/title/Trusted_Platform_Module)
+- [Arch Linux Wiki - Secure Boot](https://wiki.archlinux.org/title/Unified_Extensible_Firmware_Interface/Secure_Boot)
+- [Arch Linux Wiki - Unified kernel image](https://wiki.archlinux.org/title/Unified_kernel_image)
+- [Arch Linux Wiki - systemd-boot](https://wiki.archlinux.org/title/Systemd-boot)
+- [Arch Linux Wiki - systemd-cryptenroll](https://wiki.archlinux.org/title/Systemd-cryptenroll)
+- [Arch Linux Wiki - mkinitcpio](https://wiki.archlinux.org/title/Mkinitcpio)
+- [Arch Linux Wiki - dm-crypt / System configuration / Pinning a LUKS volume](https://wiki.archlinux.org/title/Dm-crypt/System_configuration#Pinning_a_LUKS_volume)
+- [Arch Linux Wiki - cryptsetup actions specific for LUKS / Key management](https://wiki.archlinux.org/title/Dm-crypt/Device_encryption#Key_management)
