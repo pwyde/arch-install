@@ -16,7 +16,7 @@ The script is designed to automate the complete installation process while provi
 - Automatically detects the target disk and CPU vendor.
 - Creates a new GPT partition table:
   - Creates a 2 GiB EFI System Partition formatted with FAT32.
-  - Creates A root partition using the remaining disk space.
+  - Creates a root partition using the remaining disk space.
 - Creates a LUKS2-encrypted root partition.
 - Formats the encrypted container with Btrfs.
 - Creates configurable Btrfs subvolumes:
@@ -34,7 +34,7 @@ The script is designed to automate the complete installation process while provi
 - Installs and configures `systemd-boot` as bootloader.
 - Configures secure boot using `sbctl`.
 - Creates secure boot keys and enrolls Microsoft keys.
-- Signs the UKI and systemd-boot EFI binaries.
+- Signs the UKI and `systemd-boot` EFI binaries.
 - Provides customizable installation parameters.
 - Provides cleanup functionality when the installation fails.
 - Supports resuming the installation from different stages instead of starting over.
