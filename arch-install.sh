@@ -366,7 +366,7 @@ format_partitions() {
 
   # Open the container
   print_msg "Opening LUKS container..."
-  if ! cryptsetup open "$ROOT_PART" cryptroot; then
+  if ! cryptsetup --allow-discards --persistent open "$ROOT_PART" cryptroot; then
     print_error "Failed to open LUKS container."
     print_msg "This might be due to a previous LUKS header still being detected."
     exit 1
