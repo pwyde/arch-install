@@ -1053,16 +1053,17 @@ print_summary() {
 systemd-cryptenroll ${ROOT_PART} \\
   --wipe-slot=password,tpm2 \\
   --tpm2-device=auto \\
-  --tpm2-pcrs=1+3+5+7+12 \\
+  --tpm2-pcrs=7 \\
   --tpm2-with-pin=yes
 EOF
   else
     echo
-    echo "${WHITE}System configured without TPM (not detected). Use LUKS passphrase to unlock!${NO_COLOR}"
+    echo "${WHITE}System configured without TPM (not detected). Use LUKS passphrase to unlock! ${NO_COLOR}"
   fi
 
   echo
   echo "${BLUE}==>${YELLOW} Done. Ready to reboot! ${NO_COLOR}"
+  echo "${BLUE}==>${YELLOW} Also verify that ${WHITE}Secure Boot${YELLOW} is enabled in BIOS before booting into Arch Linux! ${NO_COLOR}"
   echo "${BLUE}==>${YELLOW} After reboot, log in as ${WHITE}${USERNAME}${NO_COLOR}"
 
   # Troubleshooting tips if boot issues were detected
