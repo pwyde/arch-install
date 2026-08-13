@@ -771,18 +771,6 @@ sudo cryptsetup status cryptroot
 
 ---
 
-# References
-
-- [Arch Linux Wiki - systemd-cryptenroll](https://wiki.archlinux.org/title/Systemd-cryptenroll)
-- [Arch Linux Wiki - dm-crypt / system configuration / Pinning a LUKS volume](https://wiki.archlinux.org/title/Dm-crypt/System_configuration#Pinning_a_LUKS_volume)
-- [Arch Linux Manual - `systemd-cryptenroll(1)`](https://man.archlinux.org/man/systemd-cryptenroll.1)
-- [Arch Linux Manual - `crypttab(5)`](https://man.archlinux.org/man/crypttab.5)
-- [systemd `systemd-cryptenroll(1)`](https://www.freedesktop.org/software/systemd/man/systemd-cryptenroll.html)
-- [systemd `systemd-stub(7)`](https://www.freedesktop.org/software/systemd/man/systemd-stub.html)
-- [systemd `crypttab(5)` - `tpm2-measure-pcr=` and `fixate-volume-key=`](https://www.freedesktop.org/software/systemd/man/crypttab.html)
-
----
-
 ## Summary
 
 For a modern Arch Linux installation using LUKS2, TPM2, Secure Boot and a signed UKI, a practical policy is:
@@ -802,3 +790,15 @@ fixate-volume-key=
 ```
 
 This avoids tying TPM unlocking to PCRs that routinely change during legitimate kernel/UKI updates while still binding the TPM to the expected Secure Boot policy and binding the signed boot environment to the cryptographic identity of the intended LUKS volume.
+
+---
+
+# References
+
+- [Arch Linux Wiki - systemd-cryptenroll](https://wiki.archlinux.org/title/Systemd-cryptenroll)
+- [Arch Linux Wiki - dm-crypt / system configuration / Pinning a LUKS volume](https://wiki.archlinux.org/title/Dm-crypt/System_configuration#Pinning_a_LUKS_volume)
+- [Arch Linux Manual - `systemd-cryptenroll(1)`](https://man.archlinux.org/man/systemd-cryptenroll.1)
+- [Arch Linux Manual - `crypttab(5)`](https://man.archlinux.org/man/crypttab.5)
+- [systemd `systemd-cryptenroll(1)`](https://www.freedesktop.org/software/systemd/man/systemd-cryptenroll.html)
+- [systemd `systemd-stub(7)`](https://www.freedesktop.org/software/systemd/man/systemd-stub.html)
+- [systemd `crypttab(5)` - `tpm2-measure-pcr=` and `fixate-volume-key=`](https://www.freedesktop.org/software/systemd/man/crypttab.html)
