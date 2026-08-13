@@ -80,6 +80,10 @@ Options:
                              'base', 'configure', 'users', 'boot', 'verify'
 ```
 
+## Security Design
+
+See in-depth documentation [here](./security.md).
+
 ## References
 
 - [fdmux.dev - A Sealed Deal: TPM2, UKI, and the Arch Install Script That Nearly Broke Me](https://fdmux.dev/posts/sealed-deal-arch-linux-install/#mkinitcpio-vs-dracut-whats-the-difference)
