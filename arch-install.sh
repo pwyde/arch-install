@@ -885,7 +885,7 @@ bootctl install --esp-path=/efi || {
 cat > /efi/loader/loader.conf <<EOL
 timeout 5
 editor 0
-console-mode max
+console-mode 1
 EOL
 
 echo "==> EFI directory contents:"
