@@ -836,7 +836,7 @@ EOL
 
 mkdir -p /etc/cmdline.d
 cat > /etc/cmdline.d/root.conf <<EOL
-rd.luks.name=${ROOT_UUID}=cryptroot root=/dev/mapper/cryptroot rootfstype=btrfs rootflags=subvol=/@ rw
+rd.luks.name=${ROOT_UUID}=cryptroot root=/dev/mapper/cryptroot zswap.enabled=0 rootfstype=btrfs rootflags=subvol=/@ rw
 EOL
 
 echo "==> Configure mkinitcpio"
