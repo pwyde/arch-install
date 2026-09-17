@@ -269,6 +269,12 @@ validate_inputs() {
     exit 1
   fi
 
+  # systemd-firstboot --root only checks the keymap name is well-formed, not that it exists.
+  if [ -z "$(find /usr/share/kbd/keymaps -name "${KEYMAP}.map*" -print -quit 2>/dev/null)" ]; then
+    print_error "Keymap '${KEYMAP}' is not installed."
+    exit 1
+  fi
+
   # The Plymouth theme is copied from next to this script late in the install.
   # Check now, before the disk is wiped, rather than fail after partitioning.
   if [ ! -f "${PLYMOUTH_THEME_SRC}/${PLYMOUTH_THEME}.plymouth" ]; then
@@ -603,6 +609,11 @@ configure_system() {
 # Configure basic system settings
 configure_basic_system() {
   print_msg "Configuring basic system settings"
+
+  # Outside the chroot: --root makes systemd-firstboot skip reloading the console over D-Bus.
+  print_msg "Setting keymap to ${KEYMAP}"
+  systemd-firstboot --root=/mnt --keymap="${KEYMAP}"
+
   arch-chroot /mnt /bin/bash -e <<EOF
 echo "==> Setting timezone to ${TIMEZONE}"
 ln -sf /usr/share/zoneinfo/${TIMEZONE} /etc/localtime
@@ -615,13 +626,6 @@ cat > /etc/hosts <<EOL
 ::1         localhost
 127.0.1.1   ${HOSTNAME}.localdomain ${HOSTNAME}
 EOL
-
-echo "==> Setting keymap to ${KEYMAP}"
-# As Omarchy does: systemd-firstboot writes KEYMAP and also derives the matching
-# X11 layout (XKBLAYOUT, XKBMODEL, XKBOPTIONS) from
-# /usr/share/systemd/kbd-model-map, e.g. sv-latin1 -> se, pc105,
-# terminate:ctrl_alt_bksp. Plymouth and Wayland compositors read the XKB values.
-systemd-firstboot --keymap="${KEYMAP}" --force
 
 echo "==> Setting locale to ${LOCALE}"
 sed -i 's/#\(en_US.UTF-8\)/\1/' /etc/locale.gen
