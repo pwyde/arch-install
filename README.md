@@ -254,9 +254,9 @@ The boot splash is set up the way Omarchy does it:
   `/usr/share/plymouth/themes/arch-linux/`.
   The files live in this repository under
   [`default/plymouth/arch-linux/`](./default/plymouth/arch-linux/), based on Omarchy's
-  `default/plymouth/` (commit `9c5482c5` on the `quattro` branch) together with
-  Omarchy's MIT license, recolored to the Arch Linux colors, and with the Arch
-  Linux logo in place of Omarchy's (see below). The
+  `default/plymouth/` (commit `9c5482c5` on the `quattro` branch, MIT), recolored
+  to the Arch Linux colors, and with the Arch Linux logo in place of Omarchy's
+  (see below). The
   installer therefore has to run from a full checkout of this repository; it
   checks for the files before touching the disk.
 - **`Theme=arch-linux`** in `/etc/plymouth/plymouthd.conf`. The theme id has no
