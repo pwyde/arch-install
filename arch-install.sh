@@ -249,6 +249,14 @@ parse_args() {
   done
 }
 
+# systemd-firstboot --root only checks the keymap name is well-formed, not that it exists.
+validate_keymap() {
+  if [ -z "$(find /usr/share/kbd/keymaps -name "${KEYMAP}.map*" -print -quit 2>/dev/null)" ]; then
+    print_error "Keymap '${KEYMAP}' is not installed."
+    exit 1
+  fi
+}
+
 # Validate inputs
 validate_inputs() {
   # Check if disk exists
@@ -269,11 +277,7 @@ validate_inputs() {
     exit 1
   fi
 
-  # systemd-firstboot --root only checks the keymap name is well-formed, not that it exists.
-  if [ -z "$(find /usr/share/kbd/keymaps -name "${KEYMAP}.map*" -print -quit 2>/dev/null)" ]; then
-    print_error "Keymap '${KEYMAP}' is not installed."
-    exit 1
-  fi
+  validate_keymap
 
   # The Plymouth theme is copied from next to this script late in the install.
   # Check now, before the disk is wiped, rather than fail after partitioning.
@@ -612,6 +616,7 @@ configure_basic_system() {
 
   # Outside the chroot: --root makes systemd-firstboot skip reloading the console over D-Bus.
   print_msg "Setting keymap to ${KEYMAP}"
+  validate_keymap
   systemd-firstboot --root=/mnt --keymap="${KEYMAP}"
 
   arch-chroot /mnt /bin/bash -e <<EOF
