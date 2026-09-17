@@ -2,13 +2,13 @@
 # arch-install.sh v1.0
 #
 # A comprehensive Arch Linux installation script with LUKS encryption, TPM2 unlocking,
-# Btrfs subvolumes, secure boot and Unified Kernel Image (UKI).
+# Btrfs subvolumes, the Limine bootloader and Unified Kernel Image (UKI).
 #
 # Features:
 # - Full disk encryption with LUKS2
 # - TPM2 integration
 # - Btrfs filesystem with customizable subvolumes
-# - Unified Kernel Image for secure boot compatibility
+# - Unified Kernel Image booted by Limine
 # - Customizable installation parameters
 # - Error handling and validation
 #
@@ -24,8 +24,11 @@ DEFAULT_USERNAME="admin"
 DEFAULT_TIMEZONE="Europe/Stockholm"
 DEFAULT_KEYMAP="sv-latin1"
 DEFAULT_LOCALE="sv_SE.UTF-8"
-DEFAULT_SUBVOLUMES="@ @home @cache @log @.snapshots @root"
-DEFAULT_PACKAGES="base base-devel bash-completion btrfs-progs cryptsetup dosfstools git linux linux-firmware man-db man-pages nano networkmanager openssh sbctl sudo terminus-font unzip util-linux vim zram-generator"
+# No snapshots subvolume here on purpose: 'snapper create-config' creates its
+# own /.snapshots and refuses to run when the path already exists, so leaving it
+# out keeps the post-install snapper setup a plain create-config.
+DEFAULT_SUBVOLUMES="@ @home @cache @log @root"
+DEFAULT_PACKAGES="base base-devel bash-completion brightnessctl btrfs-progs cryptsetup dosfstools efibootmgr git limine linux linux-firmware man-db man-pages nano networkmanager openssh plymouth sudo terminus-font unzip util-linux vim zram-generator"
 
 # Color variables
 RED=$'\033[91m'
@@ -68,7 +71,7 @@ cleanup() {
     fi
 
     # Unmount all filesystems if they exist
-    if mountpoint -q /mnt/efi 2>/dev/null; then
+    if mountpoint -q /mnt 2>/dev/null; then
       print_msg "Unmounting filesystems"
       umount -Rf /mnt 2>/dev/null || true
     fi
@@ -95,6 +98,50 @@ EXTRA_PACKAGES=""
 NON_INTERACTIVE=0
 MICROCODE=""
 VERSION="1.0"
+
+# Limine bootloader settings
+# ESP_PATH is the ESP mount point inside the target system. Mounting the ESP at
+# /boot (as Omarchy does) puts the kernel, the UKIs and the bootloader on one
+# FAT partition, so there is no separate /efi. Limine looks for its config next
+# to its own EFI binary and then at /limine.conf on the boot volume.
+ESP_PATH="/boot"
+# ESP mount options. FAT has no permission bits, so they come from the mount:
+# files 0600, directories 0700, all owned by root. This matches what mkinitcpio
+# would have given them on a normal filesystem -- it builds initramfs images and
+# UKIs under `umask 077` precisely because an initramfs can carry secrets such as
+# a LUKS keyfile. Without this the kernel and the UKIs on /boot are
+# world-readable.
+ESP_MOUNT_OPTS="fmask=0177,dmask=0077"
+
+# Btrfs mount options applied to every subvolume.
+#   compress=zstd:3 - btrfs's own default level, a better ratio than level 1 for
+#     a modest CPU cost. It only affects newly written data, so it is worth
+#     setting correctly at install time rather than later.
+#   noatime - every atime update on a CoW filesystem is a metadata write that
+#     also makes snapshots diverge from their parent for no content change.
+#   nodiscard - the LUKS container is opened with --allow-discards, so the
+#     device supports TRIM and btrfs would otherwise turn on continuous
+#     discard=async by default (kernel 6.2+). Arch, Debian and Red Hat all
+#     recommend periodic TRIM instead, so fstrim.timer is enabled rather than
+#     trimming on every delete.
+BTRFS_MOUNT_OPTS="compress=zstd:3,noatime,nodiscard"
+# UKI filenames: ${ESP_PATH}/EFI/Linux/${UKI_NAME}.efi and -fallback.efi.
+# limine-entry-tool names UKIs "${CUSTOM_UKI_NAME}_${kernel}.efi" (Omarchy gets
+# omarchy_linux.efi that way), so "arch_linux" means a later
+# CUSTOM_UKI_NAME="arch" writes these same files instead of a second pair.
+UKI_NAME="arch_linux"
+# Shown as the Limine menu title and branding.
+OS_NAME="Arch Linux"
+
+# Plymouth boot splash. The theme is Omarchy's, shipped in this repository under
+# plymouth/<theme>/ (MIT, see its LICENSE) because it is mostly PNG images.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PLYMOUTH_THEME="omarchy"
+PLYMOUTH_THEME_SRC="${SCRIPT_DIR}/plymouth/${PLYMOUTH_THEME}"
+# The files Omarchy publishes to /usr/share/plymouth/themes/omarchy/, in the
+# same set as omarchy-plymouth-set --refresh-default.
+PLYMOUTH_THEME_FILES="bullet.png entry.png lock.png logo.png omarchy.plymouth omarchy.script preview-unlock.png progress_bar.png progress_box.png logos/oma.png"
+
 START_STAGE="partitions" # Default start at beginning
 
 # Password variables
@@ -216,6 +263,17 @@ validate_inputs() {
     print_error "System not booted in UEFI mode. This script requires UEFI boot."
     exit 1
   fi
+
+  # The Plymouth theme is copied from next to this script late in the install.
+  # Check now, before the disk is wiped, rather than fail after partitioning.
+  local theme_file
+  for theme_file in $PLYMOUTH_THEME_FILES; do
+    if [ ! -f "${PLYMOUTH_THEME_SRC}/${theme_file}" ]; then
+      print_error "Plymouth theme file missing: ${PLYMOUTH_THEME_SRC}/${theme_file}"
+      print_error "Run the script from a full checkout of the repository."
+      exit 1
+    fi
+  done
 
   # Check for required tools
   for tool in sgdisk cryptsetup mkfs.fat mkfs.btrfs; do
@@ -397,7 +455,7 @@ mount_filesystems() {
 
   # Mount root subvolume first
   print_msg "Mounting root subvolume"
-  mount -o subvol=@,compress=zstd:1,noatime /dev/mapper/cryptroot /mnt || {
+  mount -o "subvol=@,$BTRFS_MOUNT_OPTS" /dev/mapper/cryptroot /mnt || {
     print_error "Failed to mount root subvolume"
     print_msg "Debug info:"
     mount /dev/mapper/cryptroot /mnt
@@ -407,12 +465,10 @@ mount_filesystems() {
     exit 1
   }
 
-  mkdir -p /mnt/efi
-  print_msg "Mounting EFI partition to /mnt/efi"
-  mount "$EFI_PART" /mnt/efi
+  mkdir -p "/mnt${ESP_PATH}"
+  print_msg "Mounting EFI partition to /mnt${ESP_PATH}"
+  mount -o "$ESP_MOUNT_OPTS" "$EFI_PART" "/mnt${ESP_PATH}"
 
-  # Add /efi mount to fstab if not already present
-  ESP_UUID=$(blkid -s UUID -o value "$EFI_PART")
   # Create directories and mount other subvolumes if they exist
   print_msg "Mounting other subvolumes"
   for subvol in $SUBVOLUMES; do
@@ -425,7 +481,6 @@ mount_filesystems() {
       @home) mountpoint="/home" ;;
       @cache) mountpoint="/var/cache" ;;
       @log) mountpoint="/var/log" ;;
-      @snapshots) mountpoint="/.snapshots" ;;
       *)
         mountpoint="${subvol#@}"
         mountpoint="/$mountpoint"
@@ -434,7 +489,7 @@ mount_filesystems() {
 
       print_msg "Mounting subvolume $subvol to /mnt$mountpoint"
       mkdir -p "/mnt$mountpoint"
-      mount -o "subvol=$subvol,compress=zstd:1,noatime" /dev/mapper/cryptroot "/mnt$mountpoint" || {
+      mount -o "subvol=$subvol,$BTRFS_MOUNT_OPTS" /dev/mapper/cryptroot "/mnt$mountpoint" || {
         print_warning "Failed to mount subvolume $subvol to /mnt$mountpoint"
         continue
       }
@@ -455,8 +510,12 @@ install_base_system() {
   pacman-key --init
   pacman-key --populate archlinux
 
-  if mountpoint -q /mnt/boot; then
-    print_error "/mnt/boot is a mount point — EFI must be mounted at /mnt/efi, not /mnt/boot"
+  # The ESP is /boot, so pacstrap writes the kernel straight onto it. If it is
+  # not mounted yet the kernel lands on the Btrfs root and is then shadowed the
+  # moment the ESP is mounted over it, leaving an unbootable system.
+  if ! mountpoint -q "/mnt${ESP_PATH}"; then
+    print_error "EFI partition is not mounted at /mnt${ESP_PATH}."
+    print_error "It must be mounted before pacstrap, or the kernel will be installed to the wrong filesystem."
     mount | grep /mnt
     exit 1
   fi
@@ -478,11 +537,14 @@ install_base_system() {
     exit 1
   fi
 
-  if ! grep -qE "UUID=${ESP_UUID}[[:space:]]+/efi[[:space:]]" /mnt/etc/fstab; then
-    echo "UUID=$ESP_UUID  /efi  vfat  defaults,noatime  0  1" >>/mnt/etc/fstab
-    print_msg "Added /efi entry to /etc/fstab"
+  # Derived here rather than carried from mount_filesystems, so stages entering
+  # at 'base' do not trip over an unset variable under `set -u`.
+  ESP_UUID=$(blkid -s UUID -o value "$EFI_PART")
+  if ! grep -qE "UUID=${ESP_UUID}[[:space:]]+${ESP_PATH}[[:space:]]" /mnt/etc/fstab; then
+    echo "UUID=$ESP_UUID  ${ESP_PATH}  vfat  ${ESP_MOUNT_OPTS},noatime  0  2" >>/mnt/etc/fstab
+    print_msg "Added ${ESP_PATH} entry to /etc/fstab"
   else
-    print_msg "/efi entry already exists in /etc/fstab"
+    print_msg "${ESP_PATH} entry already exists in /etc/fstab"
   fi
 
   print_msg "Installed fstab:"
@@ -506,7 +568,15 @@ configure_system() {
   # TPM2 setup
   configure_tpm
 
-  # Boot setup (dracut, UKI, systemd-boot, secure boot)
+  # Hibernation swapfile. Must run before configure_boot: it writes resume=
+  # into /etc/cmdline.d/, which mkinitcpio embeds in the UKI.
+  configure_hibernation
+
+  # Plymouth boot splash. Must run before configure_boot: the plymouth hook
+  # reads the default theme, and the kernel parameters are embedded in the UKI.
+  configure_plymouth
+
+  # Boot setup (mkinitcpio, UKI, Limine)
   configure_boot
 
   # Enable services
@@ -568,10 +638,20 @@ LC_COLLATE=${LOCALE}
 EOL
 
 echo "==> Configuring ZRAM"
-cat > /etc/systemd/zram-generator.conf <<EOL
+# A drop-in rather than /etc/systemd/zram-generator.conf: the main file has the
+# lowest precedence, so any drop-in a package installs to
+# /usr/lib/systemd/zram-generator.conf.d/ would silently override it. Drop-ins
+# from /usr/lib and /etc are sorted together by filename and the last one wins,
+# so this competes by name instead.
+mkdir -p /etc/systemd/zram-generator.conf.d
+cat > /etc/systemd/zram-generator.conf.d/90-zram.conf <<EOL
 [zram0]
 zram-size = min(ram / 2, 16384)
 compression-algorithm = zstd
+# Above the pri=0 of the hibernation swapfile, so everyday swapping stays in
+# compressed RAM. 100 is also zram-generator's default; set explicitly because
+# the swapfile relies on it.
+swap-priority = 100
 EOL
 
 echo "==> Configuring pacman"
@@ -719,16 +799,20 @@ configure_users() {
     # Configure sudo
     print_msg "Configuring sudo"
     arch-chroot /mnt /bin/bash -e <<EOF
-cat > /etc/sudoers.d/timeout <<EOL
+cat > /etc/sudoers.d/00-wheel <<EOL
+# Allow members of group wheel to execute any command.
+%wheel ALL=(ALL:ALL) ALL
+EOL
+cat > /etc/sudoers.d/01-timeout <<EOL
 # Disable password prompt timeout.
 Defaults passwd_timeout=0
 
 # Reset environment variables and timeout for sudo sessions to 60 min.
 Defaults timestamp_timeout=60
 EOL
-cat > /etc/sudoers.d/wheel <<EOL
-# Allow members of group wheel to execute any command.
-%wheel ALL=(ALL:ALL) ALL
+cat > /etc/sudoers.d/02-passwd-tries <<EOL
+# Set allowed incorrect password attempts for sudo.
+Defaults passwd_tries=10
 EOL
 EOF
 
@@ -757,17 +841,177 @@ configure_tpm() {
   fi
 }
 
+# Configure hibernation
+#
+# Mirrors omarchy-hibernation-setup, which Omarchy's installer runs in the
+# chroot with --force --no-rebuild: a swapfile the size of RAM in its own Btrfs
+# subvolume, an fstab entry at pri=0, and resume= parameters for the initramfs.
+#
+# Differences from Omarchy, all forced by this installer's setup:
+#   - No 'resume' mkinitcpio hook. Omarchy boots a busybox initramfs, where that
+#     hook is required. The 'systemd' hook used here replaces it and already
+#     ships systemd-hibernate-resume, which reads the same resume= parameters.
+#   - resume= goes into /etc/cmdline.d/, which mkinitcpio embeds in the UKI,
+#     instead of a limine-entry-tool drop-in. It must therefore be written
+#     before configure_boot runs mkinitcpio.
+#   - No swapon. In the installer that would activate swap on the live ISO's
+#     kernel and pin /mnt, blocking the unmount. map-swapfile does not need an
+#     active swapfile, and the fstab entry activates it on first boot.
+configure_hibernation() {
+  print_msg "Configuring hibernation"
+
+  arch-chroot /mnt /bin/bash -e <<'EOF'
+if [ ! -f /sys/power/image_size ]; then
+  echo "Hibernation is not supported on this system, skipping swapfile setup."
+  exit 0
+fi
+
+SWAP_SUBVOLUME="/swap"
+SWAP_FILE="/swap/swapfile"
+
+# A Btrfs subvolume cannot be snapshotted while it holds an active swapfile,
+# so the swapfile gets a subvolume of its own. Nested under @, it is also left
+# out of snapshots of the root subvolume. +C (NODATACOW) is required: Btrfs
+# swapfiles cannot be copy-on-write, checksummed or compressed.
+if ! btrfs subvolume show "$SWAP_SUBVOLUME" &>/dev/null; then
+  echo "==> Creating Btrfs subvolume $SWAP_SUBVOLUME"
+  btrfs subvolume create "$SWAP_SUBVOLUME"
+  chattr +C "$SWAP_SUBVOLUME"
+fi
+
+# Sized to total RAM so a full memory image fits.
+if ! swaplabel "$SWAP_FILE" &>/dev/null; then
+  echo "==> Creating swapfile in Btrfs subvolume"
+  MEM_TOTAL_KB="$(awk '/MemTotal/ {print $2}' /proc/meminfo)k"
+  btrfs filesystem mkswapfile -s "$MEM_TOTAL_KB" "$SWAP_FILE"
+fi
+
+# pri=0 sits below zram (priority 100), so everyday swapping goes to compressed
+# RAM and this file is effectively reserved for hibernation images.
+if ! grep -Fq "$SWAP_FILE" /etc/fstab; then
+  echo "==> Adding swapfile to /etc/fstab"
+  printf "\n# Btrfs swapfile for system hibernation\n%s none swap defaults,pri=0 0 0\n" "$SWAP_FILE" >>/etc/fstab
+fi
+
+# Turn off the keyboard backlight before hibernating; some ASUS keyboard
+# controllers otherwise block the S4 power-off.
+echo "==> Installing keyboard-backlight system-sleep hook"
+mkdir -p /usr/lib/systemd/system-sleep
+cat >/usr/lib/systemd/system-sleep/keyboard-backlight <<'HOOK'
+#!/bin/bash
+
+# Turn off keyboard backlight before hibernate to prevent hang on power-off.
+# The ASUS keyboard controller can block S4 shutdown if LEDs are active.
+
+sleep_action=${SYSTEMD_SLEEP_ACTION:-$2}
+
+if [[ $1 == "pre" && $sleep_action == "hibernate" ]]; then
+  device=""
+  for candidate in /sys/class/leds/*kbd_backlight*; do
+    if [[ -e "$candidate" ]]; then
+      device="$(basename "$candidate")"
+      break
+    fi
+  done
+
+  if [[ -n "$device" ]]; then
+    brightnessctl -d "$device" set 0 >/dev/null 2>&1
+  fi
+fi
+HOOK
+chmod 0755 /usr/lib/systemd/system-sleep/keyboard-backlight
+
+# Tell the initramfs where the hibernation image is. Without these, resume only
+# happens late (after the GPU drivers load) and fails. The offset is physical,
+# relative to the unlocked LUKS device -- which is why it comes from
+# map-swapfile and not filefrag.
+echo "==> Adding resume kernel parameters"
+RESUME_DEVICE=$(findmnt -no SOURCE -T "$SWAP_FILE" | sed 's/\[.*\]//')
+RESUME_OFFSET=$(btrfs inspect-internal map-swapfile -r "$SWAP_FILE")
+if [ -n "$RESUME_OFFSET" ]; then
+  mkdir -p /etc/cmdline.d
+  echo "resume=$RESUME_DEVICE resume_offset=$RESUME_OFFSET" >/etc/cmdline.d/30-resume.conf
+  echo "Resume device: $RESUME_DEVICE, offset: $RESUME_OFFSET"
+else
+  echo "WARNING: Could not determine resume offset for $SWAP_FILE; hibernation will not resume." >&2
+fi
+
+# On s2idle systems the ACPI RTC alarm is needed for suspend-then-hibernate to
+# wake the machine up to hibernate.
+if grep -q "\[s2idle\]" /sys/power/mem_sleep 2>/dev/null; then
+  echo "==> Enabling ACPI RTC alarm for s2idle suspend"
+  mkdir -p /etc/cmdline.d
+  echo "rtc_cmos.use_acpi_alarm=1" >/etc/cmdline.d/20-rtc-alarm.conf
+fi
+EOF
+}
+
+# Configure Plymouth
+#
+# Mirrors Omarchy: the omarchy theme in /usr/share/plymouth/themes/omarchy/,
+# Theme=omarchy in /etc/plymouth/plymouthd.conf, the plymouth mkinitcpio hook,
+# and Omarchy's quiet-boot kernel command line.
+#
+# Differences from Omarchy, forced by this installer's setup:
+#   - No FILES+=(/etc/vconsole.conf) drop-in. Omarchy needs it with its busybox
+#     initramfs; here the sd-vconsole hook already copies vconsole.conf in.
+#   - The kernel parameters go into /etc/cmdline.d/, which mkinitcpio embeds in
+#     the UKI, instead of a limine-entry-tool drop-in.
+#
+# Must run before configure_boot: the plymouth hook reads the default theme when
+# mkinitcpio builds the UKI, and the command line is embedded at the same time.
+configure_plymouth() {
+  print_msg "Configuring Plymouth"
+
+  local theme_dir="/mnt/usr/share/plymouth/themes/${PLYMOUTH_THEME}"
+  local theme_file
+
+  print_msg "Installing Plymouth theme '${PLYMOUTH_THEME}'"
+  install -d -m 0755 "$theme_dir" "$theme_dir/logos"
+  for theme_file in $PLYMOUTH_THEME_FILES; do
+    install -m 0644 "${PLYMOUTH_THEME_SRC}/${theme_file}" "${theme_dir}/${theme_file}"
+  done
+
+  arch-chroot /mnt env PLYMOUTH_THEME="$PLYMOUTH_THEME" /bin/bash -e <<'EOF'
+echo "==> Setting default Plymouth theme"
+# Omarchy's plymouthd.conf, replacing the commented-out one the package ships.
+cat > /etc/plymouth/plymouthd.conf <<EOL
+[Daemon]
+Theme=${PLYMOUTH_THEME}
+EOL
+# Fails if the theme or its plugin is missing, which would otherwise only show
+# up as an error from the plymouth hook during mkinitcpio.
+plymouth-set-default-theme "$PLYMOUTH_THEME"
+echo "Default theme: $(plymouth-set-default-theme)"
+
+echo "==> Adding Plymouth kernel parameters"
+mkdir -p /etc/cmdline.d
+# Kernel 7.1 unpacks the initramfs asynchronously, racing /init: plymouthd
+# cannot read /proc/cmdline yet, exits, and an encrypted boot falls back to an
+# unthemed text prompt. Unpack synchronously until the race is fixed upstream.
+cat > /etc/cmdline.d/80-initramfs-async.conf <<EOL
+initramfs_async=0
+EOL
+# splash starts Plymouth; the rest keeps kernel, systemd and udev output and the
+# console cursor off the screen. Note vt.global_cursor_default=0 also hides the
+# cursor on text consoles after boot.
+cat > /etc/cmdline.d/90-splash.conf <<EOL
+quiet splash loglevel=0 systemd.show_status=false rd.udev.log_level=0 vt.global_cursor_default=0
+EOL
+EOF
+}
+
 # Configure boot
 configure_boot() {
   print_msg "Configuring boot"
 
   # Ensure the EFI partition is mounted
-  if ! mountpoint -q /mnt/efi; then
-    print_warning "EFI partition not mounted at /mnt/efi. Attempting to mount."
-    mkdir -p /mnt/efi
+  if ! mountpoint -q "/mnt${ESP_PATH}"; then
+    print_warning "EFI partition not mounted at /mnt${ESP_PATH}. Attempting to mount."
+    mkdir -p "/mnt${ESP_PATH}"
     if [ -b "$EFI_PART" ]; then
-      if mount "$EFI_PART" /mnt/efi; then
-        print_msg "EFI partition reformatted and remounted."
+      if mount -o "$ESP_MOUNT_OPTS" "$EFI_PART" "/mnt${ESP_PATH}"; then
+        print_msg "EFI partition mounted."
       else
         print_error "Failed to mount EFI partition. Boot setup will likely fail."
         if [ "$NON_INTERACTIVE" -eq 0 ]; then
@@ -797,17 +1041,16 @@ configure_boot() {
   fi
 
   # Check that the ESP partition is formatted as FAT
-  if ! file -sL "$(findmnt -n -o SOURCE /mnt/efi)" | grep -q "FAT"; then
+  if ! file -sL "$(findmnt -n -o SOURCE "/mnt${ESP_PATH}")" | grep -q "FAT"; then
     print_warning "WARNING: EFI System Partition is not formatted as FAT filesystem."
-    print_msg "Current filesystem type: $(file -sL "$(findmnt -n -o SOURCE /mnt/efi)")"
+    print_msg "Current filesystem type: $(file -sL "$(findmnt -n -o SOURCE "/mnt${ESP_PATH}")")"
     if [ "$NON_INTERACTIVE" -eq 0 ]; then
       read -r -p "Format the EFI partition with FAT32? This will erase all data on it. (y/N) " REPLY
       echo
       if [[ $REPLY =~ ^[Yy]$ ]]; then
-        # Unmount first, then format
-        umount /mnt/efi
+        umount "/mnt${ESP_PATH}"
         mkfs.fat -F32 -n "EFI" "$EFI_PART"
-        mount "$EFI_PART" /mnt/efi
+        mount -o "$ESP_MOUNT_OPTS" "$EFI_PART" "/mnt${ESP_PATH}"
         print_msg "EFI partition reformatted and remounted."
       else
         print_msg "Continuing without reformatting. Boot might fail."
@@ -817,7 +1060,8 @@ configure_boot() {
     fi
   fi
 
-  arch-chroot /mnt env ROOT_PART="$ROOT_PART" HOSTNAME="$HOSTNAME" TIMEZONE="$TIMEZONE" /bin/bash -e <<'EOF'
+  arch-chroot /mnt env ROOT_PART="$ROOT_PART" ESP_PATH="$ESP_PATH" \
+    OS_NAME="$OS_NAME" UKI_NAME="$UKI_NAME" /bin/bash -e <<'EOF'
 # Get root partition UUID for boot configuration
 ROOT_UUID=$(blkid -s UUID -o value "${ROOT_PART}")
 echo "Using root UUID: ${ROOT_UUID}"
@@ -832,17 +1076,37 @@ if [ ! -f /boot/vmlinuz-linux ]; then
 fi
 
 echo "==> Adjust cmdline"
-cat > /etc/kernel/cmdline <<EOL
-loglevel=3
-EOL
-
+# The UKI embeds this command line, so Limine does not need to supply one.
+#
+# mkinitcpio reads /etc/kernel/cmdline first, then every *.conf in
+# /etc/cmdline.d/ in name order (sort -V). Everything lives in cmdline.d with a
+# numeric prefix so the order is explicit, and /etc/kernel/cmdline is not used
+# at all -- anything in it would always come first. Gaps leave room for later
+# drop-ins:
+#   10-root.conf             LUKS unlock and root filesystem
+#   20-rtc-alarm.conf        written by configure_hibernation on s2idle systems
+#   30-resume.conf           written by configure_hibernation
+#   80-initramfs-async.conf  written by configure_plymouth
+#   90-splash.conf           written by configure_plymouth; quiet boot, last
 mkdir -p /etc/cmdline.d
-cat > /etc/cmdline.d/root.conf <<EOL
-rd.luks.name=${ROOT_UUID}=cryptroot root=/dev/mapper/cryptroot zswap.enabled=0 rootfstype=btrfs rootflags=subvol=/@ rw
+cat > /etc/cmdline.d/10-root.conf <<EOL
+rd.luks.name=${ROOT_UUID}=cryptroot root=/dev/mapper/cryptroot zswap.enabled=0 rw rootfstype=btrfs rootflags=subvol=/@
 EOL
 
 echo "==> Configure mkinitcpio"
-sed -i "s/HOOKS=.*/HOOKS=(base systemd autodetect microcode modconf kms keyboard sd-vconsole sd-encrypt block filesystems fsck)/g" /etc/mkinitcpio.conf
+# Hook order follows the Arch wiki's systemd-stack layout for LUKS:
+#   plymouth   - after systemd and before sd-encrypt, so the splash is up to
+#                take the TPM2 PIN through systemd-ask-password. Placed where
+#                Omarchy puts it, right after the init hook.
+#   keyboard   - loads keyboard *modules*, so a USB keyboard works at the TPM2
+#                PIN prompt. Not the same thing as sd-vconsole, which only sets
+#                the keymap and font.
+#   sd-vconsole- applies /etc/vconsole.conf in the initramfs.
+#   block      - must precede sd-encrypt so the block device modules backing the
+#                LUKS container are present when it runs.
+#   sd-encrypt - systemd-based unlock; the only hook that can use the TPM2 token
+#                written by systemd-cryptenroll.
+sed -i "s/HOOKS=.*/HOOKS=(base systemd plymouth autodetect microcode modconf kms keyboard sd-vconsole block sd-encrypt filesystems fsck)/g" /etc/mkinitcpio.conf
 sed -i 's/#\(COMPRESSION="zstd"\)/\1/' /etc/mkinitcpio.conf
 
 echo "==> Configure UKI (Unified Kernel Image)"
@@ -856,70 +1120,121 @@ PRESETS=('default' 'fallback')
 
 #default_config="/etc/mkinitcpio.conf"
 #default_image="/boot/initramfs-linux.img"
-default_uki="/efi/EFI/Linux/arch-linux.efi"
+default_uki="${ESP_PATH}/EFI/Linux/${UKI_NAME}.efi"
 default_options="--splash /usr/share/systemd/bootctl/splash-arch.bmp"
 
 #fallback_config="/etc/mkinitcpio.conf"
 #fallback_image="/boot/initramfs-linux-fallback.img"
-fallback_uki="/efi/EFI/Linux/arch-linux-fallback.efi"
+fallback_uki="${ESP_PATH}/EFI/Linux/${UKI_NAME}-fallback.efi"
 fallback_options="-S autodetect"
 EOL
 
 echo "==> Generate UKI (Unified Kernel Image)"
-mkdir -p /efi/EFI/Linux
+mkdir -p "${ESP_PATH}/EFI/Linux"
 mkinitcpio -P
 
-if [ ! -f /efi/EFI/Linux/arch-linux.efi ]; then
-  echo "ERROR: /efi/EFI/Linux/arch-linux.efi not found inside chroot. UKI install may have failed!" >&2
-  echo "Contents of /efi/EFI/Linux:" >&2
-  find /efi/EFI/Linux -ls >&2
+# pacstrap ran mkinitcpio with the stock preset, which wrote plain initramfs
+# images. Now that /boot is the ESP those sit on the FAT partition costing a few
+# hundred MiB, and nothing boots them -- the UKIs replaced them.
+rm -f /boot/initramfs-linux.img /boot/initramfs-linux-fallback.img
+
+if [ ! -f "${ESP_PATH}/EFI/Linux/${UKI_NAME}.efi" ]; then
+  echo "ERROR: ${ESP_PATH}/EFI/Linux/${UKI_NAME}.efi not found. UKI generation failed!" >&2
+  find "${ESP_PATH}/EFI/Linux" -ls >&2
   exit 1
 fi
 
-echo "==> Installing systemd-boot"
-bootctl install --esp-path=/efi || {
-  echo "WARNING: systemd-boot installation failed, trying manual installation"
-  mkdir -p /efi/EFI/systemd /efi/EFI/BOOT
-  cp /usr/lib/systemd/boot/efi/systemd-bootx64.efi /efi/EFI/systemd/systemd-bootx64.efi
-  cp /usr/lib/systemd/boot/efi/systemd-bootx64.efi /efi/EFI/BOOT/BOOTX64.EFI
-}
+echo "==> Installing Limine"
+# The limine package only ships the EFI binaries; deploying them and writing
+# the config is left to the administrator. Mirror the layout that
+# limine-entry-tool uses, so adding limine-mkinitcpio-hook later finds Limine
+# where it expects it.
+mkdir -p "${ESP_PATH}/EFI/limine" "${ESP_PATH}/EFI/BOOT"
+cp /usr/share/limine/BOOTX64.EFI "${ESP_PATH}/EFI/limine/limine_x64.efi"
+# Also install as the removable-media fallback, so the system still boots if
+# the firmware loses its NVRAM entry.
+cp /usr/share/limine/BOOTX64.EFI "${ESP_PATH}/EFI/BOOT/BOOTX64.EFI"
 
-cat > /efi/loader/loader.conf <<EOL
-timeout 5
-editor 0
-console-mode 1
+echo "==> Writing Limine configuration"
+# Limine looks for the config next to its own EFI binary first, then at
+# /limine.conf on the boot volume -- which is this file, since ESP_PATH is the
+# ESP mount point. 'boot():' resolves to the partition holding this config.
+cat > "${ESP_PATH}/limine.conf" <<EOL
+### Read more at https://github.com/limine-bootloader/limine/blob/trunk/CONFIG.md
+timeout: 3
+default_entry: 1
+
+interface_branding: ${OS_NAME}
+hash_mismatch_panic: no
+
+term_background: 1a1b26
+backdrop: 1a1b26
+
+# Terminal colors (Tokyo Night palette)
+term_palette: 15161e;f7768e;9ece6a;e0af68;7aa2f7;bb9af7;7dcfff;a9b1d6
+term_palette_bright: 414868;f7768e;9ece6a;e0af68;7aa2f7;bb9af7;7dcfff;c0caf5
+term_foreground: c0caf5
+term_foreground_bright: c0caf5
+term_background_bright: 24283b
+
+interface_branding_color: 9ece6a
+interface_help_color: 9ece6a
+interface_help_color_bright: 9ece6a
+
+/${OS_NAME}
+    comment: Unified Kernel Image
+    protocol: efi
+    path: boot():/EFI/Linux/${UKI_NAME}.efi
+
+/${OS_NAME} (fallback)
+    comment: Fallback Unified Kernel Image
+    protocol: efi
+    path: boot():/EFI/Linux/${UKI_NAME}-fallback.efi
 EOL
 
-echo "==> EFI directory contents:"
-find /efi/EFI -type f | sort
+echo "==> Installing pacman hook to redeploy Limine on upgrade"
+# A limine upgrade replaces /usr/share/limine/BOOTX64.EFI but not the copies on
+# the ESP, so without this the bootloader silently stays at the old version.
+mkdir -p /etc/pacman.d/hooks
+cat > /etc/pacman.d/hooks/90-limine-deploy.hook <<EOL
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = limine
 
-echo "==> Boot loader status:"
-bootctl status || echo "WARNING: bootctl status command failed, this might be normal if using manual installation"
+[Action]
+Description = Deploying Limine to the ESP...
+When = PostTransaction
+Exec = /bin/sh -c 'cp /usr/share/limine/BOOTX64.EFI ${ESP_PATH}/EFI/limine/limine_x64.efi && cp /usr/share/limine/BOOTX64.EFI ${ESP_PATH}/EFI/BOOT/BOOTX64.EFI'
+EOL
 
-echo "==> Configuring secure boot"
-sbctl create-keys
+echo "==> Registering Limine with the UEFI firmware"
+esp_dev=$(findmnt -n -o SOURCE "${ESP_PATH}")
+esp_disk=$(lsblk -no PKNAME "$esp_dev")
+esp_partnum=$(cat "/sys/class/block/$(basename "$esp_dev")/partition")
 
-echo "==> Enroll Microsoft keys"
-sbctl enroll-keys -m
+if efibootmgr 2>/dev/null | grep -q "Limine"; then
+  echo "A Limine UEFI boot entry already exists, leaving it alone."
+else
+  efibootmgr --create --disk "/dev/${esp_disk}" --part "$esp_partnum" \
+    --loader '\EFI\limine\limine_x64.efi' --label "Limine" --unicode ||
+    echo "WARNING: could not create the UEFI boot entry. The fallback at ${ESP_PATH}/EFI/BOOT/BOOTX64.EFI should still boot." >&2
+fi
 
-echo "==> Sign UKI and bootloader"
-sbctl sign -s /efi/EFI/BOOT/BOOTX64.EFI
-sbctl sign -s /efi/EFI/Linux/arch-linux.efi
-sbctl sign -s /efi/EFI/Linux/arch-linux-fallback.efi
-sbctl sign -s /efi/EFI/systemd/systemd-bootx64.efi
+echo "==> UEFI boot entries:"
+efibootmgr || echo "WARNING: efibootmgr failed"
 
-echo "==> Secure boot status:"
-sbctl status || echo "WARNING: sbctl status command failed"
+echo "==> ESP contents:"
+find "${ESP_PATH}/EFI" -type f \( -name '*.efi' -o -name '*.EFI' \) | sort
 EOF
 
   # Verify boot files exist
   print_msg "Verifying boot files..."
-  if [ -f /mnt/efi/EFI/Linux/arch-linux.efi ]; then
+  if [ -f "/mnt${ESP_PATH}/EFI/Linux/${UKI_NAME}.efi" ]; then
     print_msg "UKI created successfully"
-  elif [ -f /mnt/boot/initramfs-linux.img ]; then
-    print_warning "⚠️  UKI not created, but initramfs fallback exists!  ⚠️"
   else
-    print_warning "⚠️  Neither UKI nor initramfs found. Boot will likely fail!  ⚠️"
+    print_warning "⚠️  UKI not found. Boot will likely fail!  ⚠️"
   fi
 }
 
@@ -929,6 +1244,12 @@ enable_services() {
   arch-chroot /mnt /bin/bash -e <<EOF
 systemctl enable systemd-resolved systemd-timesyncd systemd-zram-setup@zram0.service sshd NetworkManager
 systemctl mask systemd-networkd
+
+# Periodic TRIM. The filesystems are mounted 'nodiscard', so freed blocks are
+# discarded once a week in one batch instead of on every delete -- the shape
+# Arch, Debian and Red Hat all recommend. It reaches the SSD because the LUKS
+# container is opened with --allow-discards.
+systemctl enable fstrim.timer
 EOF
 }
 
@@ -937,37 +1258,54 @@ verify_installation() {
   print_msg "Verifying critical components"
 
   # Check if EFI directory exists
-  if [ ! -d /mnt/efi/EFI ]; then
+  if [ ! -d "/mnt${ESP_PATH}/EFI" ]; then
     print_error "WARNING: EFI directory not found! Boot will not work properly."
-    print_error "Please check that the EFI partition is properly mounted at /mnt/boot."
+    print_error "Please check that the EFI partition is properly mounted at /mnt${ESP_PATH}."
   fi
 
   # Check boot files
   print_msg "Checking boot files"
-  if [ ! -f /mnt/efi/EFI/Linux/arch-linux.efi ] && [ ! -f /mnt/boot/initramfs-linux.img ]; then
-    print_error "Neither UKI nor fallback initramfs found! System won't boot."
-    print_error "Try rebuilding the boot configuration with: $0 --stage boot"
-  elif [ ! -f /mnt/efi/EFI/Linux/arch-linux.efi ]; then
-    print_error "UKI not found at /mnt/efi/EFI/Linux/arch-linux.efi! System won't boot."
+  if [ ! -f "/mnt${ESP_PATH}/EFI/Linux/${UKI_NAME}.efi" ]; then
+    print_error "UKI not found at ${ESP_PATH}/EFI/Linux/${UKI_NAME}.efi! System won't boot."
     print_error "Try rebuilding the boot configuration with: $0 --stage boot"
   fi
 
   # Check for bootloader
-  if [ ! -f /mnt/efi/EFI/systemd/systemd-bootx64.efi ] && [ ! -f /mnt/efi/EFI/BOOT/BOOTX64.EFI ]; then
-    print_error "No bootloader found! System won't boot."
+  if [ ! -f "/mnt${ESP_PATH}/EFI/limine/limine_x64.efi" ] && [ ! -f "/mnt${ESP_PATH}/EFI/BOOT/BOOTX64.EFI" ]; then
+    print_error "Limine not found! System won't boot."
     print_error "Try reinstalling the bootloader with: $0 --stage boot"
   fi
 
   # Check for bootloader configuration
-  if [ ! -f /mnt/efi/loader/loader.conf ]; then
-    print_error "Boot loader configuration not found!"
+  if [ ! -f "/mnt${ESP_PATH}/limine.conf" ]; then
+    print_error "Limine configuration not found at ${ESP_PATH}/limine.conf!"
     print_error "Try rebuilding the boot configuration with: $0 --stage boot"
   fi
 
-  # Check for secure boot setup status
-  print_msg "Checking secure boot status"
-  arch-chroot /mnt sbctl status && arch-chroot /mnt sbctl verify
-  print_msg "Verify above that secure boot status is in a healthy state..."
+  # The UKI carries its own command line, so confirm it actually got embedded.
+  print_msg "Checking kernel command line"
+  if ! grep -q "rd.luks.name" /mnt/etc/cmdline.d/10-root.conf 2>/dev/null; then
+    print_warning "No rd.luks.name in /etc/cmdline.d/10-root.conf; the UKI may not unlock the disk."
+  fi
+
+  # A swapfile without resume parameters swaps fine but can never resume from
+  # hibernation, and nothing else would point that out.
+  if grep -q "/swap/swapfile" /mnt/etc/fstab 2>/dev/null; then
+    print_msg "Checking hibernation setup"
+    if ! grep -q "resume_offset=[0-9]" /mnt/etc/cmdline.d/30-resume.conf 2>/dev/null; then
+      print_warning "Swapfile configured but /etc/cmdline.d/30-resume.conf has no resume_offset; hibernation will not resume."
+    fi
+  fi
+
+  # Plymouth only shows the theme plymouthd.conf names, and only if the hook is
+  # in the UKI; either missing still boots, just to a plain text PIN prompt.
+  print_msg "Checking Plymouth setup"
+  if ! grep -qx "Theme=${PLYMOUTH_THEME}" /mnt/etc/plymouth/plymouthd.conf 2>/dev/null; then
+    print_warning "Plymouth theme is not set to '${PLYMOUTH_THEME}' in /etc/plymouth/plymouthd.conf."
+  fi
+  if ! grep -Eq '^HOOKS=\(.*\bplymouth\b' /mnt/etc/mkinitcpio.conf 2>/dev/null; then
+    print_warning "plymouth is missing from HOOKS in /etc/mkinitcpio.conf; there will be no boot splash."
+  fi
 
   # Check for essential files
   print_msg "Checking for essential files"
@@ -985,11 +1323,11 @@ verify_installation() {
   fi
 
   # Show formatted EFI partition info
-  if mountpoint -q /mnt/efi; then
+  if mountpoint -q "/mnt${ESP_PATH}"; then
     print_msg "EFI partition information:"
-    file -sL "$(findmnt -n -o SOURCE /mnt/efi)"
+    file -sL "$(findmnt -n -o SOURCE "/mnt${ESP_PATH}")"
     print_msg "EFI partition contents:"
-    find /mnt/efi -type f -name "*.efi" | sort
+    find "/mnt${ESP_PATH}" -type f \( -name "*.efi" -o -name "*.EFI" \) | sort
   else
     print_warning "EFI partition not mounted, cannot check its contents."
   fi
@@ -1022,28 +1360,34 @@ print_summary() {
   echo
 
   echo "${WHITE}Boot Setup Status:${NO_COLOR}"
-  if [ -f /mnt/efi/EFI/Linux/arch-linux.efi ]; then
-    echo " ${WHITE}- UKI present:${NO_COLOR} Yes (/efi/EFI/Linux/arch-linux.efi)"
+  if [ -f "/mnt${ESP_PATH}/EFI/Linux/${UKI_NAME}.efi" ]; then
+    echo " ${WHITE}- UKI present:${NO_COLOR} Yes (${ESP_PATH}/EFI/Linux/${UKI_NAME}.efi)"
   else
     echo " ${WHITE}- UKI present:${NO_COLOR} No (missing)"
   fi
 
-  if [ -f /mnt/boot/initramfs-linux.img ]; then
-    echo " ${WHITE}- Fallback initramfs:${NO_COLOR} Yes (/boot/initramfs-linux.img)"
+  if [ -f "/mnt${ESP_PATH}/EFI/Linux/${UKI_NAME}-fallback.efi" ]; then
+    echo " ${WHITE}- Fallback UKI:${NO_COLOR} Yes (${ESP_PATH}/EFI/Linux/${UKI_NAME}-fallback.efi)"
   else
-    echo " ${WHITE}- Fallback initramfs:${NO_COLOR} No (missing)"
+    echo " ${WHITE}- Fallback UKI:${NO_COLOR} No (missing)"
   fi
 
-  if [ -f /mnt/efi/EFI/BOOT/BOOTX64.EFI ]; then
-    echo " ${WHITE}- Fallback bootloader:${NO_COLOR} Yes (/efi/EFI/BOOT/BOOTX64.EFI)"
+  if [ -f "/mnt${ESP_PATH}/EFI/limine/limine_x64.efi" ]; then
+    echo " ${WHITE}- Limine:${NO_COLOR} Yes (${ESP_PATH}/EFI/limine/limine_x64.efi)"
   else
-    echo " ${WHITE}- Fallback bootloader:${NO_COLOR} No (missing)"
+    echo " ${WHITE}- Limine:${NO_COLOR} No (missing)"
   fi
 
-  if [ -f /mnt/efi/EFI/systemd/systemd-bootx64.efi ]; then
-    echo " ${WHITE}- systemd-boot:${NO_COLOR} Yes (/efi/EFI/systemd/systemd-bootx64.efi)"
+  if [ -f "/mnt${ESP_PATH}/EFI/BOOT/BOOTX64.EFI" ]; then
+    echo " ${WHITE}- Removable fallback:${NO_COLOR} Yes (${ESP_PATH}/EFI/BOOT/BOOTX64.EFI)"
   else
-    echo " ${WHITE}- systemd-boot:${NO_COLOR} No (missing)"
+    echo " ${WHITE}- Removable fallback:${NO_COLOR} No (missing)"
+  fi
+
+  if [ -f "/mnt${ESP_PATH}/limine.conf" ]; then
+    echo " ${WHITE}- Limine config:${NO_COLOR} Yes (${ESP_PATH}/limine.conf)"
+  else
+    echo " ${WHITE}- Limine config:${NO_COLOR} No (missing)"
   fi
 
   if [ -d /sys/class/tpm ] && [ -n "$(ls -A /sys/class/tpm 2>/dev/null)" ]; then
@@ -1065,11 +1409,11 @@ EOF
 
   echo
   echo "${BLUE}==>${YELLOW} Done. Ready to reboot! ${NO_COLOR}"
-  echo "${BLUE}==>${YELLOW} Also verify that ${WHITE}Secure Boot${YELLOW} is enabled in BIOS before booting into Arch Linux! ${NO_COLOR}"
+  echo "${BLUE}==>${YELLOW} Secure Boot is ${WHITE}not${YELLOW} configured by this script; leave it disabled in BIOS for now. ${NO_COLOR}"
   echo "${BLUE}==>${YELLOW} After reboot, log in as ${WHITE}${USERNAME}${NO_COLOR}"
 
   # Troubleshooting tips if boot issues were detected
-  if [ ! -f /mnt/efi/EFI/Linux/arch-linux.efi ] || [ ! -f /mnt/efi/EFI/BOOT/BOOTX64.EFI ]; then
+  if [ ! -f "/mnt${ESP_PATH}/EFI/Linux/${UKI_NAME}.efi" ] || [ ! -f "/mnt${ESP_PATH}/EFI/BOOT/BOOTX64.EFI" ]; then
     echo
     echo "${YELLOW}===${BLUE} BOOT TROUBLESHOOTING ${YELLOW}===${NO_COLOR}"
     echo "If the system does not boot, try these steps:"
@@ -1078,9 +1422,9 @@ EOF
     echo "3. If it still does not boot, try rebuilding the boot setup:"
     echo "  - Boot from the Arch Linux installation media"
     echo "  - Mount the filesystems: mount -o subvol=@ /dev/mapper/cryptroot /mnt"
-    echo "  - Mount the ESP: mount $EFI_PART /mnt/boot"
+    echo "  - Mount the ESP: mount $EFI_PART /mnt${ESP_PATH}"
     echo "  - Chroot: arch-chroot /mnt"
-    echo "  - Rerun bootctl install"
+    echo "  - Rerun: mkinitcpio -P && cp /usr/share/limine/BOOTX64.EFI ${ESP_PATH}/EFI/limine/limine_x64.efi"
     echo "  - Exit chroot and reboot"
   fi
 }
@@ -1168,7 +1512,7 @@ main() {
             exit 1
           fi
           print_msg "Mounting root filesystem"
-          mount -o subvol=@,compress=zstd:1,noatime /dev/mapper/cryptroot /mnt || {
+          mount -o "subvol=@,$BTRFS_MOUNT_OPTS" /dev/mapper/cryptroot /mnt || {
             print_error "Could not mount root filesystem. Please check the subvolume configuration!"
             cryptsetup close cryptroot
             exit 1
@@ -1177,8 +1521,8 @@ main() {
           # Also mount EFI partition if it exists
           if [ -b "$EFI_PART" ]; then
             print_msg "Mounting EFI partition"
-            mkdir -p /mnt/boot
-            mount "$EFI_PART" /mnt/boot || {
+            mkdir -p "/mnt${ESP_PATH}"
+            mount -o "$ESP_MOUNT_OPTS" "$EFI_PART" "/mnt${ESP_PATH}" || {
               print_warning "Could not mount EFI partition. Boot setup might fail!"
             }
           else
@@ -1197,7 +1541,6 @@ main() {
               @home) mountpoint="/home" ;;
               @cache) mountpoint="/var/cache" ;;
               @log) mountpoint="/var/log" ;;
-              @snapshots) mountpoint="/.snapshots" ;;
               *)
                 mountpoint="${subvol#@}"
                 mountpoint="/$mountpoint"
@@ -1206,7 +1549,7 @@ main() {
 
               print_msg "Trying to mount subvolume $subvol to /mnt$mountpoint"
               mkdir -p "/mnt$mountpoint"
-              mount -o "subvol=$subvol,compress=zstd:1,noatime" /dev/mapper/cryptroot "/mnt$mountpoint" || {
+              mount -o "subvol=$subvol,$BTRFS_MOUNT_OPTS" /dev/mapper/cryptroot "/mnt$mountpoint" || {
                 print_warning "Failed to mount subvolume $subvol to /mnt$mountpoint"
               }
             fi
@@ -1221,10 +1564,10 @@ main() {
       fi
     else
       # If root is mounted but boot is not, try to mount boot
-      if ! mountpoint -q /mnt/boot && [ -b "$EFI_PART" ]; then
+      if ! mountpoint -q "/mnt${ESP_PATH}" && [ -b "$EFI_PART" ]; then
         print_msg "Mounting EFI partition"
-        mkdir -p /mnt/boot
-        mount "$EFI_PART" /mnt/boot || {
+        mkdir -p "/mnt${ESP_PATH}"
+        mount -o "$ESP_MOUNT_OPTS" "$EFI_PART" "/mnt${ESP_PATH}" || {
           print_warning "Could not mount EFI partition. Boot setup might fail!"
         }
       fi
