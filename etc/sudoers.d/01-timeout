@@ -1,0 +1,5 @@
+# Disable password prompt timeout.
+Defaults passwd_timeout=0
+
+# Reset environment variables and timeout for sudo sessions to 60 min.
+Defaults timestamp_timeout=60

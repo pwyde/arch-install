@@ -1,0 +1,2 @@
+# Set allowed incorrect password attempts for sudo.
+Defaults passwd_tries=10

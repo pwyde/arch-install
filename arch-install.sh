@@ -133,7 +133,7 @@ UKI_NAME="arch_linux"
 # Shown as the Limine menu title and branding.
 OS_NAME="Arch Linux"
 
-# Plymouth theme, based on Omarchy's (MIT, see its LICENSE).
+# Plymouth theme, based on Omarchy Linux.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLYMOUTH_THEME="arch-linux"
 PLYMOUTH_THEME_SRC="${SCRIPT_DIR}/default/plymouth/${PLYMOUTH_THEME}"
@@ -146,6 +146,16 @@ VCONSOLE_LATIN_HOOK_SRC="${SCRIPT_DIR}/etc/initcpio/install/vconsole-latin"
 # mkinitcpio drop-in with the initramfs HOOKS, used instead of editing
 # /etc/mkinitcpio.conf.
 MKINITCPIO_HOOKS_CONF_SRC="${SCRIPT_DIR}/etc/mkinitcpio.conf.d/hooks.conf"
+
+# zram-generator drop-in shipped in this repository.
+ZRAM_CONF_SRC="${SCRIPT_DIR}/etc/systemd/zram-generator.conf.d/90-zram.conf"
+
+# sudo drop-ins shipped in this repository, installed to /etc/sudoers.d/.
+SUDOERS_SRC="${SCRIPT_DIR}/etc/sudoers.d"
+SUDOERS_FILES="00-wheel 01-timeout 02-passwd-tries"
+
+# systemd-sleep hook shipped in this repository, installed for hibernation.
+SLEEP_HOOK_SRC="${SCRIPT_DIR}/default/systemd/system-sleep/keyboard-backlight"
 
 START_STAGE="partitions" # Default start at beginning
 
@@ -295,6 +305,27 @@ validate_inputs() {
 
   if [ ! -f "$MKINITCPIO_HOOKS_CONF_SRC" ]; then
     print_error "mkinitcpio drop-in missing: $MKINITCPIO_HOOKS_CONF_SRC"
+    print_error "Run the script from a full checkout of the repository."
+    exit 1
+  fi
+
+  if [ ! -f "$ZRAM_CONF_SRC" ]; then
+    print_error "zram drop-in missing: $ZRAM_CONF_SRC"
+    print_error "Run the script from a full checkout of the repository."
+    exit 1
+  fi
+
+  local sudoers_file
+  for sudoers_file in $SUDOERS_FILES; do
+    if [ ! -f "${SUDOERS_SRC}/${sudoers_file}" ]; then
+      print_error "sudo drop-in missing: ${SUDOERS_SRC}/${sudoers_file}"
+      print_error "Run the script from a full checkout of the repository."
+      exit 1
+    fi
+  done
+
+  if [ ! -f "$SLEEP_HOOK_SRC" ]; then
+    print_error "systemd-sleep hook missing: $SLEEP_HOOK_SRC"
     print_error "Run the script from a full checkout of the repository."
     exit 1
   fi
@@ -619,6 +650,9 @@ configure_basic_system() {
   validate_keymap
   systemd-firstboot --root=/mnt --keymap="${KEYMAP}"
 
+  print_msg "Configuring ZRAM"
+  install -D -m 0644 "$ZRAM_CONF_SRC" /mnt/etc/systemd/zram-generator.conf.d/90-zram.conf
+
   arch-chroot /mnt /bin/bash -e <<EOF
 echo "==> Setting timezone to ${TIMEZONE}"
 ln -sf /usr/share/zoneinfo/${TIMEZONE} /etc/localtime
@@ -660,23 +694,6 @@ LC_TELEPHONE=${LOCALE}
 LC_PAPER=${LOCALE}
 # Collation order.
 LC_COLLATE=${LOCALE}
-EOL
-
-echo "==> Configuring ZRAM"
-# A drop-in rather than /etc/systemd/zram-generator.conf: the main file has the
-# lowest precedence, so any drop-in a package installs to
-# /usr/lib/systemd/zram-generator.conf.d/ would silently override it. Drop-ins
-# from /usr/lib and /etc are sorted together by filename and the last one wins,
-# so this competes by name instead.
-mkdir -p /etc/systemd/zram-generator.conf.d
-cat > /etc/systemd/zram-generator.conf.d/90-zram.conf <<EOL
-[zram0]
-zram-size = min(ram / 2, 16384)
-compression-algorithm = zstd
-# Above the pri=0 of the hibernation swapfile, so everyday swapping stays in
-# compressed RAM. 100 is also zram-generator's default; set explicitly because
-# the swapfile relies on it.
-swap-priority = 100
 EOL
 
 echo "==> Configuring pacman"
@@ -821,25 +838,12 @@ configure_users() {
     fi
     "
 
-    # Configure sudo
-    print_msg "Configuring sudo"
-    arch-chroot /mnt /bin/bash -e <<EOF
-cat > /etc/sudoers.d/00-wheel <<EOL
-# Allow members of group wheel to execute any command.
-%wheel ALL=(ALL:ALL) ALL
-EOL
-cat > /etc/sudoers.d/01-timeout <<EOL
-# Disable password prompt timeout.
-Defaults passwd_timeout=0
-
-# Reset environment variables and timeout for sudo sessions to 60 min.
-Defaults timestamp_timeout=60
-EOL
-cat > /etc/sudoers.d/02-passwd-tries <<EOL
-# Set allowed incorrect password attempts for sudo.
-Defaults passwd_tries=10
-EOL
-EOF
+  # 0440 and root-owned, or sudo refuses to read them.
+  print_msg "Configuring sudo"
+  local sudoers_file
+  for sudoers_file in $SUDOERS_FILES; do
+    install -D -m 0440 "${SUDOERS_SRC}/${sudoers_file}" "/mnt/etc/sudoers.d/${sudoers_file}"
+  done
 
   # Clean up chroot mounts when done with this step
   cleanup_chroot
@@ -885,6 +889,13 @@ configure_tpm() {
 configure_hibernation() {
   print_msg "Configuring hibernation"
 
+  # Turns the keyboard backlight off before hibernating; some ASUS keyboard
+  # controllers otherwise block the S4 power-off.
+  if [ -f /sys/power/image_size ]; then
+    print_msg "Installing keyboard-backlight system-sleep hook"
+    install -D -m 0755 "$SLEEP_HOOK_SRC" /mnt/usr/lib/systemd/system-sleep/keyboard-backlight
+  fi
+
   arch-chroot /mnt /bin/bash -e <<'EOF'
 if [ ! -f /sys/power/image_size ]; then
   echo "Hibernation is not supported on this system, skipping swapfile setup."
@@ -917,34 +928,6 @@ if ! grep -Fq "$SWAP_FILE" /etc/fstab; then
   echo "==> Adding swapfile to /etc/fstab"
   printf "\n# Btrfs swapfile for system hibernation\n%s none swap defaults,pri=0 0 0\n" "$SWAP_FILE" >>/etc/fstab
 fi
-
-# Turn off the keyboard backlight before hibernating; some ASUS keyboard
-# controllers otherwise block the S4 power-off.
-echo "==> Installing keyboard-backlight system-sleep hook"
-mkdir -p /usr/lib/systemd/system-sleep
-cat >/usr/lib/systemd/system-sleep/keyboard-backlight <<'HOOK'
-#!/bin/bash
-
-# Turn off keyboard backlight before hibernate to prevent hang on power-off.
-# The ASUS keyboard controller can block S4 shutdown if LEDs are active.
-
-sleep_action=${SYSTEMD_SLEEP_ACTION:-$2}
-
-if [[ $1 == "pre" && $sleep_action == "hibernate" ]]; then
-  device=""
-  for candidate in /sys/class/leds/*kbd_backlight*; do
-    if [[ -e "$candidate" ]]; then
-      device="$(basename "$candidate")"
-      break
-    fi
-  done
-
-  if [[ -n "$device" ]]; then
-    brightnessctl -d "$device" set 0 >/dev/null 2>&1
-  fi
-fi
-HOOK
-chmod 0755 /usr/lib/systemd/system-sleep/keyboard-backlight
 
 # Tell the initramfs where the hibernation image is. Without these, resume only
 # happens late (after the GPU drivers load) and fails. The offset is physical,

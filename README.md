@@ -176,17 +176,20 @@ does:
   also left out of snapshots of `@`.
 - **`/swap/swapfile`**, created with `btrfs filesystem mkswapfile` and sized to
   total RAM.
-- An fstab entry at **`pri=0`**, below zram's priority of 100, so everyday
-  swapping stays in compressed RAM and the file is effectively reserved for
-  hibernation images.
+- An fstab entry at **`pri=0`**, below the priority of 100 set in
+  [`etc/systemd/zram-generator.conf.d/90-zram.conf`](./etc/systemd/zram-generator.conf.d/90-zram.conf),
+  so everyday swapping stays in compressed RAM and the file is effectively
+  reserved for hibernation images.
 - **`resume=` and `resume_offset=`** in `/etc/cmdline.d/30-resume.conf`, embedded in
   the UKI. The offset comes from `btrfs inspect-internal map-swapfile`, since it
   must be physical and relative to the unlocked LUKS device.
 - `rtc_cmos.use_acpi_alarm=1` on systems that suspend with s2idle, needed for
   suspend-then-hibernate.
-- Omarchy's `keyboard-backlight` system-sleep hook, which turns the keyboard
-  backlight off before hibernating (some ASUS controllers otherwise block the S4
-  power-off). Needs `brightnessctl`.
+- The [`keyboard-backlight`](./default/systemd/system-sleep/keyboard-backlight)
+  system-sleep hook from Omarchy, installed to
+  `/usr/lib/systemd/system-sleep/`, which turns the keyboard backlight off
+  before hibernating (some ASUS controllers otherwise block the S4 power-off).
+  Needs `brightnessctl`.
 
 Three deliberate differences from Omarchy:
 
