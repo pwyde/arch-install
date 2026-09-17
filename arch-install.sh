@@ -1178,25 +1178,23 @@ echo "==> Writing Limine configuration"
 # ESP mount point. 'boot():' resolves to the partition holding this config.
 cat > "${ESP_PATH}/limine.conf" <<EOL
 ### Read more at https://github.com/limine-bootloader/limine/blob/trunk/CONFIG.md
-timeout: 3
+timeout: 5
 default_entry: 1
 
 interface_branding: ${OS_NAME}
+interface_branding_color: ffffff
+interface_help_color: 1793d1
+interface_help_color_bright: 1793d1
 hash_mismatch_panic: no
 
 term_background: 1a1a1a
 backdrop: 1a1a1a
 
-# Arch Linux colors: background 1a1a1a, text 999999, accent 1793d1
-term_palette: 1a1a1a;f7768e;9ece6a;e0af68;1793d1;bb9af7;1793d1;999999
-term_palette_bright: 4d4d4d;f7768e;9ece6a;e0af68;1793d1;bb9af7;1793d1;999999
+term_palette: 1a1a1a;bf616a;a3be8c;ebcb8b;5e81ac;b48ead;ffffff;d8dee9
+term_palette_bright: 333333;bf616a;a3be8c;ebcb8b;5e81ac;b48ead;ffffff;eceff4
 term_foreground: 999999
 term_foreground_bright: 999999
 term_background_bright: 333333
-
-interface_branding_color: 1793d1
-interface_help_color: 1793d1
-interface_help_color_bright: 1793d1
 
 /${OS_NAME}
     comment: Unified Kernel Image
