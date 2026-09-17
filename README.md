@@ -262,7 +262,8 @@ The boot splash is set up the way Omarchy does it:
   (see below). The
   installer therefore has to run from a full checkout of this repository; it
   checks for the files before touching the disk.
-- **`Theme=arch-linux`** in `/etc/plymouth/plymouthd.conf`. The theme id has no
+- **`Theme=arch-linux`** in `/etc/plymouth/plymouthd.conf`, installed from
+  [`etc/plymouth/plymouthd.conf`](./etc/plymouth/plymouthd.conf). The theme id has no
   space because `plymouth-set-default-theme` uses it unquoted in paths.
 - **The `plymouth` mkinitcpio hook**, after `systemd` and before `sd-encrypt`, in
   the `HOOKS` of the drop-in

@@ -135,8 +135,8 @@ OS_NAME="Arch Linux"
 
 # Plymouth theme, based on Omarchy Linux.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PLYMOUTH_THEME="arch-linux"
-PLYMOUTH_THEME_SRC="${SCRIPT_DIR}/default/plymouth/${PLYMOUTH_THEME}"
+PLYMOUTH_THEME_SRC="${SCRIPT_DIR}/default/plymouth/arch-linux"
+PLYMOUTHD_CONF_SRC="${SCRIPT_DIR}/etc/plymouth/plymouthd.conf"
 
 # Custom mkinitcpio install hook shipped in this repository. It gives the
 # initramfs copy of vconsole.conf a Latin XKB layout when the configured layout
@@ -291,8 +291,14 @@ validate_inputs() {
 
   # The Plymouth theme is copied from next to this script late in the install.
   # Check now, before the disk is wiped, rather than fail after partitioning.
-  if [ ! -f "${PLYMOUTH_THEME_SRC}/${PLYMOUTH_THEME}.plymouth" ]; then
-    print_error "Plymouth theme not found: ${PLYMOUTH_THEME_SRC}/${PLYMOUTH_THEME}.plymouth"
+  if [ ! -f "${PLYMOUTH_THEME_SRC}/arch-linux.plymouth" ]; then
+    print_error "Plymouth theme not found: ${PLYMOUTH_THEME_SRC}/arch-linux.plymouth"
+    print_error "Run the script from a full checkout of the repository."
+    exit 1
+  fi
+
+  if [ ! -f "$PLYMOUTHD_CONF_SRC" ]; then
+    print_error "Plymouth config missing: $PLYMOUTHD_CONF_SRC"
     print_error "Run the script from a full checkout of the repository."
     exit 1
   fi
@@ -971,23 +977,20 @@ EOF
 configure_plymouth() {
   print_msg "Configuring Plymouth"
 
-  local theme_dir="/mnt/usr/share/plymouth/themes/${PLYMOUTH_THEME}"
+  local theme_dir="/mnt/usr/share/plymouth/themes/arch-linux"
 
   # The whole theme directory is copied, so files added to it need no script
   # change. --no-preserve gives root-owned files 0644 and directories 0755.
-  print_msg "Installing Plymouth theme '${PLYMOUTH_THEME}'"
+  print_msg "Installing Plymouth theme"
   install -d -m 0755 "$theme_dir"
   cp -rT --no-preserve=mode,ownership "$PLYMOUTH_THEME_SRC" "$theme_dir"
+  install -D -m 0644 "$PLYMOUTHD_CONF_SRC" /mnt/etc/plymouth/plymouthd.conf
 
-  arch-chroot /mnt env PLYMOUTH_THEME="$PLYMOUTH_THEME" /bin/bash -e <<'EOF'
+  arch-chroot /mnt /bin/bash -e <<'EOF'
 echo "==> Setting default Plymouth theme"
-cat > /etc/plymouth/plymouthd.conf <<EOL
-[Daemon]
-Theme=${PLYMOUTH_THEME}
-EOL
 # Fails if the theme or its plugin is missing, which would otherwise only show
 # up as an error from the plymouth hook during mkinitcpio.
-plymouth-set-default-theme "$PLYMOUTH_THEME"
+plymouth-set-default-theme arch-linux
 echo "Default theme: $(plymouth-set-default-theme)"
 
 echo "==> Adding Plymouth kernel parameters"
@@ -1298,8 +1301,8 @@ verify_installation() {
   # Plymouth only shows the theme plymouthd.conf names, and only if the hook is
   # in the UKI; either missing still boots, just to a plain text PIN prompt.
   print_msg "Checking Plymouth setup"
-  if ! grep -qx "Theme=${PLYMOUTH_THEME}" /mnt/etc/plymouth/plymouthd.conf 2>/dev/null; then
-    print_warning "Plymouth theme is not set to '${PLYMOUTH_THEME}' in /etc/plymouth/plymouthd.conf."
+  if ! grep -qx "Theme=arch-linux" /mnt/etc/plymouth/plymouthd.conf 2>/dev/null; then
+    print_warning "Plymouth theme is not set to 'arch-linux' in /etc/plymouth/plymouthd.conf."
   fi
   if ! grep -Eq '^HOOKS=\(.*\bplymouth\b' /mnt/etc/mkinitcpio.conf.d/hooks.conf 2>/dev/null; then
     print_warning "plymouth is missing from HOOKS in /etc/mkinitcpio.conf.d/hooks.conf; there will be no boot splash."
