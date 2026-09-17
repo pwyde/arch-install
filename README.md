@@ -198,6 +198,27 @@ Three deliberate differences from Omarchy:
 The resume offset is fixed at install time. If the swapfile is ever recreated,
 regenerate `/etc/cmdline.d/30-resume.conf` and rebuild the UKI with `mkinitcpio -P`.
 
+## Initramfs
+
+`HOOKS` is set by the drop-in
+[`etc/mkinitcpio.conf.d/hooks.conf`](./etc/mkinitcpio.conf.d/hooks.conf),
+installed to `/etc/mkinitcpio.conf.d/`, so `/etc/mkinitcpio.conf` stays as the
+package ships it:
+
+```
+HOOKS=(base systemd plymouth autodetect microcode modconf kms keyboard sd-vconsole vconsole-latin block sd-encrypt filesystems fsck)
+```
+
+The file documents why each hook is there and in that order. mkinitcpio reads
+drop-ins after `/etc/mkinitcpio.conf`, so this `HOOKS` wins.
+
+mkinitcpio skips drop-ins entirely when it is given a config file with `-c`, and
+a preset that sets `ALL_config` or `<preset>_config` does exactly that. The
+generated `/etc/mkinitcpio.d/linux.preset` therefore leaves `ALL_config` commented
+out, as mkinitcpio's own preset template does. Adding it back would silently
+build the UKI from the stock `HOOKS`, without `sd-encrypt`, and the system would
+not be able to unlock its disk.
+
 ## Plymouth
 
 The boot splash is set up the way Omarchy does it:
@@ -209,8 +230,9 @@ The boot splash is set up the way Omarchy does it:
   Omarchy's MIT license. The installer therefore has to run from a full checkout
   of this repository; it checks for the files before touching the disk.
 - **`Theme=omarchy`** in `/etc/plymouth/plymouthd.conf`.
-- **The `plymouth` mkinitcpio hook**, after `systemd` and before `sd-encrypt`:
-  `HOOKS=(base systemd plymouth autodetect microcode modconf kms keyboard sd-vconsole vconsole-latin block sd-encrypt filesystems fsck)`.
+- **The `plymouth` mkinitcpio hook**, after `systemd` and before `sd-encrypt`, in
+  the `HOOKS` of the drop-in
+  [`etc/mkinitcpio.conf.d/hooks.conf`](./etc/mkinitcpio.conf.d/hooks.conf).
 - **Omarchy's quiet-boot kernel parameters**, embedded in the UKI:
   - `/etc/cmdline.d/80-initramfs-async.conf`: `initramfs_async=0`, working
     around a kernel 7.1 race in which Plymouth exits before it can read

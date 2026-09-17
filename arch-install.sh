@@ -144,6 +144,10 @@ PLYMOUTH_THEME_SRC="${SCRIPT_DIR}/default/plymouth/${PLYMOUTH_THEME}"
 # has no Latin letters, so the unlock prompt stays typeable. See the hook file.
 VCONSOLE_LATIN_HOOK_SRC="${SCRIPT_DIR}/etc/initcpio/install/vconsole-latin"
 
+# mkinitcpio drop-in with the initramfs HOOKS, used instead of editing
+# /etc/mkinitcpio.conf.
+MKINITCPIO_HOOKS_CONF_SRC="${SCRIPT_DIR}/etc/mkinitcpio.conf.d/hooks.conf"
+
 START_STAGE="partitions" # Default start at beginning
 
 # Password variables
@@ -276,6 +280,12 @@ validate_inputs() {
 
   if [ ! -f "$VCONSOLE_LATIN_HOOK_SRC" ]; then
     print_error "mkinitcpio hook missing: $VCONSOLE_LATIN_HOOK_SRC"
+    print_error "Run the script from a full checkout of the repository."
+    exit 1
+  fi
+
+  if [ ! -f "$MKINITCPIO_HOOKS_CONF_SRC" ]; then
+    print_error "mkinitcpio drop-in missing: $MKINITCPIO_HOOKS_CONF_SRC"
     print_error "Run the script from a full checkout of the repository."
     exit 1
   fi
@@ -1071,6 +1081,11 @@ configure_boot() {
   print_msg "Installing mkinitcpio hook vconsole-latin"
   install -D -m 0644 "$VCONSOLE_LATIN_HOOK_SRC" /mnt/etc/initcpio/install/vconsole-latin
 
+  # HOOKS comes from a drop-in rather than an edit to /etc/mkinitcpio.conf,
+  # which stays as the package ships it. Drop-ins are read after the main file.
+  print_msg "Installing mkinitcpio drop-in hooks.conf"
+  install -D -m 0644 "$MKINITCPIO_HOOKS_CONF_SRC" /mnt/etc/mkinitcpio.conf.d/hooks.conf
+
   arch-chroot /mnt env ROOT_PART="$ROOT_PART" ESP_PATH="$ESP_PATH" \
     OS_NAME="$OS_NAME" UKI_NAME="$UKI_NAME" /bin/bash -e <<'EOF'
 # Get root partition UUID for boot configuration
@@ -1104,30 +1119,11 @@ cat > /etc/cmdline.d/10-root.conf <<EOL
 rd.luks.name=${ROOT_UUID}=cryptroot root=/dev/mapper/cryptroot zswap.enabled=0 rw rootfstype=btrfs rootflags=subvol=/@
 EOL
 
-echo "==> Configure mkinitcpio"
-# Hook order follows the Arch wiki's systemd-stack layout for LUKS:
-#   plymouth   - after systemd and before sd-encrypt, so the splash is up to
-#                take the TPM2 PIN through systemd-ask-password. Placed where
-#                Omarchy puts it, right after the init hook.
-#   keyboard   - loads keyboard *modules*, so a USB keyboard works at the TPM2
-#                PIN prompt. Not the same thing as sd-vconsole, which only sets
-#                the keymap and font.
-#   sd-vconsole- applies /etc/vconsole.conf in the initramfs.
-#   vconsole-latin - local hook, after sd-vconsole: swaps a non-Latin XKBLAYOUT
-#                for "us" in the initramfs copy of vconsole.conf, so Plymouth's
-#                password prompt stays typeable.
-#   block      - must precede sd-encrypt so the block device modules backing the
-#                LUKS container are present when it runs.
-#   sd-encrypt - systemd-based unlock; the only hook that can use the TPM2 token
-#                written by systemd-cryptenroll.
-sed -i "s/HOOKS=.*/HOOKS=(base systemd plymouth autodetect microcode modconf kms keyboard sd-vconsole vconsole-latin block sd-encrypt filesystems fsck)/g" /etc/mkinitcpio.conf
-sed -i 's/#\(COMPRESSION="zstd"\)/\1/' /etc/mkinitcpio.conf
-
 echo "==> Configure UKI (Unified Kernel Image)"
 cat > /etc/mkinitcpio.d/linux.preset <<EOL
 # mkinitcpio preset file for the 'linux' package
 
-ALL_config="/etc/mkinitcpio.conf"
+#ALL_config="/etc/mkinitcpio.conf"
 ALL_kver="/boot/vmlinuz-linux"
 
 PRESETS=('default' 'fallback')
@@ -1317,8 +1313,8 @@ verify_installation() {
   if ! grep -qx "Theme=${PLYMOUTH_THEME}" /mnt/etc/plymouth/plymouthd.conf 2>/dev/null; then
     print_warning "Plymouth theme is not set to '${PLYMOUTH_THEME}' in /etc/plymouth/plymouthd.conf."
   fi
-  if ! grep -Eq '^HOOKS=\(.*\bplymouth\b' /mnt/etc/mkinitcpio.conf 2>/dev/null; then
-    print_warning "plymouth is missing from HOOKS in /etc/mkinitcpio.conf; there will be no boot splash."
+  if ! grep -Eq '^HOOKS=\(.*\bplymouth\b' /mnt/etc/mkinitcpio.conf.d/hooks.conf 2>/dev/null; then
+    print_warning "plymouth is missing from HOOKS in /etc/mkinitcpio.conf.d/hooks.conf; there will be no boot splash."
   fi
 
   # Check for essential files
