@@ -99,12 +99,6 @@ NON_INTERACTIVE=0
 MICROCODE=""
 VERSION="1.0"
 
-# Limine bootloader settings
-# ESP_PATH is the ESP mount point inside the target system. Mounting the ESP at
-# /boot (as Omarchy does) puts the kernel, the UKIs and the bootloader on one
-# FAT partition, so there is no separate /efi. Limine looks for its config next
-# to its own EFI binary and then at /limine.conf on the boot volume.
-ESP_PATH="/boot"
 # ESP mount options. FAT has no permission bits, so they come from the mount:
 # files 0600, directories 0700, all owned by root. This matches what mkinitcpio
 # would have given them on a normal filesystem -- it builds initramfs images and
@@ -125,18 +119,17 @@ ESP_MOUNT_OPTS="fmask=0177,dmask=0077"
 #     recommend periodic TRIM instead, so fstrim.timer is enabled rather than
 #     trimming on every delete.
 BTRFS_MOUNT_OPTS="compress=zstd:3,noatime,nodiscard"
-# UKI filenames: ${ESP_PATH}/EFI/Linux/${UKI_NAME}.efi and -fallback.efi.
-# limine-entry-tool names UKIs "${CUSTOM_UKI_NAME}_${kernel}.efi" (Omarchy gets
-# omarchy_linux.efi that way), so "arch_linux" means a later
-# CUSTOM_UKI_NAME="arch" writes these same files instead of a second pair.
-UKI_NAME="arch_linux"
-# Shown as the Limine menu title and branding.
-OS_NAME="Arch Linux"
 
 # Plymouth theme, based on Omarchy Linux.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLYMOUTH_THEME_SRC="${SCRIPT_DIR}/default/plymouth/arch-linux"
 PLYMOUTHD_CONF_SRC="${SCRIPT_DIR}/etc/plymouth/plymouthd.conf"
+
+# Limine menu configuration shipped in this repository.
+LIMINE_CONF_SRC="${SCRIPT_DIR}/default/limine/limine.conf"
+
+# Pacman hook that redeploys Limine to the ESP after a package upgrade.
+LIMINE_HOOK_SRC="${SCRIPT_DIR}/etc/pacman.d/hooks/90-limine-deploy.hook"
 
 # Custom mkinitcpio install hook shipped in this repository. It gives the
 # initramfs copy of vconsole.conf a Latin XKB layout when the configured layout
@@ -157,7 +150,8 @@ SUDOERS_FILES="00-wheel 01-timeout 02-passwd-tries"
 # systemd-sleep hook shipped in this repository, installed for hibernation.
 SLEEP_HOOK_SRC="${SCRIPT_DIR}/default/systemd/system-sleep/keyboard-backlight"
 
-START_STAGE="partitions" # Default start at beginning
+# Default start at beginning
+START_STAGE="partitions"
 
 # Password variables
 USER_PASSWORD=""
@@ -303,6 +297,18 @@ validate_inputs() {
     exit 1
   fi
 
+  if [ ! -f "$LIMINE_CONF_SRC" ]; then
+    print_error "Limine config missing: $LIMINE_CONF_SRC"
+    print_error "Run the script from a full checkout of the repository."
+    exit 1
+  fi
+
+  if [ ! -f "$LIMINE_HOOK_SRC" ]; then
+    print_error "Limine pacman hook missing: $LIMINE_HOOK_SRC"
+    print_error "Run the script from a full checkout of the repository."
+    exit 1
+  fi
+
   if [ ! -f "$VCONSOLE_LATIN_HOOK_SRC" ]; then
     print_error "mkinitcpio hook missing: $VCONSOLE_LATIN_HOOK_SRC"
     print_error "Run the script from a full checkout of the repository."
@@ -422,7 +428,7 @@ create_partitions() {
   sgdisk --clear "$DISK"   # Create fresh GPT
   sleep 1
 
-  # Create EFI System Partition - 512MB
+  # Create EFI System Partition - 2GB
   print_msg "Creating EFI System Partition"
   sgdisk --new=1:0:+2048M --typecode=1:ef00 --change-name=1:"EFI System" "$DISK"
 
@@ -526,9 +532,9 @@ mount_filesystems() {
     exit 1
   }
 
-  mkdir -p "/mnt${ESP_PATH}"
-  print_msg "Mounting EFI partition to /mnt${ESP_PATH}"
-  mount -o "$ESP_MOUNT_OPTS" "$EFI_PART" "/mnt${ESP_PATH}"
+  mkdir -p "/mnt/boot"
+  print_msg "Mounting EFI partition to /mnt/boot"
+  mount -o "$ESP_MOUNT_OPTS" "$EFI_PART" "/mnt/boot"
 
   # Create directories and mount other subvolumes if they exist
   print_msg "Mounting other subvolumes"
@@ -574,8 +580,8 @@ install_base_system() {
   # The ESP is /boot, so pacstrap writes the kernel straight onto it. If it is
   # not mounted yet the kernel lands on the Btrfs root and is then shadowed the
   # moment the ESP is mounted over it, leaving an unbootable system.
-  if ! mountpoint -q "/mnt${ESP_PATH}"; then
-    print_error "EFI partition is not mounted at /mnt${ESP_PATH}."
+  if ! mountpoint -q "/mnt/boot"; then
+    print_error "EFI partition is not mounted at /mnt/boot."
     print_error "It must be mounted before pacstrap, or the kernel will be installed to the wrong filesystem."
     mount | grep /mnt
     exit 1
@@ -601,11 +607,11 @@ install_base_system() {
   # Derived here rather than carried from mount_filesystems, so stages entering
   # at 'base' do not trip over an unset variable under `set -u`.
   ESP_UUID=$(blkid -s UUID -o value "$EFI_PART")
-  if ! grep -qE "UUID=${ESP_UUID}[[:space:]]+${ESP_PATH}[[:space:]]" /mnt/etc/fstab; then
-    echo "UUID=$ESP_UUID  ${ESP_PATH}  vfat  ${ESP_MOUNT_OPTS},noatime  0  2" >>/mnt/etc/fstab
-    print_msg "Added ${ESP_PATH} entry to /etc/fstab"
+  if ! grep -qE "UUID=${ESP_UUID}[[:space:]]+/boot[[:space:]]" /mnt/etc/fstab; then
+    echo "UUID=$ESP_UUID  /boot  vfat  ${ESP_MOUNT_OPTS},noatime  0  2" >>/mnt/etc/fstab
+    print_msg "Added /boot entry to /etc/fstab"
   else
-    print_msg "${ESP_PATH} entry already exists in /etc/fstab"
+    print_msg "/boot entry already exists in /etc/fstab"
   fi
 
   print_msg "Installed fstab:"
@@ -895,8 +901,7 @@ configure_tpm() {
 configure_hibernation() {
   print_msg "Configuring hibernation"
 
-  # Turns the keyboard backlight off before hibernating; some ASUS keyboard
-  # controllers otherwise block the S4 power-off.
+  # Turns the keyboard backlight off before hibernating. See script file.
   if [ -f /sys/power/image_size ]; then
     print_msg "Installing keyboard-backlight system-sleep hook"
     install -D -m 0755 "$SLEEP_HOOK_SRC" /mnt/usr/lib/systemd/system-sleep/keyboard-backlight
@@ -1015,11 +1020,11 @@ configure_boot() {
   print_msg "Configuring boot"
 
   # Ensure the EFI partition is mounted
-  if ! mountpoint -q "/mnt${ESP_PATH}"; then
-    print_warning "EFI partition not mounted at /mnt${ESP_PATH}. Attempting to mount."
-    mkdir -p "/mnt${ESP_PATH}"
+  if ! mountpoint -q "/mnt/boot"; then
+    print_warning "EFI partition not mounted at /mnt/boot. Attempting to mount."
+    mkdir -p "/mnt/boot"
     if [ -b "$EFI_PART" ]; then
-      if mount -o "$ESP_MOUNT_OPTS" "$EFI_PART" "/mnt${ESP_PATH}"; then
+      if mount -o "$ESP_MOUNT_OPTS" "$EFI_PART" "/mnt/boot"; then
         print_msg "EFI partition mounted."
       else
         print_error "Failed to mount EFI partition. Boot setup will likely fail."
@@ -1050,16 +1055,16 @@ configure_boot() {
   fi
 
   # Check that the ESP partition is formatted as FAT
-  if ! file -sL "$(findmnt -n -o SOURCE "/mnt${ESP_PATH}")" | grep -q "FAT"; then
+  if ! file -sL "$(findmnt -n -o SOURCE "/mnt/boot")" | grep -q "FAT"; then
     print_warning "WARNING: EFI System Partition is not formatted as FAT filesystem."
-    print_msg "Current filesystem type: $(file -sL "$(findmnt -n -o SOURCE "/mnt${ESP_PATH}")")"
+    print_msg "Current filesystem type: $(file -sL "$(findmnt -n -o SOURCE "/mnt/boot")")"
     if [ "$NON_INTERACTIVE" -eq 0 ]; then
       read -r -p "Format the EFI partition with FAT32? This will erase all data on it. (y/N) " REPLY
       echo
       if [[ $REPLY =~ ^[Yy]$ ]]; then
-        umount "/mnt${ESP_PATH}"
+        umount "/mnt/boot"
         mkfs.fat -F32 -n "EFI" "$EFI_PART"
-        mount -o "$ESP_MOUNT_OPTS" "$EFI_PART" "/mnt${ESP_PATH}"
+        mount -o "$ESP_MOUNT_OPTS" "$EFI_PART" "/mnt/boot"
         print_msg "EFI partition reformatted and remounted."
       else
         print_msg "Continuing without reformatting. Boot might fail."
@@ -1068,6 +1073,14 @@ configure_boot() {
       print_msg "Continuing without reformatting in non-interactive mode."
     fi
   fi
+
+  # Limine reads it from the root of the boot volume. 'boot():' in the entries
+  # resolves to the partition holding this file.
+  print_msg "Installing Limine configuration"
+  install -D -m 0644 "$LIMINE_CONF_SRC" /mnt/boot/limine.conf
+
+  print_msg "Installing pacman hook to redeploy Limine on upgrade"
+  install -D -m 0644 "$LIMINE_HOOK_SRC" /mnt/etc/pacman.d/hooks/90-limine-deploy.hook
 
   # Local install hooks go in /etc/initcpio/install/, which mkinitcpio searches
   # before /usr/lib/initcpio/install/. Hook files are sourced, not executed.
@@ -1079,8 +1092,7 @@ configure_boot() {
   print_msg "Installing mkinitcpio drop-in hooks.conf"
   install -D -m 0644 "$MKINITCPIO_HOOKS_CONF_SRC" /mnt/etc/mkinitcpio.conf.d/hooks.conf
 
-  arch-chroot /mnt env ROOT_PART="$ROOT_PART" ESP_PATH="$ESP_PATH" \
-    OS_NAME="$OS_NAME" UKI_NAME="$UKI_NAME" /bin/bash -e <<'EOF'
+  arch-chroot /mnt env ROOT_PART="$ROOT_PART" /bin/bash -e <<'EOF'
 # Get root partition UUID for boot configuration
 ROOT_UUID=$(blkid -s UUID -o value "${ROOT_PART}")
 echo "Using root UUID: ${ROOT_UUID}"
@@ -1123,17 +1135,17 @@ PRESETS=('default' 'fallback')
 
 #default_config="/etc/mkinitcpio.conf"
 #default_image="/boot/initramfs-linux.img"
-default_uki="${ESP_PATH}/EFI/Linux/${UKI_NAME}.efi"
+default_uki="/boot/EFI/Linux/arch_linux.efi"
 #default_options="--splash /usr/share/systemd/bootctl/splash-arch.bmp"
 
 #fallback_config="/etc/mkinitcpio.conf"
 #fallback_image="/boot/initramfs-linux-fallback.img"
-fallback_uki="${ESP_PATH}/EFI/Linux/${UKI_NAME}-fallback.efi"
+fallback_uki="/boot/EFI/Linux/arch_linux-fallback.efi"
 fallback_options="-S autodetect"
 EOL
 
 echo "==> Generate UKI (Unified Kernel Image)"
-mkdir -p "${ESP_PATH}/EFI/Linux"
+mkdir -p "/boot/EFI/Linux"
 mkinitcpio -P
 
 # pacstrap ran mkinitcpio with the stock preset, which wrote plain initramfs
@@ -1141,9 +1153,9 @@ mkinitcpio -P
 # hundred MiB, and nothing boots them -- the UKIs replaced them.
 rm -f /boot/initramfs-linux.img /boot/initramfs-linux-fallback.img
 
-if [ ! -f "${ESP_PATH}/EFI/Linux/${UKI_NAME}.efi" ]; then
-  echo "ERROR: ${ESP_PATH}/EFI/Linux/${UKI_NAME}.efi not found. UKI generation failed!" >&2
-  find "${ESP_PATH}/EFI/Linux" -ls >&2
+if [ ! -f "/boot/EFI/Linux/arch_linux.efi" ]; then
+  echo "ERROR: /boot/EFI/Linux/arch_linux.efi not found. UKI generation failed!" >&2
+  find "/boot/EFI/Linux" -ls >&2
   exit 1
 fi
 
@@ -1152,66 +1164,14 @@ echo "==> Installing Limine"
 # the config is left to the administrator. Mirror the layout that
 # limine-entry-tool uses, so adding limine-mkinitcpio-hook later finds Limine
 # where it expects it.
-mkdir -p "${ESP_PATH}/EFI/limine" "${ESP_PATH}/EFI/BOOT"
-cp /usr/share/limine/BOOTX64.EFI "${ESP_PATH}/EFI/limine/limine_x64.efi"
+mkdir -p "/boot/EFI/limine" "/boot/EFI/BOOT"
+cp /usr/share/limine/BOOTX64.EFI "/boot/EFI/limine/limine_x64.efi"
 # Also install as the removable-media fallback, so the system still boots if
 # the firmware loses its NVRAM entry.
-cp /usr/share/limine/BOOTX64.EFI "${ESP_PATH}/EFI/BOOT/BOOTX64.EFI"
-
-echo "==> Writing Limine configuration"
-# Limine looks for the config next to its own EFI binary first, then at
-# /limine.conf on the boot volume -- which is this file, since ESP_PATH is the
-# ESP mount point. 'boot():' resolves to the partition holding this config.
-cat > "${ESP_PATH}/limine.conf" <<EOL
-### Read more at https://github.com/limine-bootloader/limine/blob/trunk/CONFIG.md
-timeout: 5
-default_entry: 1
-
-interface_branding: ${OS_NAME}
-interface_branding_color: ffffff
-interface_help_color: 1793d1
-interface_help_color_bright: 1793d1
-hash_mismatch_panic: no
-
-term_background: 1a1a1a
-backdrop: 1a1a1a
-
-term_palette: 1a1a1a;bf616a;a3be8c;ebcb8b;5e81ac;b48ead;ffffff;d8dee9
-term_palette_bright: 333333;bf616a;a3be8c;ebcb8b;5e81ac;b48ead;ffffff;eceff4
-term_foreground: 999999
-term_foreground_bright: 999999
-term_background_bright: 333333
-
-/${OS_NAME}
-    comment: Unified Kernel Image
-    protocol: efi
-    path: boot():/EFI/Linux/${UKI_NAME}.efi
-
-/${OS_NAME} (fallback)
-    comment: Fallback Unified Kernel Image
-    protocol: efi
-    path: boot():/EFI/Linux/${UKI_NAME}-fallback.efi
-EOL
-
-echo "==> Installing pacman hook to redeploy Limine on upgrade"
-# A limine upgrade replaces /usr/share/limine/BOOTX64.EFI but not the copies on
-# the ESP, so without this the bootloader silently stays at the old version.
-mkdir -p /etc/pacman.d/hooks
-cat > /etc/pacman.d/hooks/90-limine-deploy.hook <<EOL
-[Trigger]
-Operation = Install
-Operation = Upgrade
-Type = Package
-Target = limine
-
-[Action]
-Description = Deploying Limine to the ESP...
-When = PostTransaction
-Exec = /bin/sh -c 'cp /usr/share/limine/BOOTX64.EFI ${ESP_PATH}/EFI/limine/limine_x64.efi && cp /usr/share/limine/BOOTX64.EFI ${ESP_PATH}/EFI/BOOT/BOOTX64.EFI'
-EOL
+cp /usr/share/limine/BOOTX64.EFI "/boot/EFI/BOOT/BOOTX64.EFI"
 
 echo "==> Registering Limine with the UEFI firmware"
-esp_dev=$(findmnt -n -o SOURCE "${ESP_PATH}")
+esp_dev=$(findmnt -n -o SOURCE "/boot")
 esp_disk=$(lsblk -no PKNAME "$esp_dev")
 esp_partnum=$(cat "/sys/class/block/$(basename "$esp_dev")/partition")
 
@@ -1220,19 +1180,19 @@ if efibootmgr 2>/dev/null | grep -q "Limine"; then
 else
   efibootmgr --create --disk "/dev/${esp_disk}" --part "$esp_partnum" \
     --loader '\EFI\limine\limine_x64.efi' --label "Limine" --unicode ||
-    echo "WARNING: could not create the UEFI boot entry. The fallback at ${ESP_PATH}/EFI/BOOT/BOOTX64.EFI should still boot." >&2
+    echo "WARNING: could not create the UEFI boot entry. The fallback at /boot/EFI/BOOT/BOOTX64.EFI should still boot." >&2
 fi
 
 echo "==> UEFI boot entries:"
 efibootmgr || echo "WARNING: efibootmgr failed"
 
 echo "==> ESP contents:"
-find "${ESP_PATH}/EFI" -type f \( -name '*.efi' -o -name '*.EFI' \) | sort
+find "/boot/EFI" -type f \( -name '*.efi' -o -name '*.EFI' \) | sort
 EOF
 
   # Verify boot files exist
   print_msg "Verifying boot files..."
-  if [ -f "/mnt${ESP_PATH}/EFI/Linux/${UKI_NAME}.efi" ]; then
+  if [ -f "/mnt/boot/EFI/Linux/arch_linux.efi" ]; then
     print_msg "UKI created successfully"
   else
     print_warning "⚠️  UKI not found. Boot will likely fail!  ⚠️"
@@ -1259,27 +1219,27 @@ verify_installation() {
   print_msg "Verifying critical components"
 
   # Check if EFI directory exists
-  if [ ! -d "/mnt${ESP_PATH}/EFI" ]; then
+  if [ ! -d "/mnt/boot/EFI" ]; then
     print_error "WARNING: EFI directory not found! Boot will not work properly."
-    print_error "Please check that the EFI partition is properly mounted at /mnt${ESP_PATH}."
+    print_error "Please check that the EFI partition is properly mounted at /mnt/boot."
   fi
 
   # Check boot files
   print_msg "Checking boot files"
-  if [ ! -f "/mnt${ESP_PATH}/EFI/Linux/${UKI_NAME}.efi" ]; then
-    print_error "UKI not found at ${ESP_PATH}/EFI/Linux/${UKI_NAME}.efi! System won't boot."
+  if [ ! -f "/mnt/boot/EFI/Linux/arch_linux.efi" ]; then
+    print_error "UKI not found at /boot/EFI/Linux/arch_linux.efi! System won't boot."
     print_error "Try rebuilding the boot configuration with: $0 --stage boot"
   fi
 
   # Check for bootloader
-  if [ ! -f "/mnt${ESP_PATH}/EFI/limine/limine_x64.efi" ] && [ ! -f "/mnt${ESP_PATH}/EFI/BOOT/BOOTX64.EFI" ]; then
+  if [ ! -f "/mnt/boot/EFI/limine/limine_x64.efi" ] && [ ! -f "/mnt/boot/EFI/BOOT/BOOTX64.EFI" ]; then
     print_error "Limine not found! System won't boot."
     print_error "Try reinstalling the bootloader with: $0 --stage boot"
   fi
 
   # Check for bootloader configuration
-  if [ ! -f "/mnt${ESP_PATH}/limine.conf" ]; then
-    print_error "Limine configuration not found at ${ESP_PATH}/limine.conf!"
+  if [ ! -f "/mnt/boot/limine.conf" ]; then
+    print_error "Limine configuration not found at /boot/limine.conf!"
     print_error "Try rebuilding the boot configuration with: $0 --stage boot"
   fi
 
@@ -1324,11 +1284,11 @@ verify_installation() {
   fi
 
   # Show formatted EFI partition info
-  if mountpoint -q "/mnt${ESP_PATH}"; then
+  if mountpoint -q "/mnt/boot"; then
     print_msg "EFI partition information:"
-    file -sL "$(findmnt -n -o SOURCE "/mnt${ESP_PATH}")"
+    file -sL "$(findmnt -n -o SOURCE "/mnt/boot")"
     print_msg "EFI partition contents:"
-    find "/mnt${ESP_PATH}" -type f \( -name "*.efi" -o -name "*.EFI" \) | sort
+    find "/mnt/boot" -type f \( -name "*.efi" -o -name "*.EFI" \) | sort
   else
     print_warning "EFI partition not mounted, cannot check its contents."
   fi
@@ -1361,32 +1321,32 @@ print_summary() {
   echo
 
   echo "${WHITE}Boot Setup Status:${NO_COLOR}"
-  if [ -f "/mnt${ESP_PATH}/EFI/Linux/${UKI_NAME}.efi" ]; then
-    echo " ${WHITE}- UKI present:${NO_COLOR} Yes (${ESP_PATH}/EFI/Linux/${UKI_NAME}.efi)"
+  if [ -f "/mnt/boot/EFI/Linux/arch_linux.efi" ]; then
+    echo " ${WHITE}- UKI present:${NO_COLOR} Yes (/boot/EFI/Linux/arch_linux.efi)"
   else
     echo " ${WHITE}- UKI present:${NO_COLOR} No (missing)"
   fi
 
-  if [ -f "/mnt${ESP_PATH}/EFI/Linux/${UKI_NAME}-fallback.efi" ]; then
-    echo " ${WHITE}- Fallback UKI:${NO_COLOR} Yes (${ESP_PATH}/EFI/Linux/${UKI_NAME}-fallback.efi)"
+  if [ -f "/mnt/boot/EFI/Linux/arch_linux-fallback.efi" ]; then
+    echo " ${WHITE}- Fallback UKI:${NO_COLOR} Yes (/boot/EFI/Linux/arch_linux-fallback.efi)"
   else
     echo " ${WHITE}- Fallback UKI:${NO_COLOR} No (missing)"
   fi
 
-  if [ -f "/mnt${ESP_PATH}/EFI/limine/limine_x64.efi" ]; then
-    echo " ${WHITE}- Limine:${NO_COLOR} Yes (${ESP_PATH}/EFI/limine/limine_x64.efi)"
+  if [ -f "/mnt/boot/EFI/limine/limine_x64.efi" ]; then
+    echo " ${WHITE}- Limine:${NO_COLOR} Yes (/boot/EFI/limine/limine_x64.efi)"
   else
     echo " ${WHITE}- Limine:${NO_COLOR} No (missing)"
   fi
 
-  if [ -f "/mnt${ESP_PATH}/EFI/BOOT/BOOTX64.EFI" ]; then
-    echo " ${WHITE}- Removable fallback:${NO_COLOR} Yes (${ESP_PATH}/EFI/BOOT/BOOTX64.EFI)"
+  if [ -f "/mnt/boot/EFI/BOOT/BOOTX64.EFI" ]; then
+    echo " ${WHITE}- Removable fallback:${NO_COLOR} Yes (/boot/EFI/BOOT/BOOTX64.EFI)"
   else
     echo " ${WHITE}- Removable fallback:${NO_COLOR} No (missing)"
   fi
 
-  if [ -f "/mnt${ESP_PATH}/limine.conf" ]; then
-    echo " ${WHITE}- Limine config:${NO_COLOR} Yes (${ESP_PATH}/limine.conf)"
+  if [ -f "/mnt/boot/limine.conf" ]; then
+    echo " ${WHITE}- Limine config:${NO_COLOR} Yes (/boot/limine.conf)"
   else
     echo " ${WHITE}- Limine config:${NO_COLOR} No (missing)"
   fi
@@ -1414,7 +1374,7 @@ EOF
   echo "${BLUE}==>${YELLOW} After reboot, log in as ${WHITE}${USERNAME}${NO_COLOR}"
 
   # Troubleshooting tips if boot issues were detected
-  if [ ! -f "/mnt${ESP_PATH}/EFI/Linux/${UKI_NAME}.efi" ] || [ ! -f "/mnt${ESP_PATH}/EFI/BOOT/BOOTX64.EFI" ]; then
+  if [ ! -f "/mnt/boot/EFI/Linux/arch_linux.efi" ] || [ ! -f "/mnt/boot/EFI/BOOT/BOOTX64.EFI" ]; then
     echo
     echo "${YELLOW}===${BLUE} BOOT TROUBLESHOOTING ${YELLOW}===${NO_COLOR}"
     echo "If the system does not boot, try these steps:"
@@ -1423,9 +1383,9 @@ EOF
     echo "3. If it still does not boot, try rebuilding the boot setup:"
     echo "  - Boot from the Arch Linux installation media"
     echo "  - Mount the filesystems: mount -o subvol=@ /dev/mapper/cryptroot /mnt"
-    echo "  - Mount the ESP: mount $EFI_PART /mnt${ESP_PATH}"
+    echo "  - Mount the ESP: mount $EFI_PART /mnt/boot"
     echo "  - Chroot: arch-chroot /mnt"
-    echo "  - Rerun: mkinitcpio -P && cp /usr/share/limine/BOOTX64.EFI ${ESP_PATH}/EFI/limine/limine_x64.efi"
+    echo "  - Rerun: mkinitcpio -P && cp /usr/share/limine/BOOTX64.EFI /boot/EFI/limine/limine_x64.efi"
     echo "  - Exit chroot and reboot"
   fi
 }
@@ -1522,8 +1482,8 @@ main() {
           # Also mount EFI partition if it exists
           if [ -b "$EFI_PART" ]; then
             print_msg "Mounting EFI partition"
-            mkdir -p "/mnt${ESP_PATH}"
-            mount -o "$ESP_MOUNT_OPTS" "$EFI_PART" "/mnt${ESP_PATH}" || {
+            mkdir -p "/mnt/boot"
+            mount -o "$ESP_MOUNT_OPTS" "$EFI_PART" "/mnt/boot" || {
               print_warning "Could not mount EFI partition. Boot setup might fail!"
             }
           else
@@ -1565,10 +1525,10 @@ main() {
       fi
     else
       # If root is mounted but boot is not, try to mount boot
-      if ! mountpoint -q "/mnt${ESP_PATH}" && [ -b "$EFI_PART" ]; then
+      if ! mountpoint -q "/mnt/boot" && [ -b "$EFI_PART" ]; then
         print_msg "Mounting EFI partition"
-        mkdir -p "/mnt${ESP_PATH}"
-        mount -o "$ESP_MOUNT_OPTS" "$EFI_PART" "/mnt${ESP_PATH}" || {
+        mkdir -p "/mnt/boot"
+        mount -o "$ESP_MOUNT_OPTS" "$EFI_PART" "/mnt/boot" || {
           print_warning "Could not mount EFI partition. Boot setup might fail!"
         }
       fi

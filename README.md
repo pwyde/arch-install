@@ -101,7 +101,7 @@ the bootloader all live on the same FAT partition and there is no separate
 | `/boot/EFI/BOOT/BOOTX64.EFI` | Removable-media fallback, used if the firmware loses its NVRAM entry |
 | `/boot/EFI/Linux/arch_linux.efi` | UKI built by `mkinitcpio` |
 | `/boot/EFI/Linux/arch_linux-fallback.efi` | Fallback UKI |
-| `/boot/limine.conf` | Menu entries and theming |
+| `/boot/limine.conf` | Menu entries and theming, installed from [`default/limine/limine.conf`](./default/limine/limine.conf) |
 
 Notes:
 
@@ -123,7 +123,9 @@ Notes:
   second set. The UKI names follow the same tool's
   `${CUSTOM_UKI_NAME}_${kernel}.efi` scheme, so `CUSTOM_UKI_NAME="arch"` writes
   the same `arch_linux.efi` instead of a duplicate.
-- **A pacman hook redeploys Limine on upgrade.** The `limine` package only
+- **A pacman hook redeploys Limine on upgrade.** The
+  [`90-limine-deploy.hook`](./etc/pacman.d/hooks/90-limine-deploy.hook) file,
+  installed to `/etc/pacman.d/hooks/`. The `limine` package only
   updates `/usr/share/limine/BOOTX64.EFI`; without the hook the copies on the
   ESP would silently stay at the old version.
 - **ESP sizing**: 2 GiB holds the kernel and both UKIs comfortably. Bear it in
