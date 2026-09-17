@@ -204,7 +204,7 @@ The boot splash is set up the way Omarchy does it:
 
 - **Omarchy's `omarchy` theme**, installed to `/usr/share/plymouth/themes/omarchy/`.
   The files live in this repository under
-  [`plymouth/omarchy/`](./plymouth/omarchy/), copied unchanged from Omarchy's
+  [`default/plymouth/omarchy/`](./default/plymouth/omarchy/), copied unchanged from Omarchy's
   `default/plymouth/` (commit `9c5482c5` on the `quattro` branch) together with
   Omarchy's MIT license. The installer therefore has to run from a full checkout
   of this repository; it checks for the files before touching the disk.

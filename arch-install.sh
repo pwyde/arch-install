@@ -134,13 +134,10 @@ UKI_NAME="arch_linux"
 OS_NAME="Arch Linux"
 
 # Plymouth boot splash. The theme is Omarchy's, shipped in this repository under
-# plymouth/<theme>/ (MIT, see its LICENSE) because it is mostly PNG images.
+# default/plymouth/<theme>/ (MIT, see its LICENSE) because it is mostly PNG images.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLYMOUTH_THEME="omarchy"
-PLYMOUTH_THEME_SRC="${SCRIPT_DIR}/plymouth/${PLYMOUTH_THEME}"
-# The files Omarchy publishes to /usr/share/plymouth/themes/omarchy/, in the
-# same set as omarchy-plymouth-set --refresh-default.
-PLYMOUTH_THEME_FILES="bullet.png entry.png lock.png logo.png omarchy.plymouth omarchy.script preview-unlock.png progress_bar.png progress_box.png logos/oma.png"
+PLYMOUTH_THEME_SRC="${SCRIPT_DIR}/default/plymouth/${PLYMOUTH_THEME}"
 
 # Custom mkinitcpio install hook shipped in this repository. It gives the
 # initramfs copy of vconsole.conf a Latin XKB layout when the configured layout
@@ -271,14 +268,11 @@ validate_inputs() {
 
   # The Plymouth theme is copied from next to this script late in the install.
   # Check now, before the disk is wiped, rather than fail after partitioning.
-  local theme_file
-  for theme_file in $PLYMOUTH_THEME_FILES; do
-    if [ ! -f "${PLYMOUTH_THEME_SRC}/${theme_file}" ]; then
-      print_error "Plymouth theme file missing: ${PLYMOUTH_THEME_SRC}/${theme_file}"
-      print_error "Run the script from a full checkout of the repository."
-      exit 1
-    fi
-  done
+  if [ ! -f "${PLYMOUTH_THEME_SRC}/${PLYMOUTH_THEME}.plymouth" ]; then
+    print_error "Plymouth theme not found: ${PLYMOUTH_THEME_SRC}/${PLYMOUTH_THEME}.plymouth"
+    print_error "Run the script from a full checkout of the repository."
+    exit 1
+  fi
 
   if [ ! -f "$VCONSOLE_LATIN_HOOK_SRC" ]; then
     print_error "mkinitcpio hook missing: $VCONSOLE_LATIN_HOOK_SRC"
@@ -977,13 +971,12 @@ configure_plymouth() {
   print_msg "Configuring Plymouth"
 
   local theme_dir="/mnt/usr/share/plymouth/themes/${PLYMOUTH_THEME}"
-  local theme_file
 
+  # The whole theme directory is copied, so files added to it need no script
+  # change. --no-preserve gives root-owned files 0644 and directories 0755.
   print_msg "Installing Plymouth theme '${PLYMOUTH_THEME}'"
-  install -d -m 0755 "$theme_dir" "$theme_dir/logos"
-  for theme_file in $PLYMOUTH_THEME_FILES; do
-    install -m 0644 "${PLYMOUTH_THEME_SRC}/${theme_file}" "${theme_dir}/${theme_file}"
-  done
+  install -d -m 0755 "$theme_dir"
+  cp -rT --no-preserve=mode,ownership "$PLYMOUTH_THEME_SRC" "$theme_dir"
 
   arch-chroot /mnt env PLYMOUTH_THEME="$PLYMOUTH_THEME" /bin/bash -e <<'EOF'
 echo "==> Setting default Plymouth theme"
