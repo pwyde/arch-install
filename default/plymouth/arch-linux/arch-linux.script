@@ -1,7 +1,7 @@
-# Omarchy Plymouth Theme Script
+# Arch Linux Plymouth Theme Script
 
-Window.SetBackgroundTopColor(0.101, 0.105, 0.149);
-Window.SetBackgroundBottomColor(0.101, 0.105, 0.149);
+Window.SetBackgroundTopColor(0.102, 0.102, 0.102);
+Window.SetBackgroundBottomColor(0.102, 0.102, 0.102);
 
 logo.image = Image("logo.png");
 logo.sprite = Sprite(logo.image);
@@ -249,7 +249,7 @@ message_sprite = Sprite();
 message_sprite.SetPosition(10, 10, 10000);
 
 fun display_message_callback(text) {
-  message = Image.Text(text, 1, 1, 1);
+  message = Image.Text(text, 0.6, 0.6, 0.6);
   message_sprite.SetImage(message);
   message_sprite.SetOpacity(1);
 }

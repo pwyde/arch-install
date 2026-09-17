@@ -36,7 +36,8 @@ The script is designed to automate the complete installation process while provi
 - Installs a pacman hook that redeploys Limine to the ESP on package upgrade.
 - Creates a Btrfs swapfile the size of RAM for hibernation, with resume
   parameters embedded in the UKI.
-- Configures a Plymouth boot splash using Omarchy's theme, which also takes the
+- Configures a Plymouth boot splash with an Arch Linux theme based on Omarchy's,
+  which also takes the
   TPM2 PIN at boot.
 - Provides customizable installation parameters.
 - Provides cleanup functionality when the installation fails.
@@ -219,17 +220,47 @@ out, as mkinitcpio's own preset template does. Adding it back would silently
 build the UKI from the stock `HOOKS`, without `sd-encrypt`, and the system would
 not be able to unlock its disk.
 
+## Boot screen colors
+
+The Limine menu and the Plymouth splash use the Arch Linux colors instead of
+Omarchy's Tokyo Night palette. Arch publishes no formal color scheme; the accent
+is the blue of the official logo, and the grays match archlinux.org.
+
+| Role | Color | Limine (`/boot/limine.conf`) | Plymouth theme |
+| --- | --- | --- | --- |
+| Background | `#1A1A1A` | `term_background`, `backdrop`, palette black | window and console log background |
+| Text | `#999999` | `term_foreground`, palette gray | password field, bullets, lock icon, messages |
+| Accent | `#1793D1` | branding, help keys, countdown, palette blue and cyan (entry comments) | progress bar |
+| Muted | `#333333` | `term_background_bright` | progress bar track |
+
+The theme's images were recolored the same way Omarchy's `omarchy-plymouth-set`
+does it: every pixel takes the new color and keeps its transparency.
+`preview-unlock.png`, which is not shown at boot, was left as it was.
+
+`logo.png` is the official Arch Linux logo for dark backgrounds, the unaltered
+`archlinux-logo-light-90dpi.png` from [archlinux.org/art](https://archlinux.org/art/)
+(600×199, blue `#1793D1` and white). It is not recolored to `#999999`: the
+[trademark policy](https://terms.archlinux.org/docs/trademark-policy/) asks for
+the logos to be used in their standard form.
+
+Limine draws the selected menu entry in reverse video, swapping text and
+background, so the selection bar is `#999999` rather than the accent.
+
 ## Plymouth
 
 The boot splash is set up the way Omarchy does it:
 
-- **Omarchy's `omarchy` theme**, installed to `/usr/share/plymouth/themes/omarchy/`.
+- **The `arch-linux` theme** (display name "Arch Linux"), installed to
+  `/usr/share/plymouth/themes/arch-linux/`.
   The files live in this repository under
-  [`default/plymouth/omarchy/`](./default/plymouth/omarchy/), copied unchanged from Omarchy's
+  [`default/plymouth/arch-linux/`](./default/plymouth/arch-linux/), based on Omarchy's
   `default/plymouth/` (commit `9c5482c5` on the `quattro` branch) together with
-  Omarchy's MIT license. The installer therefore has to run from a full checkout
-  of this repository; it checks for the files before touching the disk.
-- **`Theme=omarchy`** in `/etc/plymouth/plymouthd.conf`.
+  Omarchy's MIT license, recolored to the Arch Linux colors, and with the Arch
+  Linux logo in place of Omarchy's (see below). The
+  installer therefore has to run from a full checkout of this repository; it
+  checks for the files before touching the disk.
+- **`Theme=arch-linux`** in `/etc/plymouth/plymouthd.conf`. The theme id has no
+  space because `plymouth-set-default-theme` uses it unquoted in paths.
 - **The `plymouth` mkinitcpio hook**, after `systemd` and before `sd-encrypt`, in
   the `HOOKS` of the drop-in
   [`etc/mkinitcpio.conf.d/hooks.conf`](./etc/mkinitcpio.conf.d/hooks.conf).

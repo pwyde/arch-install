@@ -133,10 +133,9 @@ UKI_NAME="arch_linux"
 # Shown as the Limine menu title and branding.
 OS_NAME="Arch Linux"
 
-# Plymouth boot splash. The theme is Omarchy's, shipped in this repository under
-# default/plymouth/<theme>/ (MIT, see its LICENSE) because it is mostly PNG images.
+# Plymouth theme, based on Omarchy's (MIT, see its LICENSE).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PLYMOUTH_THEME="omarchy"
+PLYMOUTH_THEME="arch-linux"
 PLYMOUTH_THEME_SRC="${SCRIPT_DIR}/default/plymouth/${PLYMOUTH_THEME}"
 
 # Custom mkinitcpio install hook shipped in this repository. It gives the
@@ -965,9 +964,9 @@ EOF
 
 # Configure Plymouth
 #
-# Mirrors Omarchy: the omarchy theme in /usr/share/plymouth/themes/omarchy/,
-# Theme=omarchy in /etc/plymouth/plymouthd.conf, the plymouth mkinitcpio hook,
-# and Omarchy's quiet-boot kernel command line.
+# Mirrors Omarchy's setup: the theme in /usr/share/plymouth/themes/, Theme= in
+# /etc/plymouth/plymouthd.conf, the plymouth mkinitcpio hook, and Omarchy's
+# quiet-boot kernel command line.
 #
 # Differences from Omarchy, forced by this installer's setup:
 #   - No FILES+=(/etc/vconsole.conf) drop-in. Omarchy needs it with its busybox
@@ -990,7 +989,6 @@ configure_plymouth() {
 
   arch-chroot /mnt env PLYMOUTH_THEME="$PLYMOUTH_THEME" /bin/bash -e <<'EOF'
 echo "==> Setting default Plymouth theme"
-# Omarchy's plymouthd.conf, replacing the commented-out one the package ships.
 cat > /etc/plymouth/plymouthd.conf <<EOL
 [Daemon]
 Theme=${PLYMOUTH_THEME}
@@ -1177,19 +1175,19 @@ default_entry: 1
 interface_branding: ${OS_NAME}
 hash_mismatch_panic: no
 
-term_background: 1a1b26
-backdrop: 1a1b26
+term_background: 1a1a1a
+backdrop: 1a1a1a
 
-# Terminal colors (Tokyo Night palette)
-term_palette: 15161e;f7768e;9ece6a;e0af68;7aa2f7;bb9af7;7dcfff;a9b1d6
-term_palette_bright: 414868;f7768e;9ece6a;e0af68;7aa2f7;bb9af7;7dcfff;c0caf5
-term_foreground: c0caf5
-term_foreground_bright: c0caf5
-term_background_bright: 24283b
+# Arch Linux colors: background 1a1a1a, text 999999, accent 1793d1
+term_palette: 1a1a1a;f7768e;9ece6a;e0af68;1793d1;bb9af7;1793d1;999999
+term_palette_bright: 4d4d4d;f7768e;9ece6a;e0af68;1793d1;bb9af7;1793d1;999999
+term_foreground: 999999
+term_foreground_bright: 999999
+term_background_bright: 333333
 
-interface_branding_color: 9ece6a
-interface_help_color: 9ece6a
-interface_help_color_bright: 9ece6a
+interface_branding_color: 1793d1
+interface_help_color: 1793d1
+interface_help_color_bright: 1793d1
 
 /${OS_NAME}
     comment: Unified Kernel Image
