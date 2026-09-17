@@ -210,7 +210,7 @@ The boot splash is set up the way Omarchy does it:
   of this repository; it checks for the files before touching the disk.
 - **`Theme=omarchy`** in `/etc/plymouth/plymouthd.conf`.
 - **The `plymouth` mkinitcpio hook**, after `systemd` and before `sd-encrypt`:
-  `HOOKS=(base systemd plymouth autodetect microcode modconf kms keyboard sd-vconsole block sd-encrypt filesystems fsck)`.
+  `HOOKS=(base systemd plymouth autodetect microcode modconf kms keyboard sd-vconsole vconsole-latin block sd-encrypt filesystems fsck)`.
 - **Omarchy's quiet-boot kernel parameters**, embedded in the UKI:
   - `/etc/cmdline.d/80-initramfs-async.conf`: `initramfs_async=0`, working
     around a kernel 7.1 race in which Plymouth exits before it can read
@@ -225,12 +225,19 @@ How it fits the rest of this install:
   `systemd-cryptsetup` asks for is typed into the splash. The theme draws a lock
   icon and an entry field but not the prompt text, so the PIN prompt and a
   recovery-key prompt look the same.
-- **Keyboard layout.** Plymouth builds its own xkb keymap only when
-  `/etc/vconsole.conf` sets `XKBLAYOUT` or no `KEYMAP`. This installer writes only
-  `KEYMAP`, so Plymouth reads keys through the console, with the keymap
-  `sd-vconsole` loads in the initramfs. If `XKBLAYOUT` is added to
-  `vconsole.conf` later, Plymouth switches to that layout, and the UKI must be
-  rebuilt with `mkinitcpio -P` for it to take effect.
+- **Keyboard layout.** `/etc/vconsole.conf` is written by
+  `systemd-firstboot --keymap`, as on Omarchy, which sets `KEYMAP` and derives the
+  matching `XKBLAYOUT`, `XKBMODEL` and `XKBOPTIONS` from systemd's
+  `kbd-model-map` (for example `sv-latin1` becomes `se`). The `sd-vconsole` hook
+  copies the file into the initramfs, and because `XKBLAYOUT` is set, Plymouth
+  reads the PIN with that xkb layout. With a keymap whose layout does not type
+  Latin letters (such as Russian or Greek), a Latin PIN or passphrase could not
+  be typed at the prompt. The local mkinitcpio hook
+  [`etc/initcpio/install/vconsole-latin`](./etc/initcpio/install/vconsole-latin),
+  installed to `/etc/initcpio/install/` and listed after `sd-vconsole`, guards
+  against that: for such layouts it replaces the initramfs copy of
+  `vconsole.conf` with one that sets `XKBLAYOUT=us`. The installed system's
+  `vconsole.conf` is not changed, and the check runs on every rebuild.
 - **Console cursor.** `vt.global_cursor_default=0` hides the cursor on text
   consoles after boot too, not just during the splash.
 

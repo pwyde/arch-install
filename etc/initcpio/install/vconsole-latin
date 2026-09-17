@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# mkinitcpio install hook: keep the unlock prompt typeable with non-Latin
+# keyboard layouts.
+#
+# The sd-vconsole hook copies /etc/vconsole.conf into the initramfs. Plymouth
+# reads XKBLAYOUT from that copy and uses it for keyboard input at the password
+# prompt. A layout such as "ru" or "gr" has no Latin letters, so a Latin PIN,
+# passphrase or recovery key cannot be typed there.
+#
+# For those layouts this hook replaces the initramfs copy with one that sets
+# XKBLAYOUT=us and drops XKBVARIANT, which belongs to the original layout. KEYMAP
+# is kept, so the console keymap is unchanged. /etc/vconsole.conf on the
+# installed system is never modified, and Latin layouts are left alone.
+#
+# Must be listed after sd-vconsole in HOOKS: build functions run in HOOKS order,
+# and add_file overwrites the copy sd-vconsole added.
+
+build() {
+    local layout
+
+    [[ -s /etc/vconsole.conf ]] || return 0
+
+    # Only the first layout of a comma-separated list is active by default.
+    # Sourced in a subshell with XKBLAYOUT unset, so a value exported into the
+    # build environment cannot stand in for one the file does not set.
+    # shellcheck disable=SC1091
+    layout=$(unset XKBLAYOUT; . /etc/vconsole.conf; echo "${XKBLAYOUT:-}")
+    layout="${layout%%,*}"
+
+    case "$layout" in
+        af | am | ara | bd | bg | by | et | ge | gr | il | in | iq | ir | kg | kh | kz | la | lk | mk | mm | mn | mv | np | rs | ru | sy | th | tj | ua)
+            sed -e '/^XKBVARIANT=/d' -e 's/^XKBLAYOUT=.*/XKBLAYOUT=us/' /etc/vconsole.conf |
+                add_file - /etc/vconsole.conf 644
+            ;;
+    esac
+}
+
+help() {
+    cat <<HELPEOF
+Keeps the unlock prompt typeable when /etc/vconsole.conf sets a keyboard layout
+without Latin letters: the initramfs copy of vconsole.conf gets XKBLAYOUT=us.
+The installed system's vconsole.conf is not changed. Add after sd-vconsole.
+HELPEOF
+}
+
+# vim: set ft=sh ts=4 sw=4 et:

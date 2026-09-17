@@ -142,6 +142,11 @@ PLYMOUTH_THEME_SRC="${SCRIPT_DIR}/plymouth/${PLYMOUTH_THEME}"
 # same set as omarchy-plymouth-set --refresh-default.
 PLYMOUTH_THEME_FILES="bullet.png entry.png lock.png logo.png omarchy.plymouth omarchy.script preview-unlock.png progress_bar.png progress_box.png logos/oma.png"
 
+# Custom mkinitcpio install hook shipped in this repository. It gives the
+# initramfs copy of vconsole.conf a Latin XKB layout when the configured layout
+# has no Latin letters, so the unlock prompt stays typeable. See the hook file.
+VCONSOLE_LATIN_HOOK_SRC="${SCRIPT_DIR}/etc/initcpio/install/vconsole-latin"
+
 START_STAGE="partitions" # Default start at beginning
 
 # Password variables
@@ -274,6 +279,12 @@ validate_inputs() {
       exit 1
     fi
   done
+
+  if [ ! -f "$VCONSOLE_LATIN_HOOK_SRC" ]; then
+    print_error "mkinitcpio hook missing: $VCONSOLE_LATIN_HOOK_SRC"
+    print_error "Run the script from a full checkout of the repository."
+    exit 1
+  fi
 
   # Check for required tools
   for tool in sgdisk cryptsetup mkfs.fat mkfs.btrfs; do
@@ -603,9 +614,11 @@ cat > /etc/hosts <<EOL
 EOL
 
 echo "==> Setting keymap to ${KEYMAP}"
-cat > /etc/vconsole.conf <<EOL
-KEYMAP=${KEYMAP}
-EOL
+# As Omarchy does: systemd-firstboot writes KEYMAP and also derives the matching
+# X11 layout (XKBLAYOUT, XKBMODEL, XKBOPTIONS) from
+# /usr/share/systemd/kbd-model-map, e.g. sv-latin1 -> se, pc105,
+# terminate:ctrl_alt_bksp. Plymouth and Wayland compositors read the XKB values.
+systemd-firstboot --keymap="${KEYMAP}" --force
 
 echo "==> Setting locale to ${LOCALE}"
 sed -i 's/#\(en_US.UTF-8\)/\1/' /etc/locale.gen
@@ -1060,6 +1073,11 @@ configure_boot() {
     fi
   fi
 
+  # Local install hooks go in /etc/initcpio/install/, which mkinitcpio searches
+  # before /usr/lib/initcpio/install/. Hook files are sourced, not executed.
+  print_msg "Installing mkinitcpio hook vconsole-latin"
+  install -D -m 0644 "$VCONSOLE_LATIN_HOOK_SRC" /mnt/etc/initcpio/install/vconsole-latin
+
   arch-chroot /mnt env ROOT_PART="$ROOT_PART" ESP_PATH="$ESP_PATH" \
     OS_NAME="$OS_NAME" UKI_NAME="$UKI_NAME" /bin/bash -e <<'EOF'
 # Get root partition UUID for boot configuration
@@ -1102,11 +1120,14 @@ echo "==> Configure mkinitcpio"
 #                PIN prompt. Not the same thing as sd-vconsole, which only sets
 #                the keymap and font.
 #   sd-vconsole- applies /etc/vconsole.conf in the initramfs.
+#   vconsole-latin - local hook, after sd-vconsole: swaps a non-Latin XKBLAYOUT
+#                for "us" in the initramfs copy of vconsole.conf, so Plymouth's
+#                password prompt stays typeable.
 #   block      - must precede sd-encrypt so the block device modules backing the
 #                LUKS container are present when it runs.
 #   sd-encrypt - systemd-based unlock; the only hook that can use the TPM2 token
 #                written by systemd-cryptenroll.
-sed -i "s/HOOKS=.*/HOOKS=(base systemd plymouth autodetect microcode modconf kms keyboard sd-vconsole block sd-encrypt filesystems fsck)/g" /etc/mkinitcpio.conf
+sed -i "s/HOOKS=.*/HOOKS=(base systemd plymouth autodetect microcode modconf kms keyboard sd-vconsole vconsole-latin block sd-encrypt filesystems fsck)/g" /etc/mkinitcpio.conf
 sed -i 's/#\(COMPRESSION="zstd"\)/\1/' /etc/mkinitcpio.conf
 
 echo "==> Configure UKI (Unified Kernel Image)"
