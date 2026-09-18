@@ -296,84 +296,35 @@ validate_inputs() {
 
   validate_keymap
 
-  # The Plymouth theme is copied from next to this script late in the install.
-  # Check now, before the disk is wiped, rather than fail after partitioning.
-  if [ ! -f "${PLYMOUTH_THEME_SRC}/arch-linux.plymouth" ]; then
-    print_error "Plymouth theme not found: ${PLYMOUTH_THEME_SRC}/arch-linux.plymouth"
-    print_error "Run the script from a full checkout of the repository."
-    exit 1
-  fi
-
-  if [ ! -f "$PLYMOUTHD_CONF_SRC" ]; then
-    print_error "Plymouth config missing: $PLYMOUTHD_CONF_SRC"
-    print_error "Run the script from a full checkout of the repository."
-    exit 1
-  fi
-
-  if [ ! -f "$LIMINE_CONF_SRC" ]; then
-    print_error "Limine config missing: $LIMINE_CONF_SRC"
-    print_error "Run the script from a full checkout of the repository."
-    exit 1
-  fi
-
-  if [ ! -f "$LIMINE_HOOK_SRC" ]; then
-    print_error "Limine pacman hook missing: $LIMINE_HOOK_SRC"
-    print_error "Run the script from a full checkout of the repository."
-    exit 1
-  fi
-
-  if [ ! -f "$VCONSOLE_LATIN_HOOK_SRC" ]; then
-    print_error "mkinitcpio hook missing: $VCONSOLE_LATIN_HOOK_SRC"
-    print_error "Run the script from a full checkout of the repository."
-    exit 1
-  fi
-
-  if [ ! -f "$MKINITCPIO_HOOKS_CONF_SRC" ]; then
-    print_error "mkinitcpio drop-in missing: $MKINITCPIO_HOOKS_CONF_SRC"
-    print_error "Run the script from a full checkout of the repository."
-    exit 1
-  fi
-
-  if [ ! -f "$MKINITCPIO_PRESET_SRC" ]; then
-    print_error "mkinitcpio preset missing: $MKINITCPIO_PRESET_SRC"
-    print_error "Run the script from a full checkout of the repository."
-    exit 1
-  fi
-
-  for cmdline_file in $CMDLINE_FILES; do
-    if [ ! -f "${CMDLINE_SRC}/${cmdline_file}" ]; then
-      print_error "Kernel cmdline drop-in missing: ${CMDLINE_SRC}/${cmdline_file}"
-      print_error "Run the script from a full checkout of the repository."
-      exit 1
-    fi
+  # Everything the installer copies out of this repository. Checked now, before
+  # the disk is wiped, rather than failing halfway through the install.
+  local repo_file
+  local -a repo_files=(
+    # Stands in for the whole theme directory, which is copied with cp -rT.
+    "${PLYMOUTH_THEME_SRC}/arch-linux.plymouth"
+    "$PLYMOUTHD_CONF_SRC"
+    "$LIMINE_CONF_SRC"
+    "$LIMINE_HOOK_SRC"
+    "$VCONSOLE_LATIN_HOOK_SRC"
+    "$MKINITCPIO_HOOKS_CONF_SRC"
+    "$MKINITCPIO_PRESET_SRC"
+    "$LOCALE_CONF_SRC"
+    "$ZRAM_CONF_SRC"
+    "$SLEEP_HOOK_SRC"
+  )
+  for repo_file in $CMDLINE_FILES; do
+    repo_files+=("${CMDLINE_SRC}/${repo_file}")
+  done
+  for repo_file in $SUDOERS_FILES; do
+    repo_files+=("${SUDOERS_SRC}/${repo_file}")
   done
 
-  if [ ! -f "$LOCALE_CONF_SRC" ]; then
-    print_error "locale.conf template missing: $LOCALE_CONF_SRC"
+  for repo_file in "${repo_files[@]}"; do
+    [ -f "$repo_file" ] && continue
+    print_error "Missing repository file: $repo_file"
     print_error "Run the script from a full checkout of the repository."
     exit 1
-  fi
-
-  if [ ! -f "$ZRAM_CONF_SRC" ]; then
-    print_error "zram drop-in missing: $ZRAM_CONF_SRC"
-    print_error "Run the script from a full checkout of the repository."
-    exit 1
-  fi
-
-  local sudoers_file
-  for sudoers_file in $SUDOERS_FILES; do
-    if [ ! -f "${SUDOERS_SRC}/${sudoers_file}" ]; then
-      print_error "sudo drop-in missing: ${SUDOERS_SRC}/${sudoers_file}"
-      print_error "Run the script from a full checkout of the repository."
-      exit 1
-    fi
   done
-
-  if [ ! -f "$SLEEP_HOOK_SRC" ]; then
-    print_error "systemd-sleep hook missing: $SLEEP_HOOK_SRC"
-    print_error "Run the script from a full checkout of the repository."
-    exit 1
-  fi
 
   # Check for required tools
   for tool in sgdisk cryptsetup mkfs.fat mkfs.btrfs; do
