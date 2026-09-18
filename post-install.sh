@@ -17,8 +17,6 @@
 
 set -euo pipefail
 
-VERSION="1.0"
-
 DEFAULT_AUR_HELPER="paru"
 
 RED=$'\033[91m'
@@ -59,7 +57,7 @@ START_STAGE="packages"
 
 show_help() {
   cat <<EOF
-${YELLOW}===${BLUE} Arch Linux Post-Installation Script v${VERSION} ${YELLOW}===${NO_COLOR}
+Arch Linux Post-Installation Script
 
 Configures a system installed with arch-install.sh. Run it as root on the
 installed system after the first boot, not from the live ISO.
@@ -83,7 +81,9 @@ Stages:
   secureboot  Enrol Secure Boot keys with sbctl and sign the boot files
   tpm         Re-enrol TPM2 unlocking against the current PCR 7
   verify      Check the resulting configuration
+
 EOF
+  exit 0
 }
 
 parse_args() {
@@ -91,7 +91,6 @@ parse_args() {
     case "$1" in
       -h | --help)
         show_help
-        exit 0
         ;;
       -u | --user)
         AUR_USER="$2"
@@ -107,7 +106,7 @@ parse_args() {
         ;;
       *)
         print_error "Unknown option: $1"
-        show_help
+        print_error "Run with --help for usage."
         exit 1
         ;;
     esac
@@ -205,6 +204,43 @@ validate_inputs() {
     print_error "Run the script from a full checkout of the repository."
     exit 1
   done
+}
+
+# Verify that Secure Boot is disabled in UEFI
+secure_boot_state() {
+  local sb_var sb_line
+
+  sb_var="/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c"
+
+  if [ -r "$sb_var" ]; then
+    # Four bytes of EFI variable attributes, then the state byte.
+    case "$(od -An -t u1 -j 4 -N 1 "$sb_var" 2>/dev/null | tr -d '[:space:]')" in
+      1)
+        echo "enabled"
+        return 0
+        ;;
+      0)
+        echo "disabled"
+        return 0
+        ;;
+    esac
+  fi
+
+  if command -v bootctl >/dev/null 2>&1; then
+    sb_line=$(bootctl status 2>/dev/null | grep -m1 "Secure Boot:" || true)
+    case "$sb_line" in
+      *enabled*)
+        echo "enabled"
+        return 0
+        ;;
+      *disabled*)
+        echo "disabled"
+        return 0
+        ;;
+    esac
+  fi
+
+  echo "unknown"
 }
 
 # The root device behind the LUKS container, needed for TPM re-enrolment.
@@ -353,7 +389,20 @@ configure_snapper() {
 }
 
 configure_secureboot() {
+  local sb_state
+
   print_msg "Configuring Secure Boot"
+
+  sb_state=$(secure_boot_state)
+
+  # The second pass, after the reboot that turned Secure Boot on: the keys are
+  # enrolled and the firmware has left Setup Mode, so only signing repeats.
+  if [ "$sb_state" = "enabled" ]; then
+    print_msg "Secure Boot is already active; re-signing the boot files"
+    sbctl sign-all
+    sbctl verify || print_warning "sbctl reports unsigned files; check the list above."
+    return 0
+  fi
 
   if sbctl status | grep -q "Setup Mode:.*Disabled"; then
     print_error "The firmware is not in Setup Mode, so keys cannot be enrolled."
@@ -390,14 +439,22 @@ reenroll_tpm() {
     return 0
   fi
 
-  sb_state=$(bootctl status 2>/dev/null | grep -i "Secure Boot:" || true)
+  sb_state=$(secure_boot_state)
 
-  if ! grep -qi "enabled" <<<"$sb_state"; then
-    print_warning "Secure Boot is not active yet, so PCR 7 still measures the old policy."
-    print_warning "Enrolling now would bind the TPM to a value that changes at the next boot."
-    print_warning "Reboot with Secure Boot enabled, then run: post-install.sh --stage tpm"
-    return 0
-  fi
+  case "$sb_state" in
+    enabled) ;;
+    disabled)
+      print_warning "Secure Boot is not active yet, so PCR 7 still measures the old policy."
+      print_warning "Enrolling now would bind the TPM to a value that changes at the next boot."
+      print_warning "Reboot with Secure Boot enabled, then run: post-install.sh --stage tpm"
+      return 0
+      ;;
+    *)
+      print_warning "Could not determine the Secure Boot state, so PCR 7 cannot be trusted."
+      print_warning "Verify it with 'bootctl status', then run: post-install.sh --stage tpm"
+      return 0
+      ;;
+  esac
 
   root_part=$(detect_root_device)
 
@@ -471,7 +528,7 @@ print_summary() {
 }
 
 main() {
-  echo "${YELLOW}===${BLUE} Arch Linux Post-Installation Script v${VERSION} ${YELLOW}===${NO_COLOR}"
+  echo "${YELLOW}===${BLUE} Arch Linux Post-Installation Script ${YELLOW}===${NO_COLOR}"
 
   validate_inputs
 
@@ -479,7 +536,7 @@ main() {
     packages | aur | limine | snapper | secureboot | tpm | verify) ;;
     *)
       print_error "Unknown stage: $START_STAGE"
-      show_help
+      print_error "Run with --help for the list of stages."
       exit 1
       ;;
   esac

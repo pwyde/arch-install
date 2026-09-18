@@ -97,7 +97,6 @@ SUBVOLUMES=""
 EXTRA_PACKAGES=""
 NON_INTERACTIVE=0
 MICROCODE=""
-VERSION="1.0"
 
 # ESP mount options. FAT has no permission bits, so they come from the mount:
 # files 0600, directories 0700, all owned by root. This matches what mkinitcpio
@@ -149,7 +148,7 @@ ROOT_PASSWORD_VALID=0
 # Help function
 show_help() {
   cat <<EOF
-Arch Linux Encrypted Installation Script (v${VERSION})
+Arch Linux Installation Script
 
 Usage: $(basename "$0") [options]
 
@@ -238,6 +237,41 @@ parse_args() {
       ;;
     esac
   done
+}
+
+# Verify that Secure Boot is disabled in UEFI
+validate_secure_boot() {
+  local sb_var state=""
+
+  sb_var="/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c"
+
+  if [ -r "$sb_var" ]; then
+    # Four bytes of EFI variable attributes, then the state byte.
+    state=$(od -An -t u1 -j 4 -N 1 "$sb_var" 2>/dev/null | tr -d '[:space:]')
+  elif command -v bootctl >/dev/null 2>&1; then
+    local sb_line
+    sb_line=$(bootctl status 2>/dev/null | grep -m1 "Secure Boot:" || true)
+    case "$sb_line" in
+      *enabled*) state=1 ;;
+      *disabled*) state=0 ;;
+    esac
+  fi
+
+  case "$state" in
+    1)
+      print_error "Secure Boot is enabled. Disable it in the firmware setup before installing."
+      print_error "Nothing installed here is signed, so the system would not boot."
+      print_error "Enable it again after running post-install.sh, which enrolls keys with sbctl."
+      exit 1
+      ;;
+    0)
+      print_msg "Secure Boot is disabled"
+      ;;
+    *)
+      # No SecureBoot variable means the firmware does not implement Secure Boot.
+      print_warning "Could not determine the Secure Boot state; assuming it is disabled."
+      ;;
+  esac
 }
 
 # systemd-firstboot --root only checks the keymap name is well-formed, not that it exists.
@@ -1296,6 +1330,8 @@ main() {
   check_shell_nesting
 
   parse_args "$@"
+
+  validate_secure_boot
 
   # Determine partition names even if starting from a later stage
   if [[ "$START_STAGE" != "partitions" ]]; then
