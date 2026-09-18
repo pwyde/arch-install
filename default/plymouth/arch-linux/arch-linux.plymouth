@@ -6,6 +6,6 @@ ModuleName=script
 [script]
 ImageDir=/usr/share/plymouth/themes/arch-linux
 ScriptFile=/usr/share/plymouth/themes/arch-linux/arch-linux.script
-ConsoleLogBackgroundColor=0x1a1a1a
+ConsoleLogBackgroundColor=0x000000
 MonospaceFont=Cantarell 11
 Font=Cantarell 11
