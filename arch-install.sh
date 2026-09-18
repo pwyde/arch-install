@@ -239,7 +239,7 @@ parse_args() {
   done
 }
 
-# Verify that Secure Boot is disabled in UEFI
+# Exits when Secure Boot is on, since nothing written to the ESP is signed.
 validate_secure_boot() {
   local sb_var state=""
 

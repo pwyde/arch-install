@@ -206,7 +206,7 @@ validate_inputs() {
   done
 }
 
-# Verify that Secure Boot is disabled in UEFI
+# Echoes the Secure Boot state: enabled, disabled or unknown.
 secure_boot_state() {
   local sb_var sb_line
 
