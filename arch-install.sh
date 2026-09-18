@@ -120,47 +120,21 @@ ESP_MOUNT_OPTS="fmask=0177,dmask=0077"
 #     trimming on every delete.
 BTRFS_MOUNT_OPTS="compress=zstd:3,noatime,nodiscard"
 
-# Files installed from this repository, resolved relative to this script.
+# Repository files
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLYMOUTH_THEME_SRC="${SCRIPT_DIR}/default/plymouth/arch-linux"
 PLYMOUTHD_CONF_SRC="${SCRIPT_DIR}/etc/plymouth/plymouthd.conf"
-
-# Limine menu configuration shipped in this repository.
 LIMINE_CONF_SRC="${SCRIPT_DIR}/default/limine/limine.conf"
-
-# Pacman hook that redeploys Limine to the ESP after a package upgrade.
 LIMINE_HOOK_SRC="${SCRIPT_DIR}/etc/pacman.d/hooks/90-limine-deploy.hook"
-
-# Custom mkinitcpio install hook shipped in this repository. It gives the
-# initramfs copy of vconsole.conf a Latin XKB layout when the configured layout
-# has no Latin letters, so the unlock prompt stays typeable. See the hook file.
 VCONSOLE_LATIN_HOOK_SRC="${SCRIPT_DIR}/etc/initcpio/install/vconsole-latin"
-
-# mkinitcpio drop-in with the initramfs HOOKS, used instead of editing
-# /etc/mkinitcpio.conf.
 MKINITCPIO_HOOKS_CONF_SRC="${SCRIPT_DIR}/etc/mkinitcpio.conf.d/hooks.conf"
-
-# mkinitcpio preset shipped in this repository. It builds UKIs instead of bare
-# initramfs images.
 MKINITCPIO_PRESET_SRC="${SCRIPT_DIR}/etc/mkinitcpio.d/linux.preset"
-
-# Kernel command line drop-ins shipped in this repository. 10-root.conf and
-# 30-resume.conf are written by the script, since their values are only known
-# once the disk exists.
 CMDLINE_SRC="${SCRIPT_DIR}/etc/cmdline.d"
 CMDLINE_FILES="20-rtc-alarm.conf 80-initramfs-async.conf 90-splash.conf"
-
-# @LOCALE@ is substituted with ${LOCALE} at install time.
 LOCALE_CONF_SRC="${SCRIPT_DIR}/etc/locale.conf"
-
-# zram-generator drop-in shipped in this repository.
 ZRAM_CONF_SRC="${SCRIPT_DIR}/etc/systemd/zram-generator.conf.d/90-zram.conf"
-
-# sudo drop-ins shipped in this repository, installed to /etc/sudoers.d/.
 SUDOERS_SRC="${SCRIPT_DIR}/etc/sudoers.d"
 SUDOERS_FILES="00-wheel 01-timeout 02-passwd-tries"
-
-# systemd-sleep hook shipped in this repository, installed for hibernation.
 SLEEP_HOOK_SRC="${SCRIPT_DIR}/default/systemd/system-sleep/keyboard-backlight"
 
 # Default start at beginning
