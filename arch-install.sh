@@ -120,7 +120,7 @@ ESP_MOUNT_OPTS="fmask=0177,dmask=0077"
 #     trimming on every delete.
 BTRFS_MOUNT_OPTS="compress=zstd:3,noatime,nodiscard"
 
-# Plymouth theme, based on Omarchy Linux.
+# Files installed from this repository, resolved relative to this script.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLYMOUTH_THEME_SRC="${SCRIPT_DIR}/default/plymouth/arch-linux"
 PLYMOUTHD_CONF_SRC="${SCRIPT_DIR}/etc/plymouth/plymouthd.conf"
@@ -848,14 +848,13 @@ configure_tpm() {
 
 # Configure hibernation
 #
-# Mirrors omarchy-hibernation-setup, which Omarchy's installer runs in the
-# chroot with --force --no-rebuild: a swapfile the size of RAM in its own Btrfs
-# subvolume, an fstab entry at pri=0, and resume= parameters for the initramfs.
+# A swapfile the size of RAM in its own Btrfs subvolume, an fstab entry at
+# pri=0, and resume= parameters for the initramfs.
 #
-# Differences from Omarchy, all forced by this installer's setup:
-#   - No 'resume' mkinitcpio hook. Omarchy boots a busybox initramfs, where that
-#     hook is required. The 'systemd' hook used here replaces it and already
-#     ships systemd-hibernate-resume, which reads the same resume= parameters.
+# Notes on this setup:
+#   - No 'resume' mkinitcpio hook. That hook is only required by a busybox
+#     initramfs. The 'systemd' hook used here already ships
+#     systemd-hibernate-resume, which reads the same resume= parameters.
 #   - resume= goes into /etc/cmdline.d/, which mkinitcpio embeds in the UKI,
 #     instead of a limine-entry-tool drop-in. It must therefore be written
 #     before configure_boot runs mkinitcpio.
@@ -930,12 +929,12 @@ EOF
 
 # Configure Plymouth
 #
-# Mirrors Omarchy's setup: the theme in /usr/share/plymouth/themes/, Theme= in
-# /etc/plymouth/plymouthd.conf, the plymouth mkinitcpio hook, and Omarchy's
-# quiet-boot kernel command line.
+# The theme in /usr/share/plymouth/themes/, Theme= in
+# /etc/plymouth/plymouthd.conf, the plymouth mkinitcpio hook and the quiet-boot
+# kernel command line.
 #
-# Differences from Omarchy, forced by this installer's setup:
-#   - No FILES+=(/etc/vconsole.conf) drop-in. Omarchy needs it with its busybox
+# Notes on this setup:
+#   - No FILES+=(/etc/vconsole.conf) drop-in. That is only required by a busybox
 #     initramfs; here the sd-vconsole hook already copies vconsole.conf in.
 #   - The kernel parameters go into /etc/cmdline.d/, which mkinitcpio embeds in
 #     the UKI, instead of a limine-entry-tool drop-in.
