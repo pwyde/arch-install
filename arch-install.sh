@@ -150,6 +150,9 @@ MKINITCPIO_PRESET_SRC="${SCRIPT_DIR}/etc/mkinitcpio.d/linux.preset"
 CMDLINE_SRC="${SCRIPT_DIR}/etc/cmdline.d"
 CMDLINE_FILES="20-rtc-alarm.conf 80-initramfs-async.conf 90-splash.conf"
 
+# @LOCALE@ is substituted with ${LOCALE} at install time.
+LOCALE_CONF_SRC="${SCRIPT_DIR}/etc/locale.conf"
+
 # zram-generator drop-in shipped in this repository.
 ZRAM_CONF_SRC="${SCRIPT_DIR}/etc/systemd/zram-generator.conf.d/90-zram.conf"
 
@@ -344,6 +347,12 @@ validate_inputs() {
       exit 1
     fi
   done
+
+  if [ ! -f "$LOCALE_CONF_SRC" ]; then
+    print_error "locale.conf template missing: $LOCALE_CONF_SRC"
+    print_error "Run the script from a full checkout of the repository."
+    exit 1
+  fi
 
   if [ ! -f "$ZRAM_CONF_SRC" ]; then
     print_error "zram drop-in missing: $ZRAM_CONF_SRC"
@@ -686,6 +695,10 @@ configure_basic_system() {
   validate_keymap
   systemd-firstboot --root=/mnt --keymap="${KEYMAP}"
 
+  print_msg "Setting locale to ${LOCALE}"
+  sed "s|@LOCALE@|${LOCALE}|g" "$LOCALE_CONF_SRC" |
+    install -D -m 0644 /dev/stdin /mnt/etc/locale.conf
+
   print_msg "Configuring ZRAM"
   install -D -m 0644 "$ZRAM_CONF_SRC" /mnt/etc/systemd/zram-generator.conf.d/90-zram.conf
 
@@ -702,35 +715,11 @@ cat > /etc/hosts <<EOL
 127.0.1.1   ${HOSTNAME}.localdomain ${HOSTNAME}
 EOL
 
-echo "==> Setting locale to ${LOCALE}"
+echo "==> Generating locales"
 sed -i 's/#\(en_US.UTF-8\)/\1/' /etc/locale.gen
 sed -i 's/#\(en_GB.UTF-8\)/\1/' /etc/locale.gen
 sed -i 's/#\(${LOCALE}\)/\1/' /etc/locale.gen
 locale-gen
-cat > /etc/locale.conf <<EOL
-# Determines the default locale in the absence of other locale related environment variables.
-LANG=en_GB.UTF-8
-# Format of interactive words and responses.
-LC_MESSAGES=en_GB.UTF-8
-# Character classification and case conversion.
-LC_CTYPE=${LOCALE}
-# Numeric formatting.
-LC_NUMERIC=${LOCALE}
-# Date and time formats.
-LC_TIME=${LOCALE}
-# Monetary formatting.
-LC_MONETARY=${LOCALE}
-# Default measurement system used within the region.
-LC_MEASUREMENT=${LOCALE}
-# Convention used for formatting of street or postal addresses.
-LC_ADDRESS=${LOCALE}
-# Conventions used for representation of telephone numbers.
-LC_TELEPHONE=${LOCALE}
-# Default paper size for region.
-LC_PAPER=${LOCALE}
-# Collation order.
-LC_COLLATE=${LOCALE}
-EOL
 
 echo "==> Configuring pacman"
 sed -i "/Color/s/^#//" /etc/pacman.conf
