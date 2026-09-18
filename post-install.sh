@@ -47,6 +47,7 @@ LIMINE_TOOL_CONF_SRC="${SCRIPT_DIR}/etc/limine-entry-tool.d/50-arch.conf"
 ESP_PATH="/boot"
 LIMINE_DEFAULT_CONF="/etc/default/limine"
 SNAPPER_CONFIG="/etc/snapper/configs/root"
+MKINITCPIO_PRESET="/etc/mkinitcpio.d/linux.preset"
 
 REPO_PACKAGES="snapper snap-pac sbctl git base-devel"
 AUR_PACKAGES="limine-mkinitcpio-hook limine-snapper-sync"
@@ -304,6 +305,23 @@ install_aur_packages() {
   sudo -u "$AUR_USER" "$DEFAULT_AUR_HELPER" -S --needed --noconfirm $AUR_PACKAGES
 }
 
+# limine-mkinitcpio-hook replaces mkinitcpio's pacman hook and builds the UKIs
+# by calling mkinitcpio directly, so presets are never read again. Leaving this
+# one behind invites a manual 'mkinitcpio -P' to rebuild the UKIs with an
+# embedded command line, which the entries in limine.conf then contradict.
+remove_mkinitcpio_preset() {
+  [ -f "$MKINITCPIO_PRESET" ] || return 0
+
+  # Without the hook nothing else generates UKIs, so the preset has to stay.
+  if ! pacman -Q limine-mkinitcpio-hook &>/dev/null; then
+    print_warning "limine-mkinitcpio-hook is not installed; keeping ${MKINITCPIO_PRESET}."
+    return 0
+  fi
+
+  print_msg "Removing the unused mkinitcpio preset"
+  rm -f "$MKINITCPIO_PRESET"
+}
+
 # Assemble the kernel command line exactly as mkinitcpio does when it embeds it
 # in the UKI: every *.conf in /etc/cmdline.d/ in version-sort order, comments
 # stripped, joined with spaces.
@@ -549,6 +567,7 @@ main() {
       bootstrap_aur_helper
       configure_limine_tool
       install_aur_packages
+      remove_mkinitcpio_preset
       configure_snapper
       configure_secureboot
       reenroll_tpm
@@ -561,6 +580,7 @@ main() {
       bootstrap_aur_helper
       configure_limine_tool
       install_aur_packages
+      remove_mkinitcpio_preset
       ;;
     limine)
       configure_limine_tool
