@@ -140,6 +140,16 @@ VCONSOLE_LATIN_HOOK_SRC="${SCRIPT_DIR}/etc/initcpio/install/vconsole-latin"
 # /etc/mkinitcpio.conf.
 MKINITCPIO_HOOKS_CONF_SRC="${SCRIPT_DIR}/etc/mkinitcpio.conf.d/hooks.conf"
 
+# mkinitcpio preset shipped in this repository. It builds UKIs instead of bare
+# initramfs images.
+MKINITCPIO_PRESET_SRC="${SCRIPT_DIR}/etc/mkinitcpio.d/linux.preset"
+
+# Kernel command line drop-ins shipped in this repository. 10-root.conf and
+# 30-resume.conf are written by the script, since their values are only known
+# once the disk exists.
+CMDLINE_SRC="${SCRIPT_DIR}/etc/cmdline.d"
+CMDLINE_FILES="20-rtc-alarm.conf 80-initramfs-async.conf 90-splash.conf"
+
 # zram-generator drop-in shipped in this repository.
 ZRAM_CONF_SRC="${SCRIPT_DIR}/etc/systemd/zram-generator.conf.d/90-zram.conf"
 
@@ -320,6 +330,20 @@ validate_inputs() {
     print_error "Run the script from a full checkout of the repository."
     exit 1
   fi
+
+  if [ ! -f "$MKINITCPIO_PRESET_SRC" ]; then
+    print_error "mkinitcpio preset missing: $MKINITCPIO_PRESET_SRC"
+    print_error "Run the script from a full checkout of the repository."
+    exit 1
+  fi
+
+  for cmdline_file in $CMDLINE_FILES; do
+    if [ ! -f "${CMDLINE_SRC}/${cmdline_file}" ]; then
+      print_error "Kernel cmdline drop-in missing: ${CMDLINE_SRC}/${cmdline_file}"
+      print_error "Run the script from a full checkout of the repository."
+      exit 1
+    fi
+  done
 
   if [ ! -f "$ZRAM_CONF_SRC" ]; then
     print_error "zram drop-in missing: $ZRAM_CONF_SRC"
@@ -954,15 +978,14 @@ if [ -n "$RESUME_OFFSET" ]; then
 else
   echo "WARNING: Could not determine resume offset for $SWAP_FILE; hibernation will not resume." >&2
 fi
-
-# On s2idle systems the ACPI RTC alarm is needed for suspend-then-hibernate to
-# wake the machine up to hibernate.
-if grep -q "\[s2idle\]" /sys/power/mem_sleep 2>/dev/null; then
-  echo "==> Enabling ACPI RTC alarm for s2idle suspend"
-  mkdir -p /etc/cmdline.d
-  echo "rtc_cmos.use_acpi_alarm=1" >/etc/cmdline.d/20-rtc-alarm.conf
-fi
 EOF
+
+  # The live ISO runs on the target hardware, so /sys/power/mem_sleep reports
+  # the same suspend modes the installed system will see.
+  if grep -q "\[s2idle\]" /sys/power/mem_sleep 2>/dev/null; then
+    print_msg "Enabling ACPI RTC alarm for s2idle suspend"
+    install -D -m 0644 "${CMDLINE_SRC}/20-rtc-alarm.conf" /mnt/etc/cmdline.d/20-rtc-alarm.conf
+  fi
 }
 
 # Configure Plymouth
@@ -991,27 +1014,16 @@ configure_plymouth() {
   cp -rT --no-preserve=mode,ownership "$PLYMOUTH_THEME_SRC" "$theme_dir"
   install -D -m 0644 "$PLYMOUTHD_CONF_SRC" /mnt/etc/plymouth/plymouthd.conf
 
+  print_msg "Installing Plymouth kernel parameters"
+  install -D -m 0644 "${CMDLINE_SRC}/80-initramfs-async.conf" /mnt/etc/cmdline.d/80-initramfs-async.conf
+  install -D -m 0644 "${CMDLINE_SRC}/90-splash.conf" /mnt/etc/cmdline.d/90-splash.conf
+
   arch-chroot /mnt /bin/bash -e <<'EOF'
 echo "==> Setting default Plymouth theme"
 # Fails if the theme or its plugin is missing, which would otherwise only show
 # up as an error from the plymouth hook during mkinitcpio.
 plymouth-set-default-theme arch-linux
 echo "Default theme: $(plymouth-set-default-theme)"
-
-echo "==> Adding Plymouth kernel parameters"
-mkdir -p /etc/cmdline.d
-# Kernel 7.1 unpacks the initramfs asynchronously, racing /init: plymouthd
-# cannot read /proc/cmdline yet, exits, and an encrypted boot falls back to an
-# unthemed text prompt. Unpack synchronously until the race is fixed upstream.
-cat > /etc/cmdline.d/80-initramfs-async.conf <<EOL
-initramfs_async=0
-EOL
-# splash starts Plymouth; the rest keeps kernel, systemd and udev output and the
-# console cursor off the screen. Note vt.global_cursor_default=0 also hides the
-# cursor on text consoles after boot.
-cat > /etc/cmdline.d/90-splash.conf <<EOL
-quiet splash loglevel=0 systemd.show_status=false rd.udev.log_level=0 vt.global_cursor_default=0
-EOL
 EOF
 }
 
@@ -1092,6 +1104,11 @@ configure_boot() {
   print_msg "Installing mkinitcpio drop-in hooks.conf"
   install -D -m 0644 "$MKINITCPIO_HOOKS_CONF_SRC" /mnt/etc/mkinitcpio.conf.d/hooks.conf
 
+  # Replaces the preset shipped by the linux package, which builds bare
+  # initramfs images instead of UKIs.
+  print_msg "Installing mkinitcpio preset linux.preset"
+  install -D -m 0644 "$MKINITCPIO_PRESET_SRC" /mnt/etc/mkinitcpio.d/linux.preset
+
   arch-chroot /mnt env ROOT_PART="$ROOT_PART" /bin/bash -e <<'EOF'
 # Get root partition UUID for boot configuration
 ROOT_UUID=$(blkid -s UUID -o value "${ROOT_PART}")
@@ -1107,41 +1124,9 @@ if [ ! -f /boot/vmlinuz-linux ]; then
 fi
 
 echo "==> Adjust cmdline"
-# The UKI embeds this command line, so Limine does not need to supply one.
-#
-# mkinitcpio reads /etc/kernel/cmdline first, then every *.conf in
-# /etc/cmdline.d/ in name order (sort -V). Everything lives in cmdline.d with a
-# numeric prefix so the order is explicit, and /etc/kernel/cmdline is not used
-# at all -- anything in it would always come first. Gaps leave room for later
-# drop-ins:
-#   10-root.conf             LUKS unlock and root filesystem
-#   20-rtc-alarm.conf        written by configure_hibernation on s2idle systems
-#   30-resume.conf           written by configure_hibernation
-#   80-initramfs-async.conf  written by configure_plymouth
-#   90-splash.conf           written by configure_plymouth; quiet boot, last
 mkdir -p /etc/cmdline.d
 cat > /etc/cmdline.d/10-root.conf <<EOL
 rd.luks.name=${ROOT_UUID}=cryptroot root=/dev/mapper/cryptroot zswap.enabled=0 rw rootfstype=btrfs rootflags=subvol=/@
-EOL
-
-echo "==> Configure UKI (Unified Kernel Image)"
-cat > /etc/mkinitcpio.d/linux.preset <<EOL
-# mkinitcpio preset file for the 'linux' package
-
-#ALL_config="/etc/mkinitcpio.conf"
-ALL_kver="/boot/vmlinuz-linux"
-
-PRESETS=('default' 'fallback')
-
-#default_config="/etc/mkinitcpio.conf"
-#default_image="/boot/initramfs-linux.img"
-default_uki="/boot/EFI/Linux/arch_linux.efi"
-#default_options="--splash /usr/share/systemd/bootctl/splash-arch.bmp"
-
-#fallback_config="/etc/mkinitcpio.conf"
-#fallback_image="/boot/initramfs-linux-fallback.img"
-fallback_uki="/boot/EFI/Linux/arch_linux-fallback.efi"
-fallback_options="-S autodetect"
 EOL
 
 echo "==> Generate UKI (Unified Kernel Image)"

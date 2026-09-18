@@ -220,10 +220,10 @@ drop-ins after `/etc/mkinitcpio.conf`, so this `HOOKS` wins.
 
 mkinitcpio skips drop-ins entirely when it is given a config file with `-c`, and
 a preset that sets `ALL_config` or `<preset>_config` does exactly that. The
-generated `/etc/mkinitcpio.d/linux.preset` therefore leaves `ALL_config` commented
-out, as mkinitcpio's own preset template does. Adding it back would silently
-build the UKI from the stock `HOOKS`, without `sd-encrypt`, and the system would
-not be able to unlock its disk.
+[`etc/mkinitcpio.d/linux.preset`](./etc/mkinitcpio.d/linux.preset) shipped here
+therefore leaves `ALL_config` commented out, as mkinitcpio's own preset template
+does. Adding it back would silently build the UKI from the stock `HOOKS`,
+without `sd-encrypt`, and the system would not be able to unlock its disk.
 
 ## Boot screen colors
 
@@ -271,10 +271,11 @@ The boot splash is set up the way Omarchy does it:
   the `HOOKS` of the drop-in
   [`etc/mkinitcpio.conf.d/hooks.conf`](./etc/mkinitcpio.conf.d/hooks.conf).
 - **Omarchy's quiet-boot kernel parameters**, embedded in the UKI:
-  - `/etc/cmdline.d/80-initramfs-async.conf`: `initramfs_async=0`, working
-    around a kernel 7.1 race in which Plymouth exits before it can read
-    `/proc/cmdline` and an encrypted boot falls back to a plain text prompt.
-  - `/etc/cmdline.d/90-splash.conf`:
+  - [`etc/cmdline.d/80-initramfs-async.conf`](./etc/cmdline.d/80-initramfs-async.conf):
+    `initramfs_async=0`, working around a kernel 7.1 race in which Plymouth
+    exits before it can read `/proc/cmdline` and an encrypted boot falls back
+    to a plain text prompt.
+  - [`etc/cmdline.d/90-splash.conf`](./etc/cmdline.d/90-splash.conf):
     `quiet splash loglevel=0 systemd.show_status=false rd.udev.log_level=0 vt.global_cursor_default=0`.
 
 How it fits the rest of this install:
