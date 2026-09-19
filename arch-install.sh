@@ -27,7 +27,7 @@ DEFAULT_LOCALE="sv_SE.UTF-8"
 # No snapshots subvolume here on purpose: 'snapper create-config' creates its
 # own /.snapshots and refuses to run when the path already exists.
 DEFAULT_SUBVOLUMES="@ @home @cache @log @root"
-DEFAULT_PACKAGES="base base-devel bash-completion brightnessctl btrfs-progs cryptsetup dosfstools efibootmgr git limine linux linux-firmware man-db man-pages nano networkmanager openssh plymouth snap-pac snapper sudo terminus-font unzip util-linux vim zram-generator"
+DEFAULT_PACKAGES="base base-devel bash-completion btrfs-progs cryptsetup dosfstools efibootmgr git limine linux linux-firmware man-db man-pages nano networkmanager openssh plymouth snap-pac snapper sudo terminus-font unzip util-linux vim zram-generator"
 
 # Color variables
 RED=$'\033[91m'
@@ -650,13 +650,14 @@ configure_system() {
   # reads the default theme, and the kernel parameters are embedded in the UKI.
   configure_plymouth
 
-  # Must precede configure_boot: HOOKS references sd-btrfs-overlayfs, which
-  # limine-mkinitcpio-hook ships, and mkinitcpio fails on an unknown hook.
-  install_limine_hooks
-
-  # Boot setup (mkinitcpio, UKI, Limine)
-  configure_limine_tool
+  # Boot setup: installs every file the Limine packages read, and writes
+  # /etc/cmdline.d/10-root.conf, which configure_limine_tool mirrors.
   configure_boot
+  configure_limine_tool
+
+  # Last: installing limine-mkinitcpio-hook fires its pacman hook, which builds
+  # the UKIs straight away from the configuration written above.
+  install_limine_hooks
 
   configure_snapshots
 
@@ -1072,28 +1073,7 @@ cat > /etc/cmdline.d/10-root.conf <<EOL
 rd.luks.name=${ROOT_UUID}=cryptroot root=/dev/mapper/cryptroot zswap.enabled=0 rw rootfstype=btrfs rootflags=subvol=/@
 EOL
 
-echo "==> Generate UKI (Unified Kernel Image)"
 mkdir -p "/boot/EFI/Linux"
-if command -v limine-mkinitcpio >/dev/null 2>&1; then
-  limine-mkinitcpio
-else
-  # Only reached when this stage is run on its own, before the Limine packages
-  # are installed. Builds the UKIs the same way limine-mkinitcpio would.
-  kver=$(basename "$(find /usr/lib/modules -maxdepth 1 -mindepth 1 -type d -name '*-arch*' | head -n1)")
-  mkinitcpio --kernel "$kver" --uki /boot/EFI/Linux/arch_linux.efi
-  mkinitcpio --kernel "$kver" -S autodetect --uki /boot/EFI/Linux/arch_linux-fallback.efi
-fi
-
-# pacstrap ran mkinitcpio with the stock preset, which wrote plain initramfs
-# images. Now that /boot is the ESP those sit on the FAT partition costing a few
-# hundred MiB, and nothing boots them -- the UKIs replaced them.
-rm -f /boot/initramfs-linux.img /boot/initramfs-linux-fallback.img
-
-if [ ! -f "/boot/EFI/Linux/arch_linux.efi" ]; then
-  echo "ERROR: /boot/EFI/Linux/arch_linux.efi not found. UKI generation failed!" >&2
-  find "/boot/EFI/Linux" -ls >&2
-  exit 1
-fi
 
 echo "==> Installing Limine"
 # The limine package only ships the EFI binaries; deploying them and writing
@@ -1191,11 +1171,32 @@ install_limine_hooks() {
   arch-chroot /mnt bash -c \
     'pacman -U --noconfirm /var/cache/pacman/pkg/limine-mkinitcpio-hook-*.pkg.tar.zst /var/cache/pacman/pkg/limine-snapper-sync-*.pkg.tar.zst'
 
-  # The hook overrides mkinitcpio's pacman hook and builds the UKIs by calling
-  # mkinitcpio directly, so the preset pacstrap generated is never read again.
-  # Leaving it behind invites a manual 'mkinitcpio -P' to write UKIs that
-  # disagree with the entries in limine.conf.
-  arch-chroot /mnt rm -f /etc/mkinitcpio.d/linux.preset
+  # Installing the package fires its own pacman hook, which builds the UKIs
+  # immediately -- which is why every piece of configuration it reads has to be
+  # in place before this runs.
+  arch-chroot /mnt /bin/bash -e <<'EOF'
+# The hook overrides mkinitcpio's pacman hook and builds the UKIs by calling
+# mkinitcpio directly, so the preset pacstrap generated is never read again.
+# Leaving it behind invites a manual 'mkinitcpio -P' to write UKIs that
+# disagree with the entries in limine.conf.
+rm -f /etc/mkinitcpio.d/linux.preset
+
+if [ ! -f /boot/EFI/Linux/arch_linux.efi ]; then
+  echo "==> Generating UKIs"
+  limine-mkinitcpio
+fi
+
+# pacstrap ran mkinitcpio with the stock preset, which wrote plain initramfs
+# images. Now that /boot is the ESP those sit on the FAT partition costing a few
+# hundred MiB, and nothing boots them -- the UKIs replaced them.
+rm -f /boot/initramfs-linux.img /boot/initramfs-linux-fallback.img
+
+if [ ! -f /boot/EFI/Linux/arch_linux.efi ]; then
+  echo "ERROR: /boot/EFI/Linux/arch_linux.efi not found. UKI generation failed!" >&2
+  find /boot/EFI -ls >&2
+  exit 1
+fi
+EOF
 }
 
 # Snapshots of the root subvolume, and a Limine entry for each one.
