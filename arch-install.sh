@@ -1160,7 +1160,10 @@ install_limine_hooks() {
   install -d -m 0755 /mnt/var/cache/pacman/pkg
   cp "${LIMINE_PKG_SRC}"/*.pkg.tar.zst /mnt/var/cache/pacman/pkg/
 
-  arch-chroot /mnt bash -c \
+  # SNAP_PAC_SKIP stops snap-pac taking pre/post snapshots of this transaction.
+  # Snapper has no configuration yet, so its hooks only fail noisily in the
+  # chroot with 'fatal library error, lookup self'.
+  arch-chroot /mnt env SNAP_PAC_SKIP=y bash -c \
     'pacman -U --noconfirm /var/cache/pacman/pkg/limine-mkinitcpio-hook-*.pkg.tar.zst /var/cache/pacman/pkg/limine-snapper-sync-*.pkg.tar.zst'
 
   # Installing the package fires its own pacman hook, which builds the UKIs
