@@ -1105,14 +1105,6 @@ efibootmgr || echo "WARNING: efibootmgr failed"
 echo "==> ESP contents:"
 find "/boot/EFI" -type f \( -name '*.efi' -o -name '*.EFI' \) | sort
 EOF
-
-  # Verify boot files exist
-  print_msg "Verifying boot files..."
-  if [ -f "/mnt/boot/EFI/Linux/arch_linux.efi" ]; then
-    print_msg "UKI created successfully"
-  else
-    print_warning "⚠️  UKI not found. Boot will likely fail!  ⚠️"
-  fi
 }
 
 # Assembles the kernel command line the way mkinitcpio does when it embeds it in
