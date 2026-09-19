@@ -236,7 +236,8 @@ Three deliberate choices:
 | `swapon` after creating the file | no `swapon` | In the installer it would activate swap on the live ISO's kernel and pin `/mnt`. The fstab entry activates it on first boot. |
 
 The resume offset is fixed at install time. If the swapfile is ever recreated,
-regenerate `/etc/cmdline.d/30-resume.conf` and rebuild the UKI with `mkinitcpio -P`.
+regenerate `/etc/cmdline.d/30-resume.conf` and rebuild the UKI with
+`limine-mkinitcpio`.
 
 ## Initramfs
 
@@ -246,29 +247,38 @@ installed to `/etc/mkinitcpio.conf.d/`, so `/etc/mkinitcpio.conf` stays as the
 package ships it. Drop-ins are read after the main file, so this `HOOKS` wins.
 
 ```
-HOOKS=(base udev plymouth keyboard autodetect microcode modconf kms keymap
-       consolefont vconsole-latin block encrypt filesystems fsck btrfs-overlayfs)
+HOOKS=(base systemd plymouth autodetect microcode modconf kms keyboard
+       sd-vconsole vconsole-latin block sd-encrypt filesystems fsck
+       sd-btrfs-overlayfs)
 ```
 
-This is a **udev-based initramfs**, not a systemd one. That choice follows from
-snapshots: `btrfs-overlayfs`, shipped by `limine-mkinitcpio-hook`, is what mounts
-a read-only snapshot under a writable overlay so a snapshot entry can boot.
+This is a **systemd-based initramfs**. `limine-mkinitcpio-hook` ships an
+overlayfs hook for each kind -- `sd-btrfs-overlayfs` for this one and
+`btrfs-overlayfs` for a busybox initramfs -- so bootable snapshots do not
+constrain the choice. systemd is used because it carries three things the
+busybox path would need worked around:
 
-- **`encrypt`** unlocks the container named by `cryptdevice=` on the kernel
-  command line, written as
-  `cryptdevice=UUID=<LUKS_UUID>:cryptroot:allow-discards`. The
-  `:allow-discards` suffix is what preserves TRIM through dm-crypt.
-- **`plymouth`** sits after `udev` and before `encrypt`, so the splash is up in
-  time to take the passphrase.
-- **`keyboard`** loads keyboard modules, which is not the same as `keymap`: one
-  makes a USB keyboard work at all, the other applies `KEYMAP`.
-- **`btrfs-overlayfs`** only exists once `limine-mkinitcpio-hook` is installed,
-  which is why the installer builds the AUR packages *before* it generates the
-  UKIs. `mkinitcpio` fails on an unknown hook.
-- **`resume`** comes from a second drop-in,
-  [`etc/mkinitcpio.conf.d/resume.conf`](./etc/mkinitcpio.conf.d/resume.conf), so
-  that removing hibernation means deleting one file. A udev initramfs needs it;
-  a systemd one would not.
+- **`sd-vconsole` puts `/etc/vconsole.conf` in the initramfs**, which is what
+  gives Plymouth the right `XKBLAYOUT` at the passphrase prompt. A busybox
+  initramfs does not include that file at all.
+- **Resuming from hibernation needs no extra hook.** The `systemd` hook ships
+  `systemd-hibernate-resume`, which reads the `resume=` parameters; the busybox
+  path needs `HOOKS+=(resume)`.
+- **LUKS2 tokens remain usable.** Only `sd-encrypt` can use a token written by
+  `systemd-cryptenroll`, so adding a hardware key later would not mean rebuilding
+  the initramfs and rewriting the command line.
+
+Other notes:
+
+- **`sd-encrypt`** unlocks the container named by `rd.luks.name=` on the kernel
+  command line.
+- **`plymouth`** sits after `systemd` and before `sd-encrypt`, so the splash is
+  up in time to take the passphrase through `systemd-ask-password`.
+- **`keyboard`** loads keyboard modules, which is not the same as `sd-vconsole`:
+  one makes a USB keyboard work at all, the other applies the keymap and font.
+- **`sd-btrfs-overlayfs`** only exists once `limine-mkinitcpio-hook` is
+  installed, which is why the installer builds the AUR packages *before* it
+  generates the UKIs. `mkinitcpio` fails on an unknown hook.
 
 There is **no mkinitcpio preset**. `limine-mkinitcpio-hook` overrides
 mkinitcpio's own pacman hook and builds the UKIs by calling `mkinitcpio`
@@ -316,7 +326,7 @@ The boot splash is made up of:
 - **`Theme=arch-linux`** in `/etc/plymouth/plymouthd.conf`, installed from
   [`etc/plymouth/plymouthd.conf`](./etc/plymouth/plymouthd.conf). The theme id has no
   space because `plymouth-set-default-theme` uses it unquoted in paths.
-- **The `plymouth` mkinitcpio hook**, after `udev` and before `encrypt`, in
+- **The `plymouth` mkinitcpio hook**, after `systemd` and before `sd-encrypt`, in
   the `HOOKS` of the drop-in
   [`etc/mkinitcpio.conf.d/hooks.conf`](./etc/mkinitcpio.conf.d/hooks.conf).
 - **Quiet-boot kernel parameters**, embedded in the UKI:
@@ -329,20 +339,20 @@ The boot splash is made up of:
 
 How it fits the rest of this install:
 
-- **The passphrase prompt.** Plymouth does not unlock anything; the `encrypt`
-  hook asks for the passphrase through Plymouth when the splash is running, so
-  it is typed into the splash rather than at a text prompt. The theme draws a
-  lock icon and an entry field but not the prompt text.
+- **The passphrase prompt.** Plymouth does not unlock anything; with a systemd
+  initramfs the hook installs `systemd-ask-password-plymouth`, so the passphrase
+  `systemd-cryptsetup` asks for is typed into the splash. The theme draws a lock
+  icon and an entry field but not the prompt text.
 - **Keyboard layout.** `/etc/vconsole.conf` is written by
   `systemd-firstboot --keymap`, which sets `KEYMAP` and derives the
   matching `XKBLAYOUT`, `XKBMODEL` and `XKBOPTIONS` from systemd's
-  `kbd-model-map` (for example `sv-latin1` becomes `se`). A udev initramfs does
-  not include that file on its own, so the local hook below adds it; because
-  `XKBLAYOUT` is set, Plymouth reads the passphrase with that xkb layout. With
+  `kbd-model-map` (for example `sv-latin1` becomes `se`). The `sd-vconsole`
+  hook copies the file into the initramfs, and because `XKBLAYOUT` is set,
+  Plymouth reads the passphrase with that xkb layout. With
   a keymap whose layout does not type Latin letters (such as Russian or Greek),
   a Latin passphrase could not be typed at the prompt. The local mkinitcpio hook
   [`etc/initcpio/install/vconsole-latin`](./etc/initcpio/install/vconsole-latin),
-  installed to `/etc/initcpio/install/` and listed after `consolefont`, guards
+  installed to `/etc/initcpio/install/` and listed after `sd-vconsole`, guards
   against that: for such layouts it replaces the initramfs copy of
   `vconsole.conf` with one that sets `XKBLAYOUT=us`. The installed system's
   `vconsole.conf` is not changed, and the check runs on every rebuild.

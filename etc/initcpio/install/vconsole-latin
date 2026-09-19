@@ -1,20 +1,19 @@
 #!/usr/bin/env bash
-# mkinitcpio install hook: put /etc/vconsole.conf in the initramfs and keep the
-# unlock prompt typeable with non-Latin keyboard layouts.
+# mkinitcpio install hook: keep the unlock prompt typeable with non-Latin
+# keyboard layouts.
 #
-# Plymouth reads XKBLAYOUT from the initramfs copy of /etc/vconsole.conf and uses
-# it for keyboard input at the password prompt. A busybox initramfs does not
-# include that file on its own -- the keymap hook only applies KEYMAP -- so this
-# hook adds it, which is what makes the graphical prompt use the right layout.
+# The sd-vconsole hook copies /etc/vconsole.conf into the initramfs. Plymouth
+# reads XKBLAYOUT from that copy and uses it for keyboard input at the password
+# prompt. A layout such as "ru" or "gr" has no Latin letters, so a Latin
+# passphrase cannot be typed there.
 #
-# A layout such as "ru" or "gr" has no Latin letters, so a Latin passphrase could
-# not be typed at the prompt. For those layouts the copy is rewritten with
-# XKBLAYOUT=us, dropping XKBVARIANT, which belongs to the original layout. KEYMAP
-# is kept, so the console keymap is unchanged, and /etc/vconsole.conf on the
-# installed system is never modified.
+# For those layouts this hook replaces the initramfs copy with one that sets
+# XKBLAYOUT=us and drops XKBVARIANT, which belongs to the original layout. KEYMAP
+# is kept, so the console keymap is unchanged. /etc/vconsole.conf on the
+# installed system is never modified, and Latin layouts are left alone.
 #
-# Must be listed after keymap and consolefont in HOOKS: build functions run in
-# HOOKS order, and this one owns the file.
+# Must be listed after sd-vconsole in HOOKS: build functions run in HOOKS order,
+# and add_file overwrites the copy sd-vconsole added.
 
 build() {
     local layout
@@ -33,18 +32,14 @@ build() {
             sed -e '/^XKBVARIANT=/d' -e 's/^XKBLAYOUT=.*/XKBLAYOUT=us/' /etc/vconsole.conf |
                 add_file - /etc/vconsole.conf 644
             ;;
-        *)
-            add_file /etc/vconsole.conf /etc/vconsole.conf 644
-            ;;
     esac
 }
 
 help() {
     cat <<HELPEOF
-Adds /etc/vconsole.conf to the initramfs so Plymouth uses the configured
-keyboard layout at the password prompt. When that layout has no Latin letters,
-the copy gets XKBLAYOUT=us instead, leaving the installed system's
-vconsole.conf untouched. Add after keymap and consolefont.
+Keeps the unlock prompt typeable when /etc/vconsole.conf sets a keyboard layout
+without Latin letters: the initramfs copy of vconsole.conf gets XKBLAYOUT=us.
+The installed system's vconsole.conf is not changed. Add after sd-vconsole.
 HELPEOF
 }
 

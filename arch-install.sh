@@ -126,7 +126,6 @@ LIMINE_CONF_SRC="${SCRIPT_DIR}/default/limine/limine.conf"
 LIMINE_HOOK_SRC="${SCRIPT_DIR}/etc/pacman.d/hooks/90-limine-deploy.hook"
 VCONSOLE_LATIN_HOOK_SRC="${SCRIPT_DIR}/etc/initcpio/install/vconsole-latin"
 MKINITCPIO_HOOKS_CONF_SRC="${SCRIPT_DIR}/etc/mkinitcpio.conf.d/hooks.conf"
-MKINITCPIO_RESUME_CONF_SRC="${SCRIPT_DIR}/etc/mkinitcpio.conf.d/resume.conf"
 CMDLINE_SRC="${SCRIPT_DIR}/etc/cmdline.d"
 CMDLINE_FILES="20-rtc-alarm.conf 80-initramfs-async.conf 90-splash.conf"
 LOCALE_CONF_SRC="${SCRIPT_DIR}/etc/locale.conf"
@@ -317,7 +316,6 @@ validate_inputs() {
     "$LIMINE_HOOK_SRC"
     "$VCONSOLE_LATIN_HOOK_SRC"
     "$MKINITCPIO_HOOKS_CONF_SRC"
-    "$MKINITCPIO_RESUME_CONF_SRC"
     "$LOCALE_CONF_SRC"
     "$ZRAM_CONF_SRC"
     "$SLEEP_HOOK_SRC"
@@ -637,7 +635,7 @@ configure_system() {
   # reads the default theme, and the kernel parameters are embedded in the UKI.
   configure_plymouth
 
-  # Must precede configure_boot: HOOKS references btrfs-overlayfs, which
+  # Must precede configure_boot: HOOKS references sd-btrfs-overlayfs, which
   # limine-mkinitcpio-hook ships, and mkinitcpio fails on an unknown hook.
   install_limine_hooks
 
@@ -930,8 +928,8 @@ EOF
 # kernel command line.
 #
 # Notes on this setup:
-#   - No FILES+=(/etc/vconsole.conf) drop-in. The local vconsole-latin hook adds
-#     that file to the initramfs itself, and rewrites its layout when needed.
+#   - No FILES+=(/etc/vconsole.conf) drop-in. The sd-vconsole hook already
+#     copies vconsole.conf in; vconsole-latin only rewrites its layout.
 #   - The kernel parameters go into /etc/cmdline.d/, which is mirrored to
 #     /etc/default/limine for limine-entry-tool.
 #
@@ -1039,10 +1037,6 @@ configure_boot() {
   print_msg "Installing mkinitcpio drop-in hooks.conf"
   install -D -m 0644 "$MKINITCPIO_HOOKS_CONF_SRC" /mnt/etc/mkinitcpio.conf.d/hooks.conf
 
-  # The 'resume' hook is required by this initramfs; systemd's initrd would have
-  # covered it, but the udev-based one does not.
-  install -D -m 0644 "$MKINITCPIO_RESUME_CONF_SRC" /mnt/etc/mkinitcpio.conf.d/resume.conf
-
   arch-chroot /mnt env ROOT_PART="$ROOT_PART" /bin/bash -e <<'EOF'
 # Get root partition UUID for boot configuration
 ROOT_UUID=$(blkid -s UUID -o value "${ROOT_PART}")
@@ -1060,7 +1054,7 @@ fi
 echo "==> Adjust cmdline"
 mkdir -p /etc/cmdline.d
 cat > /etc/cmdline.d/10-root.conf <<EOL
-cryptdevice=UUID=${ROOT_UUID}:cryptroot:allow-discards root=/dev/mapper/cryptroot zswap.enabled=0 rw rootfstype=btrfs rootflags=subvol=/@
+rd.luks.name=${ROOT_UUID}=cryptroot root=/dev/mapper/cryptroot zswap.enabled=0 rw rootfstype=btrfs rootflags=subvol=/@
 EOL
 
 echo "==> Generate UKI (Unified Kernel Image)"
@@ -1153,8 +1147,8 @@ configure_limine_tool() {
 
   cmdline=$(assemble_cmdline)
 
-  if ! grep -q 'cryptdevice=' <<<"$cmdline" || ! grep -q '\broot=' <<<"$cmdline"; then
-    print_error "The assembled command line has no cryptdevice= or root= parameter:"
+  if ! grep -q 'rd\.luks\.name=' <<<"$cmdline" || ! grep -q '\broot=' <<<"$cmdline"; then
+    print_error "The assembled command line has no rd.luks.name= or root= parameter:"
     print_error "  ${cmdline}"
     exit 1
   fi
@@ -1285,8 +1279,8 @@ verify_installation() {
 
   # The UKI carries its own command line, so confirm it actually got embedded.
   print_msg "Checking kernel command line"
-  if ! grep -q "cryptdevice=" /mnt/etc/cmdline.d/10-root.conf 2>/dev/null; then
-    print_warning "No cryptdevice= in /etc/cmdline.d/10-root.conf; the UKI may not unlock the disk."
+  if ! grep -q "rd.luks.name" /mnt/etc/cmdline.d/10-root.conf 2>/dev/null; then
+    print_warning "No rd.luks.name in /etc/cmdline.d/10-root.conf; the UKI may not unlock the disk."
   fi
 
   # A swapfile without resume parameters swaps fine but can never resume from
