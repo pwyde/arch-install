@@ -48,10 +48,14 @@ The script is designed to automate the complete installation process while provi
 Boot system from a Arch Linux installation [image](https://archlinux.org/download). Clone repository and execute script.
 
 ```
-git clone https://github.com/pwyde/arch-install
+git clone --depth 1 https://github.com/pwyde/arch-install
 cd arch-install
 ./arch-install.sh
 ```
+
+`--depth 1` matters: the repository carries prebuilt packages (see
+[Prebuilt packages](#prebuilt-packages)), so a full clone would also fetch every
+previous version of them.
 
 Using script with parameters.
 
@@ -183,11 +187,12 @@ a failed upgrade can be booted out of rather than repaired from a live ISO.
   [`default/snapper/root`](./default/snapper/root): five snapshots, no timeline.
   Snapshots are taken by `snap-pac` around pacman transactions rather than on a
   schedule, so each entry in the menu corresponds to an upgrade.
-- **`limine-mkinitcpio-hook` and `limine-snapper-sync`** are built from the AUR
-  during the install, as the target user, under `/var/tmp`. Once the hook is
-  installed it owns UKI generation: it overrides mkinitcpio's pacman hook and
-  calls `mkinitcpio` directly, so `/etc/mkinitcpio.d/linux.preset` is no longer
-  read and the installer removes it.
+- **`limine-mkinitcpio-hook` and `limine-snapper-sync`** are installed from
+  [`packages/`](./packages/) with `pacman -U`, which resolves their runtime
+  dependencies from the official repositories. Once the hook is installed it
+  owns UKI generation: it overrides mkinitcpio's pacman hook and calls
+  `mkinitcpio` directly, so `/etc/mkinitcpio.d/linux.preset` is no longer read
+  and the installer removes it.
 - **The kernel command line is mirrored to `/etc/default/limine`**, because
   `limine-entry-tool` reads one only from `/etc/kernel/cmdline` or
   `/proc/cmdline` and never from `/etc/cmdline.d/`. Inside the installer
@@ -197,10 +202,37 @@ a failed upgrade can be booted out of rather than repaired from a live ISO.
 - **Settings for the tool** live in
   [`etc/limine-entry-tool.d/50-arch.conf`](./etc/limine-entry-tool.d/50-arch.conf).
 
-> [!NOTE]
-> `limine-mkinitcpio-hook` compiles with GraalVM `native-image` and needs several
-> GB of RAM. If the build fails the installer continues: the system still boots
-> from the UKIs already written, only without snapshot entries.
+## Prebuilt packages
+
+`limine-mkinitcpio-hook` and `limine-snapper-sync` exist only in the AUR, and
+both compile with GraalVM `native-image`: a ~250 MB toolchain download and
+several GB of RAM. That does not belong in an installer, so they are built once
+and committed to [`packages/`](./packages/).
+
+They are ordinary AUR packages once installed, listed by `pacman -Qm` like any
+other. An AUR helper picks them up and offers updates in the normal way, since
+they carry the AUR's own package names and versions.
+
+To rebuild them, on a machine with enough memory:
+
+```bash
+sudo pacman -S --needed devtools git
+mkdir -p ~/build && cd ~/build
+
+for pkg in limine-mkinitcpio-hook limine-snapper-sync; do
+    git clone "https://aur.archlinux.org/${pkg}.git"
+    (cd "$pkg" && pkgctl build)
+done
+
+cp ~/build/*/*.pkg.tar.zst /path/to/arch-install/packages/
+```
+
+`pkgctl build` builds in a clean chroot containing only `base-devel` and the
+declared dependencies, so the result cannot pick up something that happens to be
+installed on the build machine but is missing on a freshly installed system.
+
+Do not edit the PKGBUILDs or bump `pkgrel`: the versions have to match the AUR's
+for an AUR helper to offer later updates.
 
 ## Hibernation
 

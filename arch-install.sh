@@ -136,6 +136,10 @@ SLEEP_HOOK_SRC="${SCRIPT_DIR}/default/systemd/system-sleep/keyboard-backlight"
 SNAPPER_CONFIG_SRC="${SCRIPT_DIR}/default/snapper/root"
 SNAPPER_CONFD_SRC="${SCRIPT_DIR}/etc/conf.d/snapper"
 LIMINE_TOOL_CONF_SRC="${SCRIPT_DIR}/etc/limine-entry-tool.d/50-arch.conf"
+# Prebuilt AUR packages. They are compiled with GraalVM native-image, which is
+# far too heavy to run during an install; see README.md for how to rebuild them.
+LIMINE_PKG_SRC="${SCRIPT_DIR}/packages"
+LIMINE_PKGS="limine-mkinitcpio-hook limine-snapper-sync"
 
 # Default start at beginning
 START_STAGE="partitions"
@@ -335,6 +339,17 @@ validate_inputs() {
     print_error "Missing repository file: $repo_file"
     print_error "Run the script from a full checkout of the repository."
     exit 1
+  done
+
+  local pkg_name
+  local -a pkg_files
+  for pkg_name in $LIMINE_PKGS; do
+    pkg_files=("${LIMINE_PKG_SRC}/${pkg_name}"-*.pkg.tar.zst)
+    if [ ! -f "${pkg_files[0]}" ]; then
+      print_error "Missing prebuilt package: ${LIMINE_PKG_SRC}/${pkg_name}-*.pkg.tar.zst"
+      print_error "See README.md for how to build it."
+      exit 1
+    fi
   done
 
   # Check for required tools
@@ -1062,8 +1077,8 @@ mkdir -p "/boot/EFI/Linux"
 if command -v limine-mkinitcpio >/dev/null 2>&1; then
   limine-mkinitcpio
 else
-  # Fallback when the AUR build failed: build the UKIs directly, the same way
-  # limine-mkinitcpio would, so the system still boots without snapshot entries.
+  # Only reached when this stage is run on its own, before the Limine packages
+  # are installed. Builds the UKIs the same way limine-mkinitcpio would.
   kver=$(basename "$(find /usr/lib/modules -maxdepth 1 -mindepth 1 -type d -name '*-arch*' | head -n1)")
   mkinitcpio --kernel "$kver" --uki /boot/EFI/Linux/arch_linux.efi
   mkinitcpio --kernel "$kver" -S autodetect --uki /boot/EFI/Linux/arch_linux-fallback.efi
@@ -1163,49 +1178,18 @@ KERNEL_CMDLINE[default]+=${cmdline}
 EOF
 }
 
-# limine-mkinitcpio-hook and limine-snapper-sync are only in the AUR. makepkg
-# refuses to run as root, and arch-chroot puts a tmpfs on /tmp, so the build
-# runs as the new user under /var/tmp. Failure here is not fatal: the system
-# still boots from the UKIs the preset built, only without snapshot entries.
+# The Limine snapshot packages are prebuilt and shipped in this repository:
+# building them needs a GraalVM toolchain and several GB of RAM, which does not
+# belong in an installer. pacman pulls their runtime dependencies from the
+# official repositories.
 install_limine_hooks() {
-  print_msg "Building the Limine snapshot packages from the AUR"
-  print_warning "limine-mkinitcpio-hook compiles with GraalVM and needs several GB of RAM."
+  print_msg "Installing the Limine snapshot packages"
 
-  if arch-chroot /mnt env BUILD_USER="$USERNAME" /bin/bash -e <<'EOF'
-build_dir="/var/tmp/aur-build"
-rm -rf "$build_dir"
-install -d -o "$BUILD_USER" -g "$BUILD_USER" -m 0755 "$build_dir"
+  install -d -m 0755 /mnt/var/cache/pacman/pkg
+  cp "${LIMINE_PKG_SRC}"/*.pkg.tar.zst /mnt/var/cache/pacman/pkg/
 
-for pkg in limine-mkinitcpio-hook limine-snapper-sync; do
-  echo "==> Building ${pkg}"
-  runuser -u "$BUILD_USER" -- git clone --depth 1 \
-    "https://aur.archlinux.org/${pkg}.git" "${build_dir}/${pkg}"
-
-  # Install the dependencies as root so makepkg never needs sudo of its own.
-  mapfile -t deps < <(runuser -u "$BUILD_USER" -- \
-    bash -c "cd '${build_dir}/${pkg}' && makepkg --printsrcinfo" |
-    awk '$1 == "depends" || $1 == "makedepends" { print $3 }' |
-    sed 's/[<>=].*//' | sort -u)
-  pacman -S --needed --asdeps --noconfirm "${deps[@]}"
-
-  # --nodeps because the dependencies were just installed as root; makepkg
-  # would otherwise try to call sudo itself.
-  runuser -u "$BUILD_USER" -- \
-    bash -c "cd '${build_dir}/${pkg}' && makepkg --noconfirm --nodeps"
-
-  pacman -U --noconfirm "${build_dir}/${pkg}"/*.pkg.tar.*
-done
-
-rm -rf "$build_dir"
-EOF
-  then
-    print_msg "Limine snapshot packages installed"
-  else
-    print_warning "The AUR build failed. The system still boots, but Limine will show"
-    print_warning "no snapshot entries. Build limine-mkinitcpio-hook and"
-    print_warning "limine-snapper-sync by hand after the first boot."
-    return 0
-  fi
+  arch-chroot /mnt bash -c \
+    'pacman -U --noconfirm /var/cache/pacman/pkg/limine-mkinitcpio-hook-*.pkg.tar.zst /var/cache/pacman/pkg/limine-snapper-sync-*.pkg.tar.zst'
 
   # The hook overrides mkinitcpio's pacman hook and builds the UKIs by calling
   # mkinitcpio directly, so the preset pacstrap generated is never read again.
