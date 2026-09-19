@@ -25,10 +25,9 @@ DEFAULT_TIMEZONE="Europe/Stockholm"
 DEFAULT_KEYMAP="sv-latin1"
 DEFAULT_LOCALE="sv_SE.UTF-8"
 # No snapshots subvolume here on purpose: 'snapper create-config' creates its
-# own /.snapshots and refuses to run when the path already exists, so leaving it
-# out keeps the post-install snapper setup a plain create-config.
+# own /.snapshots and refuses to run when the path already exists.
 DEFAULT_SUBVOLUMES="@ @home @cache @log @root"
-DEFAULT_PACKAGES="base base-devel bash-completion brightnessctl btrfs-progs cryptsetup dosfstools efibootmgr git limine linux linux-firmware man-db man-pages nano networkmanager openssh plymouth sudo terminus-font unzip util-linux vim zram-generator"
+DEFAULT_PACKAGES="base base-devel bash-completion brightnessctl btrfs-progs cryptsetup dosfstools efibootmgr git limine linux linux-firmware man-db man-pages nano networkmanager openssh plymouth snap-pac snapper sudo terminus-font unzip util-linux vim zram-generator"
 
 # Color variables
 RED=$'\033[91m'
@@ -127,7 +126,7 @@ LIMINE_CONF_SRC="${SCRIPT_DIR}/default/limine/limine.conf"
 LIMINE_HOOK_SRC="${SCRIPT_DIR}/etc/pacman.d/hooks/90-limine-deploy.hook"
 VCONSOLE_LATIN_HOOK_SRC="${SCRIPT_DIR}/etc/initcpio/install/vconsole-latin"
 MKINITCPIO_HOOKS_CONF_SRC="${SCRIPT_DIR}/etc/mkinitcpio.conf.d/hooks.conf"
-MKINITCPIO_PRESET_SRC="${SCRIPT_DIR}/etc/mkinitcpio.d/linux.preset"
+MKINITCPIO_RESUME_CONF_SRC="${SCRIPT_DIR}/etc/mkinitcpio.conf.d/resume.conf"
 CMDLINE_SRC="${SCRIPT_DIR}/etc/cmdline.d"
 CMDLINE_FILES="20-rtc-alarm.conf 80-initramfs-async.conf 90-splash.conf"
 LOCALE_CONF_SRC="${SCRIPT_DIR}/etc/locale.conf"
@@ -135,6 +134,9 @@ ZRAM_CONF_SRC="${SCRIPT_DIR}/etc/systemd/zram-generator.conf.d/90-zram.conf"
 SUDOERS_SRC="${SCRIPT_DIR}/etc/sudoers.d"
 SUDOERS_FILES="00-wheel 01-timeout 02-passwd-tries"
 SLEEP_HOOK_SRC="${SCRIPT_DIR}/default/systemd/system-sleep/keyboard-backlight"
+SNAPPER_CONFIG_SRC="${SCRIPT_DIR}/default/snapper/root"
+SNAPPER_CONFD_SRC="${SCRIPT_DIR}/etc/conf.d/snapper"
+LIMINE_TOOL_CONF_SRC="${SCRIPT_DIR}/etc/limine-entry-tool.d/50-arch.conf"
 
 # Default start at beginning
 START_STAGE="partitions"
@@ -261,7 +263,7 @@ validate_secure_boot() {
     1)
       print_error "Secure Boot is enabled. Disable it in the firmware setup before installing."
       print_error "Nothing installed here is signed, so the system would not boot."
-      print_error "Enable it again after running post-install.sh, which enrolls keys with sbctl."
+      print_error "This installation does not sign its boot files; leave Secure Boot off."
       exit 1
       ;;
     0)
@@ -315,10 +317,13 @@ validate_inputs() {
     "$LIMINE_HOOK_SRC"
     "$VCONSOLE_LATIN_HOOK_SRC"
     "$MKINITCPIO_HOOKS_CONF_SRC"
-    "$MKINITCPIO_PRESET_SRC"
+    "$MKINITCPIO_RESUME_CONF_SRC"
     "$LOCALE_CONF_SRC"
     "$ZRAM_CONF_SRC"
     "$SLEEP_HOOK_SRC"
+    "$SNAPPER_CONFIG_SRC"
+    "$SNAPPER_CONFD_SRC"
+    "$LIMINE_TOOL_CONF_SRC"
   )
   for repo_file in $CMDLINE_FILES; do
     repo_files+=("${CMDLINE_SRC}/${repo_file}")
@@ -624,9 +629,6 @@ configure_system() {
   prompt_for_passwords
   configure_users
 
-  # TPM2 setup
-  configure_tpm
-
   # Hibernation swapfile. Must run before configure_boot: it writes resume=
   # into /etc/cmdline.d/, which mkinitcpio embeds in the UKI.
   configure_hibernation
@@ -635,8 +637,15 @@ configure_system() {
   # reads the default theme, and the kernel parameters are embedded in the UKI.
   configure_plymouth
 
+  # Must precede configure_boot: HOOKS references btrfs-overlayfs, which
+  # limine-mkinitcpio-hook ships, and mkinitcpio fails on an unknown hook.
+  install_limine_hooks
+
   # Boot setup (mkinitcpio, UKI, Limine)
+  configure_limine_tool
   configure_boot
+
+  configure_snapshots
 
   # Enable services
   enable_services
@@ -833,27 +842,6 @@ configure_users() {
   cleanup_chroot
 }
 
-# Configure TPM
-configure_tpm() {
-  print_msg "Configuring TPM"
-
-  # Check if a TPM device is available
-  if [ -d /sys/class/tpm ] && [ -n "$(ls -A /sys/class/tpm 2>/dev/null)" ]; then
-    print_msg "TPM device detected, enrolling recovery key..."
-    arch-chroot /mnt systemd-cryptenroll --recovery-key "$ROOT_PART"
-
-    # Enroll TPM unlocking using the provided PIN
-    if ! arch-chroot /mnt systemd-cryptenroll "$ROOT_PART" \
-      --wipe-slot=password,tpm2 \
-      --tpm2-device=auto \
-      --tpm2-with-pin=yes; then
-      print_error "TPM enrollment failed!"
-    fi
-  else
-    print_warning "System configured without TPM (not detected). Use LUKS passphrase to unlock!"
-  fi
-}
-
 # Configure hibernation
 #
 # A swapfile the size of RAM in its own Btrfs subvolume, an fstab entry at
@@ -942,10 +930,10 @@ EOF
 # kernel command line.
 #
 # Notes on this setup:
-#   - No FILES+=(/etc/vconsole.conf) drop-in. That is only required by a busybox
-#     initramfs; here the sd-vconsole hook already copies vconsole.conf in.
-#   - The kernel parameters go into /etc/cmdline.d/, which mkinitcpio embeds in
-#     the UKI, instead of a limine-entry-tool drop-in.
+#   - No FILES+=(/etc/vconsole.conf) drop-in. The local vconsole-latin hook adds
+#     that file to the initramfs itself, and rewrites its layout when needed.
+#   - The kernel parameters go into /etc/cmdline.d/, which is mirrored to
+#     /etc/default/limine for limine-entry-tool.
 #
 # Must run before configure_boot: the plymouth hook reads the default theme when
 # mkinitcpio builds the UKI, and the command line is embedded at the same time.
@@ -1051,10 +1039,9 @@ configure_boot() {
   print_msg "Installing mkinitcpio drop-in hooks.conf"
   install -D -m 0644 "$MKINITCPIO_HOOKS_CONF_SRC" /mnt/etc/mkinitcpio.conf.d/hooks.conf
 
-  # Replaces the preset shipped by the linux package, which builds bare
-  # initramfs images instead of UKIs.
-  print_msg "Installing mkinitcpio preset linux.preset"
-  install -D -m 0644 "$MKINITCPIO_PRESET_SRC" /mnt/etc/mkinitcpio.d/linux.preset
+  # The 'resume' hook is required by this initramfs; systemd's initrd would have
+  # covered it, but the udev-based one does not.
+  install -D -m 0644 "$MKINITCPIO_RESUME_CONF_SRC" /mnt/etc/mkinitcpio.conf.d/resume.conf
 
   arch-chroot /mnt env ROOT_PART="$ROOT_PART" /bin/bash -e <<'EOF'
 # Get root partition UUID for boot configuration
@@ -1073,12 +1060,20 @@ fi
 echo "==> Adjust cmdline"
 mkdir -p /etc/cmdline.d
 cat > /etc/cmdline.d/10-root.conf <<EOL
-rd.luks.name=${ROOT_UUID}=cryptroot root=/dev/mapper/cryptroot zswap.enabled=0 rw rootfstype=btrfs rootflags=subvol=/@
+cryptdevice=UUID=${ROOT_UUID}:cryptroot:allow-discards root=/dev/mapper/cryptroot zswap.enabled=0 rw rootfstype=btrfs rootflags=subvol=/@
 EOL
 
 echo "==> Generate UKI (Unified Kernel Image)"
 mkdir -p "/boot/EFI/Linux"
-mkinitcpio -P
+if command -v limine-mkinitcpio >/dev/null 2>&1; then
+  limine-mkinitcpio
+else
+  # Fallback when the AUR build failed: build the UKIs directly, the same way
+  # limine-mkinitcpio would, so the system still boots without snapshot entries.
+  kver=$(basename "$(find /usr/lib/modules -maxdepth 1 -mindepth 1 -type d -name '*-arch*' | head -n1)")
+  mkinitcpio --kernel "$kver" --uki /boot/EFI/Linux/arch_linux.efi
+  mkinitcpio --kernel "$kver" -S autodetect --uki /boot/EFI/Linux/arch_linux-fallback.efi
+fi
 
 # pacstrap ran mkinitcpio with the stock preset, which wrote plain initramfs
 # images. Now that /boot is the ESP those sit on the FAT partition costing a few
@@ -1131,6 +1126,119 @@ EOF
   fi
 }
 
+# Assembles the kernel command line the way mkinitcpio does when it embeds it in
+# the UKI: every *.conf in /etc/cmdline.d/ in version-sort order, comments
+# stripped, joined with spaces.
+assemble_cmdline() {
+  local -a files=()
+
+  mapfile -t files < <(find /mnt/etc/cmdline.d -maxdepth 1 -type f -name '*.conf' 2>/dev/null |
+    LC_ALL=C.UTF-8 sort -V)
+
+  if [ "${#files[@]}" -eq 0 ]; then
+    echo ""
+    return 0
+  fi
+
+  grep -ha -- '^[^#]' "${files[@]}" | tr -s '\n' ' ' | sed 's/[[:space:]]*$//'
+}
+
+# limine-entry-tool reads a command line only from /etc/kernel/cmdline or
+# /proc/cmdline, never from /etc/cmdline.d/. Inside the installer /proc/cmdline
+# is the live ISO's, so the real one has to be written where the tool looks.
+configure_limine_tool() {
+  local cmdline
+
+  print_msg "Configuring limine-entry-tool"
+
+  cmdline=$(assemble_cmdline)
+
+  if ! grep -q 'cryptdevice=' <<<"$cmdline" || ! grep -q '\broot=' <<<"$cmdline"; then
+    print_error "The assembled command line has no cryptdevice= or root= parameter:"
+    print_error "  ${cmdline}"
+    exit 1
+  fi
+
+  install -D -m 0644 "$LIMINE_TOOL_CONF_SRC" /mnt/etc/limine-entry-tool.d/50-arch.conf
+
+  install -D -m 0644 /dev/stdin /mnt/etc/default/limine <<EOF
+# Written by arch-install.sh from /etc/cmdline.d/, which stays the source of
+# truth for the kernel command line. After changing anything there, mirror it
+# here and run 'limine-mkinitcpio'.
+KERNEL_CMDLINE[default]+=${cmdline}
+EOF
+}
+
+# limine-mkinitcpio-hook and limine-snapper-sync are only in the AUR. makepkg
+# refuses to run as root, and arch-chroot puts a tmpfs on /tmp, so the build
+# runs as the new user under /var/tmp. Failure here is not fatal: the system
+# still boots from the UKIs the preset built, only without snapshot entries.
+install_limine_hooks() {
+  print_msg "Building the Limine snapshot packages from the AUR"
+  print_warning "limine-mkinitcpio-hook compiles with GraalVM and needs several GB of RAM."
+
+  if arch-chroot /mnt env BUILD_USER="$USERNAME" /bin/bash -e <<'EOF'
+build_dir="/var/tmp/aur-build"
+rm -rf "$build_dir"
+install -d -o "$BUILD_USER" -g "$BUILD_USER" -m 0755 "$build_dir"
+
+for pkg in limine-mkinitcpio-hook limine-snapper-sync; do
+  echo "==> Building ${pkg}"
+  runuser -u "$BUILD_USER" -- git clone --depth 1 \
+    "https://aur.archlinux.org/${pkg}.git" "${build_dir}/${pkg}"
+
+  # Install the dependencies as root so makepkg never needs sudo of its own.
+  mapfile -t deps < <(runuser -u "$BUILD_USER" -- \
+    bash -c "cd '${build_dir}/${pkg}' && makepkg --printsrcinfo" |
+    awk '$1 == "depends" || $1 == "makedepends" { print $3 }' |
+    sed 's/[<>=].*//' | sort -u)
+  pacman -S --needed --asdeps --noconfirm "${deps[@]}"
+
+  # --nodeps because the dependencies were just installed as root; makepkg
+  # would otherwise try to call sudo itself.
+  runuser -u "$BUILD_USER" -- \
+    bash -c "cd '${build_dir}/${pkg}' && makepkg --noconfirm --nodeps"
+
+  pacman -U --noconfirm "${build_dir}/${pkg}"/*.pkg.tar.*
+done
+
+rm -rf "$build_dir"
+EOF
+  then
+    print_msg "Limine snapshot packages installed"
+  else
+    print_warning "The AUR build failed. The system still boots, but Limine will show"
+    print_warning "no snapshot entries. Build limine-mkinitcpio-hook and"
+    print_warning "limine-snapper-sync by hand after the first boot."
+    return 0
+  fi
+
+  # The hook overrides mkinitcpio's pacman hook and builds the UKIs by calling
+  # mkinitcpio directly, so the preset pacstrap generated is never read again.
+  # Leaving it behind invites a manual 'mkinitcpio -P' to write UKIs that
+  # disagree with the entries in limine.conf.
+  arch-chroot /mnt rm -f /etc/mkinitcpio.d/linux.preset
+}
+
+# Snapshots of the root subvolume, and a Limine entry for each one.
+configure_snapshots() {
+  print_msg "Configuring Snapper"
+
+  if ! arch-chroot /mnt test -x /usr/bin/limine-snapper-sync; then
+    print_warning "limine-snapper-sync is missing; skipping snapshot configuration."
+    return 0
+  fi
+
+  # create-config makes its own /.snapshots subvolume and refuses to run when
+  # the path already exists, which is why no such subvolume is created earlier.
+  arch-chroot /mnt snapper --no-dbus -c root create-config /
+
+  install -D -m 0644 "$SNAPPER_CONFIG_SRC" /mnt/etc/snapper/configs/root
+  install -D -m 0644 "$SNAPPER_CONFD_SRC" /mnt/etc/conf.d/snapper
+
+  arch-chroot /mnt systemctl enable snapper-cleanup.timer limine-snapper-sync.service
+}
+
 # Enable services
 enable_services() {
   print_msg "Enabling services"
@@ -1177,8 +1285,8 @@ verify_installation() {
 
   # The UKI carries its own command line, so confirm it actually got embedded.
   print_msg "Checking kernel command line"
-  if ! grep -q "rd.luks.name" /mnt/etc/cmdline.d/10-root.conf 2>/dev/null; then
-    print_warning "No rd.luks.name in /etc/cmdline.d/10-root.conf; the UKI may not unlock the disk."
+  if ! grep -q "cryptdevice=" /mnt/etc/cmdline.d/10-root.conf 2>/dev/null; then
+    print_warning "No cryptdevice= in /etc/cmdline.d/10-root.conf; the UKI may not unlock the disk."
   fi
 
   # A swapfile without resume parameters swaps fine but can never resume from
@@ -1283,22 +1391,9 @@ print_summary() {
     echo " ${WHITE}- Limine config:${NO_COLOR} No (missing)"
   fi
 
-  if [ -d /sys/class/tpm ] && [ -n "$(ls -A /sys/class/tpm 2>/dev/null)" ]; then
-    echo
-    echo "${WHITE}System configured with TPM unlocking. If TPM unlock fails, use the recovery password.${NO_COLOR}"
-    echo
-    echo "${WHITE}Consider enrolling TPM with PCR selection:${NO_COLOR}"
-    cat <<EOF
-systemd-cryptenroll ${ROOT_PART} \\
-  --wipe-slot=password,tpm2 \\
-  --tpm2-device=auto \\
-  --tpm2-pcrs=7 \\
-  --tpm2-with-pin=yes
-EOF
-  else
-    echo
-    echo "${WHITE}System configured without TPM (not detected). Use LUKS passphrase to unlock! ${NO_COLOR}"
-  fi
+  echo
+  echo "${WHITE}The disk is unlocked with the LUKS passphrase. There is no second"
+  echo "credential: losing the passphrase means losing the data.${NO_COLOR}"
 
   echo
   echo "${BLUE}==>${YELLOW} Done. Ready to reboot! ${NO_COLOR}"
@@ -1317,14 +1412,14 @@ EOF
     echo "  - Mount the filesystems: mount -o subvol=@ /dev/mapper/cryptroot /mnt"
     echo "  - Mount the ESP: mount $EFI_PART /mnt/boot"
     echo "  - Chroot: arch-chroot /mnt"
-    echo "  - Rerun: mkinitcpio -P && cp /usr/share/limine/BOOTX64.EFI /boot/EFI/limine/limine_x64.efi"
+    echo "  - Rerun: limine-mkinitcpio && cp /usr/share/limine/BOOTX64.EFI /boot/EFI/limine/limine_x64.efi"
     echo "  - Exit chroot and reboot"
   fi
 }
 
 # Main function
 main() {
-  echo "${YELLOW}===${BLUE} Arch Linux Encrypted Installation Script v${VERSION} ${YELLOW}===${NO_COLOR}"
+  echo "${YELLOW}===${BLUE} Arch Linux Encrypted Installation Script ${YELLOW}===${NO_COLOR}"
   echo
 
   check_shell_nesting

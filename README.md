@@ -6,7 +6,7 @@
 
 ## Description
 
-`arch-install.sh` is an automated Arch Linux installation script that installs and configures an encrypted Arch Linux system using **LUKS2**, **Btrfs**, **TPM2**, **Unified Kernel Images (UKIs)** and the **Limine** bootloader.
+`arch-install.sh` is an automated Arch Linux installation script that installs and configures an encrypted Arch Linux system using **LUKS2**, **Btrfs**, **Unified Kernel Images (UKIs)**, the **Limine** bootloader and **Snapper** snapshots with a boot entry for each snapshot.
 
 The script is designed to automate the complete installation process while providing validation, error handling, cleanup, and support for resuming the installation from individual stages.
 
@@ -28,7 +28,6 @@ The script is designed to automate the complete installation process while provi
 - Installs the Arch Linux base system and configurable additional packages.
 - Automatically installs the appropriate CPU microcode package for Intel or AMD processors.
 - Configures base system, i.e. timezone, hostname, locale and more...
-- Detects available TPM hardware and configures TPM2-based disk unlocking with a PIN.
 - Configures `mkinitcpio` to generate Unified Kernel Images (UKIs).
 - Installs and configures `limine` as bootloader, booting the UKIs directly.
 - Installs Limine as the removable-media fallback loader and registers a UEFI
@@ -36,9 +35,10 @@ The script is designed to automate the complete installation process while provi
 - Installs a pacman hook that redeploys Limine to the ESP on package upgrade.
 - Creates a Btrfs swapfile the size of RAM for hibernation, with resume
   parameters embedded in the UKI.
-- Configures a Plymouth boot splash with an Arch Linux theme based on Omarchy's,
-  which also takes the
-  TPM2 PIN at boot.
+- Configures Snapper on the root subvolume and builds the Limine snapshot
+  packages, so each snapshot gets its own boot entry.
+- Configures a Plymouth boot splash with an Arch Linux theme, which also takes
+  the LUKS passphrase at boot.
 - Provides customizable installation parameters.
 - Provides cleanup functionality when the installation fails.
 - Supports resuming the installation from different stages instead of starting over.
@@ -87,10 +87,11 @@ Options:
 ## Bootloader
 
 The script installs [Limine](https://wiki.archlinux.org/title/Limine) from the
-official repositories and configures it by hand -- `limine-mkinitcpio-hook` and
-`limine-snapper-sync` are AUR packages and are deliberately left out.
+official repositories and configures it by hand, then builds
+`limine-mkinitcpio-hook` and `limine-snapper-sync` from the AUR so that snapshots
+appear in the boot menu.
 
-The ESP is mounted at **`/boot`** (as Omarchy does), so the kernel, the UKIs and
+The ESP is mounted at **`/boot`**, so the kernel, the UKIs and
 the bootloader all live on the same FAT partition and there is no separate
 `/efi`.
 
@@ -114,13 +115,13 @@ Notes:
   applied on a normal filesystem -- it builds initramfs images and UKIs under
   `umask 077`, because an initramfs can carry secrets such as a LUKS keyfile.
 - **The kernel command line lives inside the UKI**, written to
-  `/etc/cmdline.d/10-root.conf` and embedded by `mkinitcpio`. Limine chainloads the
+  `/etc/cmdline.d/10-root.conf` and embedded when the UKI is built. Limine chainloads the
   UKI with `protocol: efi` and supplies no command line of its own.
 - **The paths match what `limine-entry-tool` expects.** It derives
   `${ESP_PATH}/EFI/limine/limine_x64.efi`, `${ESP_PATH}/EFI/BOOT/BOOTX64.EFI`
-  and `${ESP_PATH}/limine.conf` and those are not configurable, so installing
-  `limine-mkinitcpio-hook` later takes over these files rather than creating a
-  second set. The UKI names follow the same tool's
+  and `${ESP_PATH}/limine.conf`, and those are not configurable, so when
+  `limine-mkinitcpio-hook` is installed it takes over these files rather than
+  creating a second set. The UKI names follow the same tool's
   `${CUSTOM_UKI_NAME}_${kernel}.efi` scheme, so `CUSTOM_UKI_NAME="arch"` writes
   the same `arch_linux.efi` instead of a duplicate.
 - **A pacman hook redeploys Limine on upgrade.** The
@@ -132,8 +133,10 @@ Notes:
   mind if you later add snapshot boot entries, since each snapshot can carry its
   own UKI.
 
-Secure Boot is **not** configured by this script -- leave it disabled in
-firmware. It is handled by a separate post-installation script.
+Secure Boot is **not** used, and the installer refuses to run while it is
+enabled: nothing installed here is signed, so the firmware would reject the
+bootloader. TPM2 unlocking is not used either. Both decisions are motivated in
+[security.md](./security.md).
 
 ## Filesystem layout
 
@@ -159,18 +162,49 @@ Btrfs subvolumes, all mounted `compress=zstd:3,noatime,nodiscard`:
   blocks are discarded weekly in one batch instead of on every delete.
 - **There is deliberately no snapshots subvolume.** `snapper create-config`
   creates its own `/.snapshots` and refuses to run when the path already exists,
-  so creating one here would only have to be worked around later. Snapper is set
-  up by a separate post-installation script.
+  so creating one here would only have to be worked around later. The installer
+  runs `create-config` itself once the base system is in place.
 
 Note that enabling TRIM on a dm-crypt device leaks which blocks are free, which
 can be enough to reveal the filesystem in use. See
 [dm-crypt/Specialties](https://wiki.archlinux.org/title/Dm-crypt/Specialties#Discard/TRIM_support_for_solid_state_drives_(SSD))
 for the trade-off; it is enabled here deliberately.
 
+## Snapshots
+
+Snapper takes a snapshot of the root subvolume around each pacman transaction,
+and `limine-snapper-sync` gives every snapshot its own entry in the boot menu, so
+a failed upgrade can be booted out of rather than repaired from a live ISO.
+
+- **`snapper -c root create-config /`** runs after the base system is installed.
+  It creates its own `/.snapshots` subvolume, which is why the installer creates
+  no such subvolume itself.
+- **The retention policy** comes from
+  [`default/snapper/root`](./default/snapper/root): five snapshots, no timeline.
+  Snapshots are taken by `snap-pac` around pacman transactions rather than on a
+  schedule, so each entry in the menu corresponds to an upgrade.
+- **`limine-mkinitcpio-hook` and `limine-snapper-sync`** are built from the AUR
+  during the install, as the target user, under `/var/tmp`. Once the hook is
+  installed it owns UKI generation: it overrides mkinitcpio's pacman hook and
+  calls `mkinitcpio` directly, so `/etc/mkinitcpio.d/linux.preset` is no longer
+  read and the installer removes it.
+- **The kernel command line is mirrored to `/etc/default/limine`**, because
+  `limine-entry-tool` reads one only from `/etc/kernel/cmdline` or
+  `/proc/cmdline` and never from `/etc/cmdline.d/`. Inside the installer
+  `/proc/cmdline` belongs to the live ISO, so the real command line has to be
+  written where the tool looks. `/etc/cmdline.d/` stays the source of truth;
+  after changing anything there, mirror it and run `limine-mkinitcpio`.
+- **Settings for the tool** live in
+  [`etc/limine-entry-tool.d/50-arch.conf`](./etc/limine-entry-tool.d/50-arch.conf).
+
+> [!NOTE]
+> `limine-mkinitcpio-hook` compiles with GraalVM `native-image` and needs several
+> GB of RAM. If the build fails the installer continues: the system still boots
+> from the UKIs already written, only without snapshot entries.
+
 ## Hibernation
 
-The script sets up hibernation the way Omarchy's `omarchy-hibernation-setup`
-does:
+Hibernation is set up as follows:
 
 - A **`/swap` Btrfs subvolume** marked `NODATACOW` (`chattr +C`), nested under
   `@`. A Btrfs subvolume cannot be snapshotted while it holds an active
@@ -188,16 +222,16 @@ does:
 - `rtc_cmos.use_acpi_alarm=1` on systems that suspend with s2idle, needed for
   suspend-then-hibernate.
 - The [`keyboard-backlight`](./default/systemd/system-sleep/keyboard-backlight)
-  system-sleep hook from Omarchy, installed to
+  system-sleep hook, installed to
   `/usr/lib/systemd/system-sleep/`, which turns the keyboard backlight off
   before hibernating (some ASUS controllers otherwise block the S4 power-off).
   Needs `brightnessctl`.
 
-Three deliberate differences from Omarchy:
+Three deliberate choices:
 
-| Omarchy | This script | Why |
+| Common approach | This script | Why |
 | --- | --- | --- |
-| `HOOKS+=(resume)` | no `resume` hook | Omarchy boots a busybox initramfs, where that hook is required. The `systemd` hook used here replaces it and ships `systemd-hibernate-resume`, which reads the same parameters. |
+| `HOOKS+=(resume)` | no `resume` hook | That hook is only required by a busybox initramfs. The `systemd` hook used here ships `systemd-hibernate-resume`, which reads the same parameters. |
 | `resume=` in a `limine-entry-tool` drop-in | `resume=` in `/etc/cmdline.d/` | There is no `limine-entry-tool` at install time; the UKI's command line comes from `/etc/cmdline.d/`. |
 | `swapon` after creating the file | no `swapon` | In the installer it would activate swap on the live ISO's kernel and pin `/mnt`. The fstab entry activates it on first boot. |
 
@@ -206,29 +240,45 @@ regenerate `/etc/cmdline.d/30-resume.conf` and rebuild the UKI with `mkinitcpio 
 
 ## Initramfs
 
-`HOOKS` is set by the drop-in
+`HOOKS` comes from the drop-in
 [`etc/mkinitcpio.conf.d/hooks.conf`](./etc/mkinitcpio.conf.d/hooks.conf),
 installed to `/etc/mkinitcpio.conf.d/`, so `/etc/mkinitcpio.conf` stays as the
-package ships it:
+package ships it. Drop-ins are read after the main file, so this `HOOKS` wins.
 
 ```
-HOOKS=(base systemd plymouth autodetect microcode modconf kms keyboard sd-vconsole vconsole-latin block sd-encrypt filesystems fsck)
+HOOKS=(base udev plymouth keyboard autodetect microcode modconf kms keymap
+       consolefont vconsole-latin block encrypt filesystems fsck btrfs-overlayfs)
 ```
 
-The file documents why each hook is there and in that order. mkinitcpio reads
-drop-ins after `/etc/mkinitcpio.conf`, so this `HOOKS` wins.
+This is a **udev-based initramfs**, not a systemd one. That choice follows from
+snapshots: `btrfs-overlayfs`, shipped by `limine-mkinitcpio-hook`, is what mounts
+a read-only snapshot under a writable overlay so a snapshot entry can boot.
 
-mkinitcpio skips drop-ins entirely when it is given a config file with `-c`, and
-a preset that sets `ALL_config` or `<preset>_config` does exactly that. The
-[`etc/mkinitcpio.d/linux.preset`](./etc/mkinitcpio.d/linux.preset) shipped here
-therefore leaves `ALL_config` commented out, as mkinitcpio's own preset template
-does. Adding it back would silently build the UKI from the stock `HOOKS`,
-without `sd-encrypt`, and the system would not be able to unlock its disk.
+- **`encrypt`** unlocks the container named by `cryptdevice=` on the kernel
+  command line, written as
+  `cryptdevice=UUID=<LUKS_UUID>:cryptroot:allow-discards`. The
+  `:allow-discards` suffix is what preserves TRIM through dm-crypt.
+- **`plymouth`** sits after `udev` and before `encrypt`, so the splash is up in
+  time to take the passphrase.
+- **`keyboard`** loads keyboard modules, which is not the same as `keymap`: one
+  makes a USB keyboard work at all, the other applies `KEYMAP`.
+- **`btrfs-overlayfs`** only exists once `limine-mkinitcpio-hook` is installed,
+  which is why the installer builds the AUR packages *before* it generates the
+  UKIs. `mkinitcpio` fails on an unknown hook.
+- **`resume`** comes from a second drop-in,
+  [`etc/mkinitcpio.conf.d/resume.conf`](./etc/mkinitcpio.conf.d/resume.conf), so
+  that removing hibernation means deleting one file. A udev initramfs needs it;
+  a systemd one would not.
+
+There is **no mkinitcpio preset**. `limine-mkinitcpio-hook` overrides
+mkinitcpio's own pacman hook and builds the UKIs by calling `mkinitcpio`
+directly with `--kernel` and `--uki`, so `/etc/mkinitcpio.d/` is never read. The
+installer deletes the preset that `pacstrap` generates.
 
 ## Boot screen colors
 
 The Limine menu and the Plymouth splash use the Arch Linux colors instead of
-Omarchy's Tokyo Night palette. Arch publishes no formal color scheme; the accent
+a Tokyo Night palette. Arch publishes no formal color scheme; the accent
 is the blue of the official logo, and the grays match archlinux.org.
 
 | Role | Color | Limine (`/boot/limine.conf`) | Plymouth theme |
@@ -238,7 +288,7 @@ is the blue of the official logo, and the grays match archlinux.org.
 | Accent | `#1793D1` | branding, help keys, countdown, palette blue and cyan (entry comments) | progress bar |
 | Muted | `#333333` | `term_background_bright` | progress bar track |
 
-The theme's images were recolored the same way Omarchy's `omarchy-plymouth-set`
+The theme's images were recolored the same way a theme switcher
 does it: every pixel takes the new color and keeps its transparency.
 `preview-unlock.png`, which is not shown at boot, was left as it was.
 
@@ -253,24 +303,23 @@ background, so the selection bar is `#999999` rather than the accent.
 
 ## Plymouth
 
-The boot splash is set up the way Omarchy does it:
+The boot splash is made up of:
 
 - **The `arch-linux` theme** (display name "Arch Linux"), installed to
   `/usr/share/plymouth/themes/arch-linux/`.
   The files live in this repository under
-  [`default/plymouth/arch-linux/`](./default/plymouth/arch-linux/), based on Omarchy's
-  `default/plymouth/` (commit `9c5482c5` on the `quattro` branch, MIT), recolored
-  to the Arch Linux colors, and with the Arch Linux logo in place of Omarchy's
-  (see below). The
+  [`default/plymouth/arch-linux/`](./default/plymouth/arch-linux/), derived from
+  an MIT-licensed theme, recolored to the Arch Linux colors and carrying the
+  Arch Linux logo (see below). The
   installer therefore has to run from a full checkout of this repository; it
   checks for the files before touching the disk.
 - **`Theme=arch-linux`** in `/etc/plymouth/plymouthd.conf`, installed from
   [`etc/plymouth/plymouthd.conf`](./etc/plymouth/plymouthd.conf). The theme id has no
   space because `plymouth-set-default-theme` uses it unquoted in paths.
-- **The `plymouth` mkinitcpio hook**, after `systemd` and before `sd-encrypt`, in
+- **The `plymouth` mkinitcpio hook**, after `udev` and before `encrypt`, in
   the `HOOKS` of the drop-in
   [`etc/mkinitcpio.conf.d/hooks.conf`](./etc/mkinitcpio.conf.d/hooks.conf).
-- **Omarchy's quiet-boot kernel parameters**, embedded in the UKI:
+- **Quiet-boot kernel parameters**, embedded in the UKI:
   - [`etc/cmdline.d/80-initramfs-async.conf`](./etc/cmdline.d/80-initramfs-async.conf):
     `initramfs_async=0`, working around a kernel 7.1 race in which Plymouth
     exits before it can read `/proc/cmdline` and an encrypted boot falls back
@@ -280,34 +329,25 @@ The boot splash is set up the way Omarchy does it:
 
 How it fits the rest of this install:
 
-- **TPM2 PIN.** Plymouth does not unlock anything; with a systemd initramfs the
-  hook installs `systemd-ask-password-plymouth`, so the PIN that
-  `systemd-cryptsetup` asks for is typed into the splash. The theme draws a lock
-  icon and an entry field but not the prompt text, so the PIN prompt and a
-  recovery-key prompt look the same.
+- **The passphrase prompt.** Plymouth does not unlock anything; the `encrypt`
+  hook asks for the passphrase through Plymouth when the splash is running, so
+  it is typed into the splash rather than at a text prompt. The theme draws a
+  lock icon and an entry field but not the prompt text.
 - **Keyboard layout.** `/etc/vconsole.conf` is written by
-  `systemd-firstboot --keymap`, as on Omarchy, which sets `KEYMAP` and derives the
+  `systemd-firstboot --keymap`, which sets `KEYMAP` and derives the
   matching `XKBLAYOUT`, `XKBMODEL` and `XKBOPTIONS` from systemd's
-  `kbd-model-map` (for example `sv-latin1` becomes `se`). The `sd-vconsole` hook
-  copies the file into the initramfs, and because `XKBLAYOUT` is set, Plymouth
-  reads the PIN with that xkb layout. With a keymap whose layout does not type
-  Latin letters (such as Russian or Greek), a Latin PIN or passphrase could not
-  be typed at the prompt. The local mkinitcpio hook
+  `kbd-model-map` (for example `sv-latin1` becomes `se`). A udev initramfs does
+  not include that file on its own, so the local hook below adds it; because
+  `XKBLAYOUT` is set, Plymouth reads the passphrase with that xkb layout. With
+  a keymap whose layout does not type Latin letters (such as Russian or Greek),
+  a Latin passphrase could not be typed at the prompt. The local mkinitcpio hook
   [`etc/initcpio/install/vconsole-latin`](./etc/initcpio/install/vconsole-latin),
-  installed to `/etc/initcpio/install/` and listed after `sd-vconsole`, guards
+  installed to `/etc/initcpio/install/` and listed after `consolefont`, guards
   against that: for such layouts it replaces the initramfs copy of
   `vconsole.conf` with one that sets `XKBLAYOUT=us`. The installed system's
   `vconsole.conf` is not changed, and the check runs on every rebuild.
 - **Console cursor.** `vt.global_cursor_default=0` hides the cursor on text
   consoles after boot too, not just during the splash.
-
-Two differences from Omarchy, forced by the systemd initramfs and the lack of
-`limine-entry-tool` at install time:
-
-| Omarchy | This script | Why |
-| --- | --- | --- |
-| `FILES+=(/etc/vconsole.conf)` in its mkinitcpio hooks drop-in | not needed | Omarchy's busybox initramfs does not include `vconsole.conf` by itself; the `sd-vconsole` hook used here already does. |
-| kernel parameters in a `limine-entry-tool` drop-in | kernel parameters in `/etc/cmdline.d/` | The UKI's command line comes from `/etc/cmdline.d/`. |
 
 ## Security Design
 
@@ -327,7 +367,6 @@ See in-depth documentation [here](./security.md).
 - [Arch Linux Wiki - Unified kernel image](https://wiki.archlinux.org/title/Unified_kernel_image)
 - [Arch Linux Wiki - Limine](https://wiki.archlinux.org/title/Limine)
 - [Limine - CONFIG.md](https://github.com/limine-bootloader/limine/blob/trunk/CONFIG.md)
-- [Omarchy](https://github.com/omacom/omarchy)
 - [Arch Linux Wiki - systemd-cryptenroll](https://wiki.archlinux.org/title/Systemd-cryptenroll)
 - [Arch Linux Wiki - mkinitcpio](https://wiki.archlinux.org/title/Mkinitcpio)
 - [Arch Linux Wiki - dm-crypt / System configuration / Pinning a LUKS volume](https://wiki.archlinux.org/title/Dm-crypt/System_configuration#Pinning_a_LUKS_volume)
