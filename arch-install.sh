@@ -520,6 +520,52 @@ format_partitions() {
   CRYPTROOT_OPENED=1
 }
 
+# Resuming mid-install needs the container open. A failed run closes it, so any
+# stage after 'format' has to be able to reopen it.
+ensure_cryptroot_open() {
+  [ -e /dev/mapper/cryptroot ] && return 0
+
+  if [ ! -b "$ROOT_PART" ]; then
+    print_error "Root partition $ROOT_PART not found."
+    exit 1
+  fi
+
+  if ! cryptsetup isLuks "$ROOT_PART"; then
+    print_error "$ROOT_PART is not a LUKS container."
+    exit 1
+  fi
+
+  # Discards are persistent in the header from luksFormat, so a plain open
+  # keeps them without rewriting it.
+  print_msg "Opening LUKS container on $ROOT_PART"
+  if ! cryptsetup open "$ROOT_PART" cryptroot; then
+    print_error "Failed to open LUKS container."
+    exit 1
+  fi
+  CRYPTROOT_OPENED=1
+}
+
+# Stages from 'base' onwards expect the subvolumes and the ESP in place. A
+# failed run leaves them unmounted, so resuming has to mount them again.
+ensure_mounted() {
+  ensure_cryptroot_open
+
+  if ! mountpoint -q /mnt; then
+    print_msg "Filesystems are not mounted; mounting them for this stage"
+    mount_filesystems
+    return 0
+  fi
+
+  # Root can be mounted while the ESP is not, and everything from the base
+  # install onwards writes to it.
+  if ! mountpoint -q /mnt/boot && [ -b "$EFI_PART" ]; then
+    print_msg "Mounting EFI partition to /mnt/boot"
+    mkdir -p /mnt/boot
+    mount -o "$ESP_MOUNT_OPTS" "$EFI_PART" /mnt/boot ||
+      print_warning "Could not mount the EFI partition. Boot setup might fail!"
+  fi
+}
+
 # Setup Btrfs filesystem with subvolumes
 setup_btrfs() {
   print_msg "Format and layout Btrfs"
@@ -1459,6 +1505,7 @@ main() {
     print_summary
     ;;
   btrfs)
+    ensure_cryptroot_open
     setup_btrfs
     mount_filesystems
     install_base_system
@@ -1467,6 +1514,7 @@ main() {
     print_summary
     ;;
   mount)
+    ensure_cryptroot_open
     mount_filesystems
     install_base_system
     configure_system
@@ -1474,94 +1522,21 @@ main() {
     print_summary
     ;;
   base)
+    ensure_mounted
     install_base_system
     configure_system
     verify_installation
     print_summary
     ;;
   configure)
+    ensure_mounted
     configure_system
     verify_installation
     print_summary
     ;;
   users)
     prompt_for_passwords
-
-    # Check if we need to mount root first
-    if ! mountpoint -q /mnt; then
-      print_msg "Root not mounted, attempting to mount for user setup"
-      # Try to locate the LUKS container and mount it
-      if [ -b "$ROOT_PART" ]; then
-        print_msg "Found root partition $ROOT_PART"
-        if cryptsetup isLuks "$ROOT_PART"; then
-          print_msg "Opening LUKS container..."
-          if ! cryptsetup open "$ROOT_PART" cryptroot; then
-            print_error "Failed to open LUKS container!"
-            print_msg "This might be due to a previous LUKS header still being detected."
-            exit 1
-          fi
-          CRYPTROOT_OPENED=1
-          print_msg "Mounting root filesystem"
-          mount -o "subvol=@,$BTRFS_MOUNT_OPTS" /dev/mapper/cryptroot /mnt || {
-            print_error "Could not mount root filesystem. Please check the subvolume configuration!"
-            cryptsetup close cryptroot
-            exit 1
-          }
-
-          # Also mount EFI partition if it exists
-          if [ -b "$EFI_PART" ]; then
-            print_msg "Mounting EFI partition"
-            mkdir -p "/mnt/boot"
-            mount -o "$ESP_MOUNT_OPTS" "$EFI_PART" "/mnt/boot" || {
-              print_warning "Could not mount EFI partition. Boot setup might fail!"
-            }
-          else
-            print_warning "EFI partition $EFI_PART not found. Boot setup might fail!"
-          fi
-
-          # Mount other subvolumes if needed
-          print_msg "Mounting other subvolumes"
-          for subvol in $SUBVOLUMES; do
-            if [[ "$subvol" != "@" ]]; then
-              # Convert '@subvol' format to '/subvol' path format
-              local mountpoint
-
-              # For special cases
-              case "$subvol" in
-              @home) mountpoint="/home" ;;
-              @cache) mountpoint="/var/cache" ;;
-              @log) mountpoint="/var/log" ;;
-              *)
-                mountpoint="${subvol#@}"
-                mountpoint="/$mountpoint"
-                ;;
-              esac
-
-              print_msg "Trying to mount subvolume $subvol to /mnt$mountpoint"
-              mkdir -p "/mnt$mountpoint"
-              mount -o "subvol=$subvol,$BTRFS_MOUNT_OPTS" /dev/mapper/cryptroot "/mnt$mountpoint" || {
-                print_warning "Failed to mount subvolume $subvol to /mnt$mountpoint"
-              }
-            fi
-          done
-        else
-          print_error "Root partition is not a LUKS container. Cannot continue!"
-          exit 1
-        fi
-      else
-        print_error "Root partition $ROOT_PART not found. Please specify the correct disk with --disk!"
-        exit 1
-      fi
-    else
-      # If root is mounted but boot is not, try to mount boot
-      if ! mountpoint -q "/mnt/boot" && [ -b "$EFI_PART" ]; then
-        print_msg "Mounting EFI partition"
-        mkdir -p "/mnt/boot"
-        mount -o "$ESP_MOUNT_OPTS" "$EFI_PART" "/mnt/boot" || {
-          print_warning "Could not mount EFI partition. Boot setup might fail!"
-        }
-      fi
-    fi
+    ensure_mounted
 
     configure_users
 
@@ -1579,12 +1554,14 @@ main() {
     print_summary
     ;;
   boot)
+    ensure_mounted
     configure_boot
     enable_services
     verify_installation
     print_summary
     ;;
   verify)
+    ensure_mounted
     verify_installation
     print_summary
     ;;
