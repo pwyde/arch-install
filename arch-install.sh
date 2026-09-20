@@ -163,7 +163,6 @@ ROOT_PASSWORD_VALID=0
 
 # Help function
 show_help() {
-  print_logo
   cat <<EOF
 Arch Linux Installation Script
 
@@ -1421,6 +1420,8 @@ print_summary() {
 # Main function
 main() {
   check_shell_nesting
+
+  print_logo
 
   parse_args "$@"
 
