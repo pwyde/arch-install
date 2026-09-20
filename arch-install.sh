@@ -80,6 +80,13 @@ cleanup() {
       cleanup_chroot
     fi
 
+    # pacman-key leaves a gpg-agent running on the target keyring. It keeps a
+    # reference to the filesystem after the unmount, which blocks the close
+    # below. Addressing it by homedir stops that agent and no other.
+    if [ -d /mnt/etc/pacman.d/gnupg ]; then
+      gpgconf --homedir /mnt/etc/pacman.d/gnupg --kill all &>/dev/null || true
+    fi
+
     # Unmount all filesystems if they exist
     if mountpoint -q /mnt 2>/dev/null; then
       print_msg "Unmounting filesystems"
@@ -93,10 +100,10 @@ cleanup() {
       local tries=0
       until cryptsetup close cryptroot 2>/dev/null; do
         tries=$((tries + 1))
-        if [ "$tries" -ge 5 ]; then
+        if [ "$tries" -ge 10 ]; then
           print_warning "Could not close the LUKS container; something still holds it."
-          print_warning "Inspect with: lsof +f -- /dev/mapper/cryptroot"
-          print_warning "Then close it with: cryptsetup close cryptroot"
+          print_warning "This is safe to leave: the next --stage reuses the open container."
+          print_warning "To close it by hand, retry: cryptsetup close cryptroot"
           break
         fi
         sleep 1
