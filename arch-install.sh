@@ -64,6 +64,9 @@ print_error() {
 cleanup() {
   local exit_code=$?
 
+  # An interrupt fires INT and then EXIT, which would run this twice.
+  trap - EXIT INT TERM
+
   # Only run cleanup if the script errors out
   if [ $exit_code -ne 0 ]; then
     print_error "Script exited with error code $exit_code. Performing cleanup..."
@@ -515,6 +518,7 @@ format_partitions() {
     print_msg "This might be due to a previous LUKS header still being detected."
     exit 1
   fi
+  CRYPTROOT_OPENED=1
 }
 
 # Setup Btrfs filesystem with subvolumes
