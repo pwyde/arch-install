@@ -27,7 +27,11 @@ DEFAULT_LOCALE="sv_SE.UTF-8"
 # No snapshots subvolume here on purpose: 'snapper create-config' creates its
 # own /.snapshots and refuses to run when the path already exists.
 DEFAULT_SUBVOLUMES="@ @home @cache @log @root"
-DEFAULT_PACKAGES="base base-devel bash-completion btrfs-progs cryptsetup dosfstools efibootmgr git limine linux linux-firmware man-db man-pages nano networkmanager openssh plymouth snap-pac snapper sudo terminus-font unzip util-linux vim zram-generator"
+# mkinitcpio and iptables are named explicitly. They provide the virtual
+# packages 'initramfs' and 'libxtables.so', which have several providers each,
+# and pacstrap runs with --noconfirm, so the choice would otherwise come from
+# whichever provider pacman happens to list first.
+DEFAULT_PACKAGES="base base-devel bash-completion btrfs-progs cryptsetup dosfstools efibootmgr git iptables limine linux linux-firmware man-db man-pages mkinitcpio nano networkmanager openssh plymouth snap-pac snapper sudo terminus-font unzip util-linux vim zram-generator"
 
 # Color variables
 RED=$'\033[91m'
@@ -599,6 +603,9 @@ install_base_system() {
 
   # Install base packages
   print_msg "Running pacstrap to install packages (this may take a while)"
+
+  # pacstrap passes --noconfirm unless -i is given, so this needs no flag of its
+  # own to run unattended.
   # shellcheck disable=SC2086
   pacstrap -K /mnt $PACKAGES || {
     print_error "pacstrap failed. Check internet connection and package names."
