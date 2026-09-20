@@ -577,6 +577,12 @@ mount_filesystems() {
     fi
   done
 
+  # A fresh subvolume is 0755, but root's home is meant to be 0750, and pacman
+  # warns about the difference when it installs the filesystem package.
+  if mountpoint -q /mnt/root; then
+    chmod 0750 /mnt/root
+  fi
+
   print_msg "Mounted filesystems:"
   mount | grep "/mnt"
 }
@@ -605,9 +611,11 @@ install_base_system() {
   print_msg "Running pacstrap to install packages (this may take a while)"
 
   # pacstrap passes --noconfirm unless -i is given, so this needs no flag of its
-  # own to run unattended.
+  # own to run unattended. SNAP_PAC_SKIP reaches the alpm hooks through pacman's
+  # environment: snapper has no configuration yet, so its post-transaction hook
+  # would only fail noisily in the target.
   # shellcheck disable=SC2086
-  pacstrap -K /mnt $PACKAGES || {
+  SNAP_PAC_SKIP=y pacstrap -K /mnt $PACKAGES || {
     print_error "pacstrap failed. Check internet connection and package names."
     exit 1
   }
@@ -619,16 +627,6 @@ install_base_system() {
   if [ ! -s /mnt/etc/fstab ]; then
     print_error "fstab generation failed or produced empty file"
     exit 1
-  fi
-
-  # Derived here rather than carried from mount_filesystems, so stages entering
-  # at 'base' do not trip over an unset variable under `set -u`.
-  ESP_UUID=$(blkid -s UUID -o value "$EFI_PART")
-  if ! grep -qE "UUID=${ESP_UUID}[[:space:]]+/boot[[:space:]]" /mnt/etc/fstab; then
-    echo "UUID=$ESP_UUID  /boot  vfat  ${ESP_MOUNT_OPTS},noatime  0  2" >>/mnt/etc/fstab
-    print_msg "Added /boot entry to /etc/fstab"
-  else
-    print_msg "/boot entry already exists in /etc/fstab"
   fi
 
   print_msg "Installed fstab:"
