@@ -18,7 +18,7 @@
 set -euo pipefail
 
 # Define default variables
-DEFAULT_DISK=$(lsblk -dpno NAME | grep -v loop | head -n1)
+DEFAULT_DISK=$(lsblk -dpno NAME | grep -vE '/dev/(loop|zram|sr|ram)' | head -n1)
 DEFAULT_HOSTNAME="arch-linux"
 DEFAULT_USERNAME="admin"
 DEFAULT_TIMEZONE="Europe/Stockholm"
@@ -38,8 +38,12 @@ RED=$'\033[91m'
 GREEN=$'\033[92m'
 BLUE=$'\033[94m'
 YELLOW=$'\033[93m'
-WHITE=$'\033[97m'
+WHITE=$'\033[1;97m'
 NO_COLOR=$'\033[0m'
+
+# Set once this script opens the LUKS container, so cleanup only closes one it
+# opened itself and never an unrelated cryptroot that was already mapped.
+CRYPTROOT_OPENED=0
 
 # Trap for cleanup
 trap cleanup EXIT INT TERM
@@ -79,8 +83,9 @@ cleanup() {
       umount -Rf /mnt 2>/dev/null || true
     fi
 
-    # Close the LUKS container if it exists
-    if [ -e "/dev/mapper/cryptroot" ]; then
+    # Only the container this script opened; an already-mapped cryptroot
+    # belongs to the running system.
+    if [ "${CRYPTROOT_OPENED:-0}" -eq 1 ] && [ -e "/dev/mapper/cryptroot" ]; then
       print_msg "Closing LUKS container"
       cryptsetup close cryptroot 2>/dev/null || true
     fi
@@ -155,6 +160,7 @@ ROOT_PASSWORD_VALID=0
 
 # Help function
 show_help() {
+  print_logo
   cat <<EOF
 Arch Linux Installation Script
 
@@ -376,6 +382,7 @@ setup_luks() {
     print_msg "This might be due to a previous LUKS header still being detected."
     exit 1
   fi
+  CRYPTROOT_OPENED=1
 }
 
 # Setup partitions based on disk
@@ -1307,10 +1314,39 @@ check_shell_nesting() {
   fi
 }
 
+print_logo() {
+  # Colour is set around the heredoc rather than inside it, so the heredoc
+  # stays quoted and the art is never subject to expansion.
+  printf '%s' "$BLUE"
+  cat <<'EOF'
+                   ▄
+                  ▟█▙
+                 ▟███▙
+                ▟█████▙
+               ▟███████▙
+              ▂▔▀▜██████▙
+             ▟██▅▂▝▜█████▙
+            ▟█████████████▙
+           ▟███████████████▙
+          ▟█████████████████▙
+         ▟███████████████████▙
+        ▟█████████▛▀▀▜████████▙
+       ▟████████▛      ▜███████▙
+      ▟█████████        ████████▙
+     ▟██████████        █████▆▅▄▃▂
+    ▟██████████▛        ▜█████████▙
+   ▟██████▀▀▀              ▀▀██████▙
+  ▟███▀▘                       ▝▀███▙
+ ▟▛▀                               ▀▜▙
+
+EOF
+  printf '%s' "$NO_COLOR"
+}
+
 # Print installation summary
 print_summary() {
   echo
-  echo "${YELLOW}===${BLUE} INSTALLATION SUMMARY ${YELLOW}===${NO_COLOR}"
+  echo "${WHITE}===${BLUE} INSTALLATION SUMMARY ${WHITE}===${NO_COLOR}"
   echo "${WHITE}Disk:${NO_COLOR} ${DISK}"
   echo "${WHITE}EFI Partition:${NO_COLOR} ${EFI_PART}"
   echo "${WHITE}Root Partition:${NO_COLOR} ${ROOT_PART} (encrypted)"
@@ -1357,14 +1393,14 @@ print_summary() {
   echo "credential: losing the passphrase means losing the data.${NO_COLOR}"
 
   echo
-  echo "${BLUE}==>${YELLOW} Done. Ready to reboot! ${NO_COLOR}"
-  echo "${BLUE}==>${YELLOW} Secure Boot is ${WHITE}not${YELLOW} configured by this script; leave it disabled in BIOS for now. ${NO_COLOR}"
-  echo "${BLUE}==>${YELLOW} After reboot, log in as ${WHITE}${USERNAME}${NO_COLOR}"
+  echo "${BLUE}==>${WHITE} Done. Ready to reboot! ${NO_COLOR}"
+  echo "${BLUE}==>${WHITE} Secure Boot is not configured by this script; leave it disabled in BIOS for now. ${NO_COLOR}"
+  echo "${BLUE}==>${WHITE} After reboot, log in as ${USERNAME}${NO_COLOR}"
 
   # Troubleshooting tips if boot issues were detected
   if [ ! -f "/mnt/boot/EFI/Linux/arch_linux.efi" ] || [ ! -f "/mnt/boot/EFI/BOOT/BOOTX64.EFI" ]; then
     echo
-    echo "${YELLOW}===${BLUE} BOOT TROUBLESHOOTING ${YELLOW}===${NO_COLOR}"
+    echo "${WHITE}===${BLUE} BOOT TROUBLESHOOTING ${WHITE}===${NO_COLOR}"
     echo "If the system does not boot, try these steps:"
     echo "1. From the UEFI/BIOS setup, make sure Secure Boot is disabled"
     echo "2. Make sure the EFI partition is set as the primary boot device"
@@ -1380,9 +1416,6 @@ print_summary() {
 
 # Main function
 main() {
-  echo "${YELLOW}===${BLUE} Arch Linux Encrypted Installation Script ${YELLOW}===${NO_COLOR}"
-  echo
-
   check_shell_nesting
 
   parse_args "$@"
@@ -1462,6 +1495,7 @@ main() {
             print_msg "This might be due to a previous LUKS header still being detected."
             exit 1
           fi
+          CRYPTROOT_OPENED=1
           print_msg "Mounting root filesystem"
           mount -o "subvol=@,$BTRFS_MOUNT_OPTS" /dev/mapper/cryptroot /mnt || {
             print_error "Could not mount root filesystem. Please check the subvolume configuration!"
