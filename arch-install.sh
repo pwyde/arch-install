@@ -1091,9 +1091,6 @@ done < <(efibootmgr 2>/dev/null |
 
 echo "==> UEFI boot entries:"
 efibootmgr || echo "WARNING: efibootmgr failed"
-
-echo "==> ESP contents:"
-find "/boot/EFI" -type f \( -name '*.efi' -o -name '*.EFI' \) | sort
 EOF
 }
 
