@@ -127,7 +127,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PLYMOUTH_THEME_SRC="${SCRIPT_DIR}/default/plymouth/arch-linux"
 PLYMOUTHD_CONF_SRC="${SCRIPT_DIR}/etc/plymouth/plymouthd.conf"
 LIMINE_CONF_SRC="${SCRIPT_DIR}/default/limine/limine.conf"
-LIMINE_HOOK_SRC="${SCRIPT_DIR}/etc/pacman.d/hooks/90-limine-deploy.hook"
 VCONSOLE_LATIN_HOOK_SRC="${SCRIPT_DIR}/etc/initcpio/install/vconsole-latin"
 MKINITCPIO_HOOKS_CONF_SRC="${SCRIPT_DIR}/etc/mkinitcpio.conf.d/hooks.conf"
 CMDLINE_SRC="${SCRIPT_DIR}/etc/cmdline.d"
@@ -321,7 +320,6 @@ validate_inputs() {
     "${PLYMOUTH_THEME_SRC}/arch-linux.plymouth"
     "$PLYMOUTHD_CONF_SRC"
     "$LIMINE_CONF_SRC"
-    "$LIMINE_HOOK_SRC"
     "$VCONSOLE_LATIN_HOOK_SRC"
     "$MKINITCPIO_HOOKS_CONF_SRC"
     "$LOCALE_CONF_SRC"
@@ -1045,9 +1043,6 @@ configure_boot() {
   print_msg "Installing Limine configuration"
   install -D -m 0644 "$LIMINE_CONF_SRC" /mnt/boot/limine.conf
 
-  print_msg "Installing pacman hook to redeploy Limine on upgrade"
-  install -D -m 0644 "$LIMINE_HOOK_SRC" /mnt/etc/pacman.d/hooks/90-limine-deploy.hook
-
   # Local install hooks go in /etc/initcpio/install/, which mkinitcpio searches
   # before /usr/lib/initcpio/install/. Hook files are sourced, not executed.
   print_msg "Installing mkinitcpio hook vconsole-latin"
@@ -1078,31 +1073,21 @@ cat > /etc/cmdline.d/10-root.conf <<EOL
 rd.luks.name=${ROOT_UUID}=cryptroot root=/dev/mapper/cryptroot zswap.enabled=0 rw rootfstype=btrfs rootflags=subvol=/@
 EOL
 
-mkdir -p "/boot/EFI/Linux"
+# limine-install deploys the EFI binaries and the removable-media fallback when
+# limine-mkinitcpio-hook is installed. Putting them here first only gives it
+# something to back up as limine_x64.bak on an otherwise fresh ESP.
 
-echo "==> Installing Limine"
-# The limine package only ships the EFI binaries; deploying them and writing
-# the config is left to the administrator. Mirror the layout that
-# limine-entry-tool uses, so adding limine-mkinitcpio-hook later finds Limine
-# where it expects it.
-mkdir -p "/boot/EFI/limine" "/boot/EFI/BOOT"
-cp /usr/share/limine/BOOTX64.EFI "/boot/EFI/limine/limine_x64.efi"
-# Also install as the removable-media fallback, so the system still boots if
-# the firmware loses its NVRAM entry.
-cp /usr/share/limine/BOOTX64.EFI "/boot/EFI/BOOT/BOOTX64.EFI"
-
-echo "==> Registering Limine with the UEFI firmware"
-esp_dev=$(findmnt -n -o SOURCE "/boot")
-esp_disk=$(lsblk -no PKNAME "$esp_dev")
-esp_partnum=$(cat "/sys/class/block/$(basename "$esp_dev")/partition")
-
-if efibootmgr 2>/dev/null | grep -q "Limine"; then
-  echo "A Limine UEFI boot entry already exists, leaving it alone."
-else
-  efibootmgr --create --disk "/dev/${esp_disk}" --part "$esp_partnum" \
-    --loader '\EFI\limine\limine_x64.efi' --label "Limine" --unicode ||
-    echo "WARNING: could not create the UEFI boot entry. The fallback at /boot/EFI/BOOT/BOOTX64.EFI should still boot." >&2
-fi
+echo "==> Removing stale Limine UEFI boot entries"
+# The disk was just repartitioned, so any entry with this label points at a
+# partition that no longer exists. Registering the new one is left to
+# limine-install, which runs when limine-mkinitcpio-hook is installed; creating
+# one here as well would leave the firmware with two entries of the same name.
+while read -r bootnum; do
+  echo "Removing stale entry Boot${bootnum}"
+  efibootmgr --bootnum "$bootnum" --delete-bootnum >/dev/null ||
+    echo "WARNING: could not remove Boot${bootnum}" >&2
+done < <(efibootmgr 2>/dev/null |
+  awk '$1 ~ /^Boot[0-9A-Fa-f]{4}\*?$/ && $2 == "Limine" { print substr($1, 5, 4) }')
 
 echo "==> UEFI boot entries:"
 efibootmgr || echo "WARNING: efibootmgr failed"
@@ -1391,7 +1376,7 @@ print_summary() {
     echo "  - Mount the filesystems: mount -o subvol=@ /dev/mapper/cryptroot /mnt"
     echo "  - Mount the ESP: mount $EFI_PART /mnt/boot"
     echo "  - Chroot: arch-chroot /mnt"
-    echo "  - Rerun: limine-mkinitcpio && cp /usr/share/limine/BOOTX64.EFI /boot/EFI/limine/limine_x64.efi"
+    echo "  - Rerun: limine-install && limine-mkinitcpio"
     echo "  - Exit chroot and reboot"
   fi
 }
