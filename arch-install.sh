@@ -77,7 +77,6 @@ cleanup() {
       mountpoint -q /mnt/sys 2>/dev/null ||
       mountpoint -q /mnt/dev 2>/dev/null ||
       mountpoint -q /mnt/run 2>/dev/null; then
-      print_msg "Cleaning up chroot mounts"
       cleanup_chroot
     fi
 
@@ -91,7 +90,11 @@ cleanup() {
     # belongs to the running system.
     if [ "${CRYPTROOT_OPENED:-0}" -eq 1 ] && [ -e "/dev/mapper/cryptroot" ]; then
       print_msg "Closing LUKS container"
-      cryptsetup close cryptroot 2>/dev/null || true
+      if ! cryptsetup close cryptroot 2>/dev/null; then
+        print_warning "Could not close the LUKS container; something still holds it."
+        print_warning "pacstrap leaves a gpg-agent running in the target. Try:"
+        print_warning "  fuser -km /mnt; cryptsetup close cryptroot"
+      fi
     fi
 
     print_msg "Cleanup complete. Please check the logs for errors."
@@ -978,7 +981,7 @@ fi
 # relative to the unlocked LUKS device -- which is why it comes from
 # map-swapfile and not filefrag.
 echo "==> Adding resume kernel parameters"
-RESUME_DEVICE=$(findmnt -no SOURCE -T "$SWAP_FILE" | sed 's/\[.*\]//')
+RESUME_DEVICE=$(findmnt -no SOURCE --first-only -T "$SWAP_FILE" | sed 's/\[.*\]//')
 RESUME_OFFSET=$(btrfs inspect-internal map-swapfile -r "$SWAP_FILE")
 if [ -n "$RESUME_OFFSET" ]; then
   mkdir -p /etc/cmdline.d
@@ -1076,9 +1079,9 @@ configure_boot() {
   fi
 
   # Check that the ESP partition is formatted as FAT
-  if ! file -sL "$(findmnt -n -o SOURCE "/mnt/boot")" | grep -q "FAT"; then
+  if ! file -sL "$(findmnt -n -o SOURCE --first-only "/mnt/boot")" | grep -q "FAT"; then
     print_warning "WARNING: EFI System Partition is not formatted as FAT filesystem."
-    print_msg "Current filesystem type: $(file -sL "$(findmnt -n -o SOURCE "/mnt/boot")")"
+    print_msg "Current filesystem type: $(file -sL "$(findmnt -n -o SOURCE --first-only "/mnt/boot")")"
     if [ "$NON_INTERACTIVE" -eq 0 ]; then
       read -r -p "Format the EFI partition with FAT32? This will erase all data on it. (y/N) " REPLY
       echo
@@ -1347,7 +1350,7 @@ verify_installation() {
   # Show formatted EFI partition info
   if mountpoint -q "/mnt/boot"; then
     print_msg "EFI partition information:"
-    file -sL "$(findmnt -n -o SOURCE "/mnt/boot")"
+    file -sL "$(findmnt -n -o SOURCE --first-only "/mnt/boot")"
     print_msg "EFI partition contents:"
     find "/mnt/boot" -type f \( -name "*.efi" -o -name "*.EFI" \) | sort
   else
@@ -1539,8 +1542,8 @@ main() {
     print_summary
     ;;
   users)
-    prompt_for_passwords
     ensure_mounted
+    prompt_for_passwords
 
     configure_users
 
@@ -1550,6 +1553,9 @@ main() {
       echo
       if [[ $REPLY =~ ^[Yy]$ ]]; then
         configure_boot
+        configure_limine_tool
+        install_limine_hooks
+        configure_snapshots
         enable_services
       fi
     fi
