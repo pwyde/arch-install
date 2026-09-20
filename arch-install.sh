@@ -45,8 +45,12 @@ NO_COLOR=$'\033[0m'
 # opened itself and never an unrelated cryptroot that was already mapped.
 CRYPTROOT_OPENED=0
 
-# Trap for cleanup
-trap cleanup EXIT INT TERM
+# Only EXIT runs cleanup: a signal handler would see the status of whatever
+# command the signal interrupted, which is 0 more often than not. Converting the
+# signals to an exit gives cleanup the real code, and only one trap fires.
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 print_msg() {
   echo -e "${GREEN}==>${NO_COLOR}${WHITE}" "${@}" "${NO_COLOR}" >&1
@@ -63,9 +67,6 @@ print_error() {
 # Cleanup function for unexpected exits
 cleanup() {
   local exit_code=$?
-
-  # An interrupt fires INT and then EXIT, which would run this twice.
-  trap - EXIT INT TERM
 
   # Only run cleanup if the script errors out
   if [ $exit_code -ne 0 ]; then
@@ -1247,8 +1248,11 @@ configure_snapshots() {
   fi
 
   # create-config makes its own /.snapshots subvolume and refuses to run when
-  # the path already exists, which is why no such subvolume is created earlier.
-  arch-chroot /mnt snapper --no-dbus -c root create-config /
+  # the path already exists, which is why no such subvolume is created earlier,
+  # and why this only runs when there is no config yet.
+  if [ ! -f /mnt/etc/snapper/configs/root ]; then
+    arch-chroot /mnt snapper --no-dbus -c root create-config /
+  fi
 
   install -D -m 0644 "$SNAPPER_CONFIG_SRC" /mnt/etc/snapper/configs/root
   install -D -m 0644 "$SNAPPER_CONFD_SRC" /mnt/etc/conf.d/snapper
@@ -1556,6 +1560,9 @@ main() {
   boot)
     ensure_mounted
     configure_boot
+    configure_limine_tool
+    install_limine_hooks
+    configure_snapshots
     enable_services
     verify_installation
     print_summary
