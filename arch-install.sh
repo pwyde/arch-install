@@ -90,11 +90,17 @@ cleanup() {
     # belongs to the running system.
     if [ "${CRYPTROOT_OPENED:-0}" -eq 1 ] && [ -e "/dev/mapper/cryptroot" ]; then
       print_msg "Closing LUKS container"
-      if ! cryptsetup close cryptroot 2>/dev/null; then
-        print_warning "Could not close the LUKS container; something still holds it."
-        print_warning "pacstrap leaves a gpg-agent running in the target. Try:"
-        print_warning "  fuser -km /mnt; cryptsetup close cryptroot"
-      fi
+      local tries=0
+      until cryptsetup close cryptroot 2>/dev/null; do
+        tries=$((tries + 1))
+        if [ "$tries" -ge 5 ]; then
+          print_warning "Could not close the LUKS container; something still holds it."
+          print_warning "Inspect with: lsof +f -- /dev/mapper/cryptroot"
+          print_warning "Then close it with: cryptsetup close cryptroot"
+          break
+        fi
+        sleep 1
+      done
     fi
 
     print_msg "Cleanup complete. Please check the logs for errors."
@@ -1552,6 +1558,8 @@ main() {
       read -r -p "Do you want to reconfigure the boot setup? This might help if the system is not booting (y/N) " REPLY
       echo
       if [[ $REPLY =~ ^[Yy]$ ]]; then
+        configure_hibernation
+        configure_plymouth
         configure_boot
         configure_limine_tool
         install_limine_hooks
@@ -1565,6 +1573,8 @@ main() {
     ;;
   boot)
     ensure_mounted
+    configure_hibernation
+    configure_plymouth
     configure_boot
     configure_limine_tool
     install_limine_hooks
