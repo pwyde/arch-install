@@ -8,7 +8,7 @@
 
 `arch-install.sh` is an automated Arch Linux installation script that installs and configures an encrypted Arch Linux system using **LUKS2**, **Btrfs**, **Unified Kernel Images (UKIs)**, the **Limine** bootloader and **Snapper** snapshots with a boot entry for each snapshot.
 
-The script is designed to automate the complete installation process while providing validation, error handling, cleanup, and support for resuming the installation from individual stages.
+The script is designed to automate the complete installation process in a single sequential run, while providing validation, error handling and cleanup.
 
 ## Features
 
@@ -41,7 +41,6 @@ The script is designed to automate the complete installation process while provi
   the LUKS passphrase at boot.
 - Provides customizable installation parameters.
 - Provides cleanup functionality when the installation fails.
-- Supports resuming the installation from different stages instead of starting over.
 
 ## Instructions
 
@@ -83,9 +82,6 @@ Options:
   -s, --subvolumes SUBVOLS   Btrfs subvolumes, space-separated (default: @ @home @cache @log @root)
   -p, --packages PACKAGES    Additional packages to install (appended to defaults)
   -y, --yes                  Non-interactive mode, use defaults for prompts
-  --stage STAGE              Start from specific installation stage:
-                             'partitions', 'format', 'btrfs', 'mount',
-                             'base', 'configure', 'users', 'boot', 'verify'
 ```
 
 ## Bootloader

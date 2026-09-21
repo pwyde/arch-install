@@ -1,12 +1,12 @@
 #!/bin/bash
 # arch-install.sh v1.0
 #
-# A comprehensive Arch Linux installation script with LUKS encryption, TPM2 unlocking,
+# A comprehensive Arch Linux installation script with LUKS encryption,
 # Btrfs subvolumes, the Limine bootloader and Unified Kernel Image (UKI).
 #
 # Features:
-# - Full disk encryption with LUKS2
-# - TPM2 integration
+# - Full disk encryption with LUKS2, unlocked by passphrase
+# - Snapper snapshots with a Limine boot entry for each
 # - Btrfs filesystem with customizable subvolumes
 # - Unified Kernel Image booted by Limine
 # - Customizable installation parameters
@@ -44,6 +44,9 @@ NO_COLOR=$'\033[0m'
 # Set once this script opens the LUKS container, so cleanup only closes one it
 # opened itself and never an unrelated cryptroot that was already mapped.
 CRYPTROOT_OPENED=0
+# Set by the first step that writes to the disk. Until then a failure has
+# nothing to undo, and reporting a cleanup would only obscure the real error.
+DISK_MODIFIED=0
 
 # Only EXIT runs cleanup: a signal handler would see the status of whatever
 # command the signal interrupted, which is 0 more often than not. Converting the
@@ -68,8 +71,9 @@ print_error() {
 cleanup() {
   local exit_code=$?
 
-  # Only run cleanup if the script errors out
-  if [ $exit_code -ne 0 ]; then
+  # Argument, validation and confirmation failures all land here before
+  # anything on the disk has changed, so they stay quiet.
+  if [ "$exit_code" -ne 0 ] && [ "${DISK_MODIFIED:-0}" -eq 1 ]; then
     print_error "Script exited with error code $exit_code. Performing cleanup..."
 
     # Clean up chroot special mounts first
@@ -102,8 +106,8 @@ cleanup() {
         tries=$((tries + 1))
         if [ "$tries" -ge 10 ]; then
           print_warning "Could not close the LUKS container; something still holds it."
-          print_warning "This is safe to leave: the next --stage reuses the open container."
-          print_warning "To close it by hand, retry: cryptsetup close cryptroot"
+          print_warning "Close it before running the installer again:"
+          print_warning "  cryptsetup close cryptroot"
           break
         fi
         sleep 1
@@ -169,14 +173,12 @@ LIMINE_TOOL_CONF_SRC="${SCRIPT_DIR}/etc/limine-entry-tool.d/50-arch.conf"
 LIMINE_PKG_SRC="${SCRIPT_DIR}/packages"
 LIMINE_PKGS="limine-mkinitcpio-hook limine-snapper-sync"
 
-# Default start at beginning
-START_STAGE="partitions"
-
 # Password variables
 USER_PASSWORD=""
 ROOT_PASSWORD=""
-USER_PASSWORD_VALID=0
-ROOT_PASSWORD_VALID=0
+# Names whichever accounts fell back to 'changeme', so print_summary can repeat
+# it at the end, where a warning from the password prompt has long scrolled off.
+PASSWORD_FALLBACK=""
 
 # Help function
 show_help() {
@@ -196,16 +198,22 @@ Options:
   -s, --subvolumes SUBVOLS   Btrfs subvolumes, space-separated (default: $DEFAULT_SUBVOLUMES)
   -p, --packages PACKAGES    Additional packages to install (appended to defaults)
   -y, --yes                  Non-interactive mode, use defaults for prompts
-  --stage STAGE              Start from specific installation stage:
-                             'partitions', 'format', 'btrfs', 'mount',
-                             'base', 'configure', 'users', 'boot', 'verify'
 
 Example:
   $(basename "$0") --disk /dev/sda --hostname mymachine --username myuser
-  $(basename "$0") --stage users --hostname mymachine --username myuser
 
 EOF
   exit 0
+}
+
+# Every option below takes a value. Without this an omitted one dies with a raw
+# "$2: unbound variable" from set -u, which names neither the option nor itself.
+require_value() {
+  if [ -z "${2:-}" ]; then
+    print_error "Option $1 requires a value."
+    print_msg "Run with --help for the available options."
+    exit 1
+  fi
 }
 
 # Process command line arguments
@@ -217,7 +225,6 @@ parse_args() {
   KEYMAP="$DEFAULT_KEYMAP"
   LOCALE="$DEFAULT_LOCALE"
   SUBVOLUMES="$DEFAULT_SUBVOLUMES"
-  START_STAGE="partitions" # Default start at beginning
 
   while [[ $# -gt 0 ]]; do
     case $1 in
@@ -225,34 +232,42 @@ parse_args() {
       show_help
       ;;
     -d | --disk)
+      require_value "$1" "${2:-}"
       DISK="$2"
       shift 2
       ;;
     -n | --hostname)
+      require_value "$1" "${2:-}"
       HOSTNAME="$2"
       shift 2
       ;;
     -u | --username)
+      require_value "$1" "${2:-}"
       USERNAME="$2"
       shift 2
       ;;
     -t | --timezone)
+      require_value "$1" "${2:-}"
       TIMEZONE="$2"
       shift 2
       ;;
-    -k | --kaymap)
+    -k | --keymap)
+      require_value "$1" "${2:-}"
       KEYMAP="$2"
       shift 2
       ;;
     -l | --locale)
+      require_value "$1" "${2:-}"
       LOCALE="$2"
       shift 2
       ;;
     -s | --subvolumes)
+      require_value "$1" "${2:-}"
       SUBVOLUMES="$2"
       shift 2
       ;;
     -p | --packages)
+      require_value "$1" "${2:-}"
       EXTRA_PACKAGES="$2"
       shift 2
       ;;
@@ -260,13 +275,10 @@ parse_args() {
       NON_INTERACTIVE=1
       shift
       ;;
-    --stage)
-      START_STAGE="$2"
-      shift 2
-      ;;
     *)
-      echo "Unknown option: $1"
-      show_help
+      print_error "Unknown option: $1"
+      print_msg "Run with --help for the available options."
+      exit 1
       ;;
     esac
   done
@@ -444,6 +456,7 @@ confirm_operation() {
 
 # Create disk partitions
 create_partitions() {
+  DISK_MODIFIED=1
   print_msg "Creating partitions on $DISK"
 
   # Make sure the disk is not in use
@@ -535,52 +548,6 @@ format_partitions() {
     exit 1
   fi
   CRYPTROOT_OPENED=1
-}
-
-# Resuming mid-install needs the container open. A failed run closes it, so any
-# stage after 'format' has to be able to reopen it.
-ensure_cryptroot_open() {
-  [ -e /dev/mapper/cryptroot ] && return 0
-
-  if [ ! -b "$ROOT_PART" ]; then
-    print_error "Root partition $ROOT_PART not found."
-    exit 1
-  fi
-
-  if ! cryptsetup isLuks "$ROOT_PART"; then
-    print_error "$ROOT_PART is not a LUKS container."
-    exit 1
-  fi
-
-  # Discards are persistent in the header from luksFormat, so a plain open
-  # keeps them without rewriting it.
-  print_msg "Opening LUKS container on $ROOT_PART"
-  if ! cryptsetup open "$ROOT_PART" cryptroot; then
-    print_error "Failed to open LUKS container."
-    exit 1
-  fi
-  CRYPTROOT_OPENED=1
-}
-
-# Stages from 'base' onwards expect the subvolumes and the ESP in place. A
-# failed run leaves them unmounted, so resuming has to mount them again.
-ensure_mounted() {
-  ensure_cryptroot_open
-
-  if ! mountpoint -q /mnt; then
-    print_msg "Filesystems are not mounted; mounting them for this stage"
-    mount_filesystems
-    return 0
-  fi
-
-  # Root can be mounted while the ESP is not, and everything from the base
-  # install onwards writes to it.
-  if ! mountpoint -q /mnt/boot && [ -b "$EFI_PART" ]; then
-    print_msg "Mounting EFI partition to /mnt/boot"
-    mkdir -p /mnt/boot
-    mount -o "$ESP_MOUNT_OPTS" "$EFI_PART" /mnt/boot ||
-      print_warning "Could not mount the EFI partition. Boot setup might fail!"
-  fi
 }
 
 # Setup Btrfs filesystem with subvolumes
@@ -796,14 +763,14 @@ prompt_for_passwords() {
   USER_PASSWORD_CONFIRM=""
   ROOT_PASSWORD=""
   ROOT_PASSWORD_CONFIRM=""
-  USER_PASSWORD_VALID=0
-  ROOT_PASSWORD_VALID=0
+  PASSWORD_FALLBACK=""
 
   # Skip prompts in non-interactive mode
   if [ "$NON_INTERACTIVE" -eq 1 ]; then
     print_msg "Non-interactive mode: Setting default temporary passwords"
     USER_PASSWORD="changeme"
     ROOT_PASSWORD="changeme"
+    PASSWORD_FALLBACK="${USERNAME} root "
     return
   fi
 
@@ -815,13 +782,18 @@ prompt_for_passwords() {
   read -rs USER_PASSWORD_CONFIRM
   echo
 
-  if [ "$USER_PASSWORD" = "$USER_PASSWORD_CONFIRM" ]; then
-    print_msg "Password for ${USERNAME} set successfully"
-    USER_PASSWORD_VALID=1
-  else
-    print_msg "Passwords do not match. Setting temporary password 'changeme'"
+  if [ -z "$USER_PASSWORD" ]; then
+    print_msg "Password is empty. Setting temporary password 'changeme'"
+    PASSWORD_FALLBACK="${PASSWORD_FALLBACK}${USERNAME} "
     USER_PASSWORD="changeme"
     print_warning "You must change the password after first login with: passwd"
+  elif [ "$USER_PASSWORD" != "$USER_PASSWORD_CONFIRM" ]; then
+    print_msg "Passwords do not match. Setting temporary password 'changeme'"
+    PASSWORD_FALLBACK="${PASSWORD_FALLBACK}${USERNAME} "
+    USER_PASSWORD="changeme"
+    print_warning "You must change the password after first login with: passwd"
+  else
+    print_msg "Password for ${USERNAME} set successfully"
   fi
 
   print_msg "Setting root password"
@@ -832,13 +804,18 @@ prompt_for_passwords() {
   read -rs ROOT_PASSWORD_CONFIRM
   echo
 
-  if [ "$ROOT_PASSWORD" = "$ROOT_PASSWORD_CONFIRM" ]; then
-    print_msg "Root password set successfully"
-    ROOT_PASSWORD_VALID=1
-  else
-    print_msg "Passwords do not match. Setting temporary password 'changeme'"
+  if [ -z "$ROOT_PASSWORD" ]; then
+    print_msg "Password is empty. Setting temporary password 'changeme'"
+    PASSWORD_FALLBACK="${PASSWORD_FALLBACK}root "
     ROOT_PASSWORD="changeme"
     print_warning "You must change the root password after installation with: sudo passwd root"
+  elif [ "$ROOT_PASSWORD" != "$ROOT_PASSWORD_CONFIRM" ]; then
+    print_msg "Passwords do not match. Setting temporary password 'changeme'"
+    PASSWORD_FALLBACK="${PASSWORD_FALLBACK}root "
+    ROOT_PASSWORD="changeme"
+    print_warning "You must change the root password after installation with: sudo passwd root"
+  else
+    print_msg "Root password set successfully"
   fi
 }
 
@@ -900,26 +877,19 @@ configure_users() {
   # Ensure chroot environment is prepared
   prepare_chroot
 
-  # Pass the password variables explicitly to the chroot environment
-  arch-chroot /mnt /bin/bash -c "
-    # Create user (skip if already exists)
-    echo '==> Creating user ${USERNAME}'
-    if id '${USERNAME}' &>/dev/null; then
-        echo 'User ${USERNAME} already exists, skipping creation'
-    else
-        useradd -m -G wheel -s /bin/bash '${USERNAME}'
-        echo '${USERNAME}:${USER_PASSWORD}' | chpasswd
-        if [ ${USER_PASSWORD_VALID} -eq 0 ]; then
-            echo 'WARNING: You must change the password after first login with: passwd'
-        fi
-    fi
+  # Created before the passwords are set, so a rerun that finds the account
+  # already there still refreshes both.
+  if arch-chroot /mnt id "$USERNAME" &>/dev/null; then
+    print_msg "User ${USERNAME} already exists, skipping creation"
+  else
+    print_msg "Creating user ${USERNAME}"
+    arch-chroot /mnt useradd -m -G wheel -s /bin/bash "$USERNAME"
+  fi
 
-    # Set root password
-    echo 'root:${ROOT_PASSWORD}' | chpasswd
-    if [ ${ROOT_PASSWORD_VALID} -eq 0 ]; then
-        echo 'WARNING: You must change the root password after installation with: sudo passwd root'
-    fi
-    "
+  # Both passwords reach chpasswd on stdin. Interpolated into a command string
+  # they break on any quote character the passphrase happens to contain.
+  printf '%s:%s\n' "$USERNAME" "$USER_PASSWORD" | arch-chroot /mnt chpasswd
+  printf '%s:%s\n' root "$ROOT_PASSWORD" | arch-chroot /mnt chpasswd
 
   # 0440 and root-owned, or sudo refuses to read them.
   print_msg "Configuring sudo"
@@ -1305,19 +1275,19 @@ verify_installation() {
   print_msg "Checking boot files"
   if [ ! -f "/mnt/boot/EFI/Linux/arch_linux.efi" ]; then
     print_error "UKI not found at /boot/EFI/Linux/arch_linux.efi! System won't boot."
-    print_error "Try rebuilding the boot configuration with: $0 --stage boot"
+    print_error "Rebuild it with: arch-chroot /mnt limine-mkinitcpio"
   fi
 
   # Check for bootloader
   if [ ! -f "/mnt/boot/EFI/limine/limine_x64.efi" ] && [ ! -f "/mnt/boot/EFI/BOOT/BOOTX64.EFI" ]; then
     print_error "Limine not found! System won't boot."
-    print_error "Try reinstalling the bootloader with: $0 --stage boot"
+    print_error "Reinstall it with: arch-chroot /mnt limine-install"
   fi
 
   # Check for bootloader configuration
   if [ ! -f "/mnt/boot/limine.conf" ]; then
     print_error "Limine configuration not found at /boot/limine.conf!"
-    print_error "Try rebuilding the boot configuration with: $0 --stage boot"
+    print_error "Rebuild it with: arch-chroot /mnt limine-mkinitcpio"
   fi
 
   # The UKI carries its own command line, so confirm it actually got embedded.
@@ -1461,6 +1431,12 @@ print_summary() {
   echo "${WHITE}The disk is unlocked with the LUKS passphrase. There is no second"
   echo "credential: losing the passphrase means losing the data.${NO_COLOR}"
 
+  if [ -n "$PASSWORD_FALLBACK" ]; then
+    echo
+    echo "${YELLOW}The temporary password 'changeme' was set for: ${PASSWORD_FALLBACK% }"
+    echo "Log in with it and change it immediately with: passwd${NO_COLOR}"
+  fi
+
   echo
   echo "${BLUE}==>${WHITE} Done. Ready to reboot! ${NO_COLOR}"
   echo "${BLUE}==>${WHITE} Secure Boot is not configured by this script; leave it disabled in BIOS for now. ${NO_COLOR}"
@@ -1493,113 +1469,20 @@ main() {
 
   validate_secure_boot
 
-  # Determine partition names even if starting from a later stage
-  if [[ "$START_STAGE" != "partitions" ]]; then
-    setup_partitions
-  fi
+  validate_inputs
+  setup_partitions
+  confirm_operation
 
-  # Run only the specified stages
-  case "$START_STAGE" in
-  partitions | start)
-    validate_inputs
-    setup_partitions
-    confirm_operation
-    create_partitions
-    format_partitions
-    setup_btrfs
-    mount_filesystems
-    install_base_system
-    configure_system
-    verify_installation
-    print_summary
-    ;;
-  format)
-    validate_inputs
-    confirm_operation
-    format_partitions
-    setup_btrfs
-    mount_filesystems
-    install_base_system
-    configure_system
-    verify_installation
-    print_summary
-    ;;
-  btrfs)
-    ensure_cryptroot_open
-    setup_btrfs
-    mount_filesystems
-    install_base_system
-    configure_system
-    verify_installation
-    print_summary
-    ;;
-  mount)
-    ensure_cryptroot_open
-    mount_filesystems
-    install_base_system
-    configure_system
-    verify_installation
-    print_summary
-    ;;
-  base)
-    ensure_mounted
-    install_base_system
-    configure_system
-    verify_installation
-    print_summary
-    ;;
-  configure)
-    ensure_mounted
-    configure_system
-    verify_installation
-    print_summary
-    ;;
-  users)
-    ensure_mounted
-    prompt_for_passwords
+  create_partitions
+  format_partitions
+  setup_btrfs
+  mount_filesystems
 
-    configure_users
+  install_base_system
+  configure_system
 
-    # Ask if boot setup should be performed again
-    if [ "$NON_INTERACTIVE" -eq 0 ]; then
-      read -r -p "Do you want to reconfigure the boot setup? This might help if the system is not booting (y/N) " REPLY
-      echo
-      if [[ $REPLY =~ ^[Yy]$ ]]; then
-        configure_hibernation
-        configure_plymouth
-        configure_boot
-        configure_limine_tool
-        install_limine_hooks
-        configure_snapshots
-        enable_services
-      fi
-    fi
-
-    verify_installation
-    print_summary
-    ;;
-  boot)
-    ensure_mounted
-    configure_hibernation
-    configure_plymouth
-    configure_boot
-    configure_limine_tool
-    install_limine_hooks
-    configure_snapshots
-    enable_services
-    verify_installation
-    print_summary
-    ;;
-  verify)
-    ensure_mounted
-    verify_installation
-    print_summary
-    ;;
-  *)
-    echo "Unknown stage: $START_STAGE"
-    show_help
-    ;;
-  esac
+  verify_installation
+  print_summary
 }
 
 # Run the script
