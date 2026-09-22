@@ -28,17 +28,21 @@ The script is designed to automate the complete installation process in a single
 - Installs the Arch Linux base system and configurable additional packages.
 - Automatically installs the appropriate CPU microcode package for Intel or AMD processors.
 - Configures base system, i.e. timezone, hostname, locale and more...
-- Configures `mkinitcpio` to generate Unified Kernel Images (UKIs).
+- Builds Unified Kernel Images (UKIs) with `mkinitcpio`, carrying the kernel
+  command line.
 - Installs and configures `limine` as bootloader, booting the UKIs directly.
-- Installs Limine as the removable-media fallback loader and registers a UEFI
-  boot entry with `efibootmgr`.
-- Installs a pacman hook that redeploys Limine to the ESP on package upgrade.
+- Installs `limine-mkinitcpio-hook`, which deploys Limine and a removable-media
+  fallback loader to the ESP, registers a UEFI boot entry, and redeploys both
+  whenever `limine` is upgraded.
 - Creates a Btrfs swapfile the size of RAM for hibernation, with resume
   parameters embedded in the UKI.
-- Configures Snapper on the root subvolume and builds the Limine snapshot
-  packages, so each snapshot gets its own boot entry.
+- Configures Snapper on the root subvolume and installs the Limine snapshot
+  packages, prebuilt in this repository, so each snapshot gets its own boot
+  entry.
 - Configures a Plymouth boot splash with an Arch Linux theme, which also takes
   the LUKS passphrase at boot.
+- Configures zram swap, `sudo` for the `wheel` group, NetworkManager, OpenSSH
+  and weekly TRIM.
 - Provides customizable installation parameters.
 - Provides cleanup functionality when the installation fails.
 
@@ -84,12 +88,22 @@ Options:
   -y, --yes                  Non-interactive mode, use defaults for prompts
 ```
 
+- **`--disk`** defaults to the first disk `lsblk` reports, skipping loop, zram,
+  optical and RAM devices, so the default shown depends on the machine.
+- **`--locale`** sets the regional formats: numbers, dates, currency,
+  measurements, paper size and sort order. Messages stay in English
+  (`LANG=en_GB.UTF-8`), as set in [`etc/locale.conf`](./etc/locale.conf).
+- **`--yes`** sets both the user and root password to `changeme`. So does an
+  empty or mismatched password at the prompt; the summary at the end lists which
+  accounts got it.
+
 ## Bootloader
 
 The script installs [Limine](https://wiki.archlinux.org/title/Limine) from the
-official repositories and configures it by hand, then builds
-`limine-mkinitcpio-hook` and `limine-snapper-sync` from the AUR so that snapshots
-appear in the boot menu.
+official repositories and writes its menu, then installs `limine-mkinitcpio-hook`
+and `limine-snapper-sync` (see [Prebuilt packages](#prebuilt-packages)). The
+first deploys Limine to the ESP and builds the UKIs; the second gives snapshots
+their boot entries.
 
 The ESP is mounted at **`/boot`**, so the kernel, the UKIs and
 the bootloader all live on the same FAT partition and there is no separate
@@ -114,24 +128,26 @@ Notes:
   `/boot` are world-readable. These values match what `mkinitcpio` would have
   applied on a normal filesystem -- it builds initramfs images and UKIs under
   `umask 077`, because an initramfs can carry secrets such as a LUKS keyfile.
-- **The kernel command line lives inside the UKI**, written to
-  `/etc/cmdline.d/10-root.conf` and embedded when the UKI is built. Limine chainloads the
-  UKI with `protocol: efi` and supplies no command line of its own.
-- **The paths match what `limine-entry-tool` expects.** It derives
+- **The kernel command line lives inside the UKI.** It is assembled from every
+  file in `/etc/cmdline.d/` -- `10-root.conf` for the root and LUKS parameters,
+  the rest for hibernation and the splash -- and embedded when the UKI is built.
+  Limine chainloads the UKI with `protocol: efi` and supplies no command line of
+  its own.
+- **The paths are the ones `limine-entry-tool` uses.** It derives
   `${ESP_PATH}/EFI/limine/limine_x64.efi`, `${ESP_PATH}/EFI/BOOT/BOOTX64.EFI`
-  and `${ESP_PATH}/limine.conf`, and those are not configurable, so when
-  `limine-mkinitcpio-hook` is installed it takes over these files rather than
-  creating a second set. The UKI names follow the same tool's
-  `${CUSTOM_UKI_NAME}_${kernel}.efi` scheme, so `CUSTOM_UKI_NAME="arch"` writes
-  the same `arch_linux.efi` instead of a duplicate.
-- **A pacman hook redeploys Limine on upgrade.** The
-  [`90-limine-deploy.hook`](./etc/pacman.d/hooks/90-limine-deploy.hook) file,
-  installed to `/etc/pacman.d/hooks/`. The `limine` package only
-  updates `/usr/share/limine/BOOTX64.EFI`; without the hook the copies on the
-  ESP would silently stay at the old version.
-- **ESP sizing**: 2 GiB holds the kernel and both UKIs comfortably. Bear it in
-  mind if you later add snapshot boot entries, since each snapshot can carry its
-  own UKI.
+  and `${ESP_PATH}/limine.conf`, and those are not configurable. The UKI names
+  follow its `${CUSTOM_UKI_NAME}_${kernel}.efi` scheme, so
+  `CUSTOM_UKI_NAME="arch"` produces `arch_linux.efi`, the file the entries in
+  `limine.conf` boot.
+- **Limine is redeployed on upgrade** by `80-limine-efi-deploy.hook`, which
+  `limine-mkinitcpio-hook` ships. It runs `limine-install` whenever `limine` is
+  installed or upgraded. The `limine` package itself only updates the copy under
+  `/usr/share/limine/`; without the hook the one on the ESP would silently stay
+  at the old version.
+- **ESP sizing**: 2 GiB holds the kernel and both UKIs comfortably, and leaves
+  room for `limine-snapper-sync`, which keeps copies of the boot files a snapshot
+  needs once the kernel has moved on. Identical copies are deduplicated, and at
+  most six snapshot entries are kept.
 
 Secure Boot is **not** used, and the installer refuses to run while it is
 enabled: nothing installed here is signed, so the firmware would reject the
@@ -149,6 +165,9 @@ Btrfs subvolumes, all mounted `compress=zstd:3,noatime,nodiscard`:
 | `@cache` | `/var/cache` |
 | `@log` | `/var/log` |
 | `@root` | `/root` |
+
+Two more are created later: `/swap` for the hibernation swapfile (see
+[Hibernation](#hibernation)) and `/.snapshots`, by Snapper.
 
 - **`compress=zstd:3`** is btrfs's own default level. The level applies only to
   newly written data, so it is set at install time rather than changed later.
@@ -253,14 +272,15 @@ Hibernation is set up as follows:
   system-sleep hook, installed to
   `/usr/lib/systemd/system-sleep/`, which turns the keyboard backlight off
   before hibernating (some ASUS controllers otherwise block the S4 power-off).
-  Needs `brightnessctl`.
+  It needs `brightnessctl`, which is not installed by default and does nothing
+  without it; add it with `--packages brightnessctl` on affected hardware.
 
 Three deliberate choices:
 
 | Common approach | This script | Why |
 | --- | --- | --- |
 | `HOOKS+=(resume)` | no `resume` hook | That hook is only required by a busybox initramfs. The `systemd` hook used here ships `systemd-hibernate-resume`, which reads the same parameters. |
-| `resume=` in a `limine-entry-tool` drop-in | `resume=` in `/etc/cmdline.d/` | There is no `limine-entry-tool` at install time; the UKI's command line comes from `/etc/cmdline.d/`. |
+| `resume=` in a `limine-entry-tool` drop-in | `resume=` in `/etc/cmdline.d/` | `/etc/cmdline.d/` is the single source of the command line. The installer mirrors it into `/etc/default/limine`, so a second copy of the parameters there would drift. |
 | `swapon` after creating the file | no `swapon` | In the installer it would activate swap on the live ISO's kernel and pin `/mnt`. The fstab entry activates it on first boot. |
 
 The resume offset is fixed at install time. If the swapfile is ever recreated,
@@ -305,8 +325,8 @@ Other notes:
 - **`keyboard`** loads keyboard modules, which is not the same as `sd-vconsole`:
   one makes a USB keyboard work at all, the other applies the keymap and font.
 - **`sd-btrfs-overlayfs`** only exists once `limine-mkinitcpio-hook` is
-  installed, which is why the installer builds the AUR packages *before* it
-  generates the UKIs. `mkinitcpio` fails on an unknown hook.
+  installed, and `mkinitcpio` fails on an unknown hook. That is why the UKIs are
+  built by the package's own pacman hook when it is installed, not before.
 
 There is **no mkinitcpio preset**. `limine-mkinitcpio-hook` overrides
 mkinitcpio's own pacman hook and builds the UKIs by calling `mkinitcpio`
@@ -315,16 +335,21 @@ installer deletes the preset that `pacstrap` generates.
 
 ## Boot screen colors
 
-The Limine menu and the Plymouth splash use the Arch Linux colors instead of
-a Tokyo Night palette. Arch publishes no formal color scheme; the accent
-is the blue of the official logo, and the grays match archlinux.org.
+The Limine menu and the Plymouth splash draw on the Arch Linux colors against a
+black background. Arch publishes no formal color scheme; the accent is the blue
+of the official logo, and the gray matches archlinux.org.
 
-| Role | Color | Limine (`/boot/limine.conf`) | Plymouth theme |
-| --- | --- | --- | --- |
-| Background | `#1A1A1A` | `term_background`, `backdrop`, palette black | window and console log background |
-| Text | `#999999` | `term_foreground`, palette gray | password field, bullets, lock icon, messages |
-| Accent | `#1793D1` | branding, help keys, countdown, palette blue and cyan (entry comments) | progress bar |
-| Muted | `#333333` | `term_background_bright` | progress bar track |
+| Color | Limine ([`limine.conf`](./default/limine/limine.conf)) | Plymouth theme |
+| --- | --- | --- |
+| `#000000` | `term_background`, `backdrop`, palette black | window background |
+| `#999999` | `term_foreground`, `term_foreground_bright` | password field, bullets, lock icon, messages |
+| `#1793D1` | `interface_help_color` (help keys) | progress bar |
+| `#FFFFFF` | `interface_branding_color`, palette cyan | white of the logo |
+| `#1A1A1A` | `term_background_bright`, bright palette black | -- |
+| `#333333` | -- | progress bar track |
+
+The remaining palette slots (red, green, yellow, blue, magenta and white) are
+left at Nord values.
 
 The theme's images were recolored the same way a theme switcher
 does it: every pixel takes the new color and keeps its transparency.
