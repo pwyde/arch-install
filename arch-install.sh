@@ -36,7 +36,10 @@ DEFAULT_PACKAGES="base base-devel bash-completion btrfs-progs cryptsetup dosfsto
 # Color variables
 RED=$'\033[91m'
 GREEN=$'\033[92m'
-BLUE=$'\033[94m'
+# 24-bit #1793D1, the Arch blue used by the Limine menu and the Plymouth theme.
+# The plain console has 16 colors and approximates it; a truecolor terminal
+# shows it exactly.
+BLUE=$'\033[38;2;23;147;209m'
 YELLOW=$'\033[93m'
 WHITE=$'\033[1;97m'
 NO_COLOR=$'\033[0m'
@@ -183,8 +186,6 @@ PASSWORD_FALLBACK=""
 # Help function
 show_help() {
   cat <<EOF
-Arch Linux Installation Script
-
 Usage: $(basename "$0") [options]
 
 Options:
@@ -1358,34 +1359,36 @@ print_logo() {
   # stays quoted and the art is never subject to expansion.
   printf '%s' "$BLUE"
   cat <<'EOF'
-                   ▄
-                  ▟█▙
-                 ▟███▙
-                ▟█████▙
-               ▟███████▙
-              ▂▔▀▜██████▙
-             ▟██▅▂▝▜█████▙
-            ▟█████████████▙
-           ▟███████████████▙
-          ▟█████████████████▙
-         ▟███████████████████▙
-        ▟█████████▛▀▀▜████████▙
-       ▟████████▛      ▜███████▙
-      ▟█████████        ████████▙
-     ▟██████████        █████▆▅▄▃▂
-    ▟██████████▛        ▜█████████▙
-   ▟██████▀▀▀              ▀▀██████▙
-  ▟███▀▘                       ▝▀███▙
- ▟▛▀                               ▀▜▙
+                    ▄
+                   ▟█▙
+                  ▟███▙
+                 ▟█████▙
+                ▟███████▙
+               ▂▔▀▜██████▙
+              ▟██▅▂▝▜█████▙
+             ▟█████████████▙
+            ▟███████████████▙
+           ▟█████████████████▙
+          ▟███████████████████▙
+         ▟█████████▛▀▀▜████████▙
+        ▟████████▛      ▜███████▙
+       ▟█████████        ████████▙
+      ▟██████████        █████▆▅▄▃▂
+     ▟██████████▛        ▜█████████▙
+    ▟██████▀▀▀              ▀▀██████▙
+   ▟███▀▘                       ▝▀███▙
+  ▟▛▀                               ▀▜▙
 
 EOF
   printf '%s' "$NO_COLOR"
+  echo "${WHITE}===${BLUE} ARCH LiNUX iNSTALLATiON SCRiPT ${WHITE}===${NO_COLOR}"
+  echo
 }
 
 # Print installation summary
 print_summary() {
   echo
-  echo "${WHITE}===${BLUE} INSTALLATION SUMMARY ${WHITE}===${NO_COLOR}"
+  echo "${WHITE}===${BLUE} iNSTALLATiON SUMMARY ${WHITE}===${NO_COLOR}"
   echo "${WHITE}Disk:${NO_COLOR} ${DISK}"
   echo "${WHITE}EFI Partition:${NO_COLOR} ${EFI_PART}"
   echo "${WHITE}Root Partition:${NO_COLOR} ${ROOT_PART} (encrypted)"
@@ -1445,7 +1448,7 @@ print_summary() {
   # Troubleshooting tips if boot issues were detected
   if [ ! -f "/mnt/boot/EFI/Linux/arch_linux.efi" ] || [ ! -f "/mnt/boot/EFI/BOOT/BOOTX64.EFI" ]; then
     echo
-    echo "${WHITE}===${BLUE} BOOT TROUBLESHOOTING ${WHITE}===${NO_COLOR}"
+    echo "${WHITE}===${BLUE} BOOT TROUBLESHOOTiNG ${WHITE}===${NO_COLOR}"
     echo "If the system does not boot, try these steps:"
     echo "1. From the UEFI/BIOS setup, make sure Secure Boot is disabled"
     echo "2. Make sure the EFI partition is set as the primary boot device"
