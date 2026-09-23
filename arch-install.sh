@@ -162,8 +162,9 @@ LIMINE_CONF_SRC="${SCRIPT_DIR}/default/limine/limine.conf"
 VCONSOLE_LATIN_HOOK_SRC="${SCRIPT_DIR}/etc/initcpio/install/vconsole-latin"
 MKINITCPIO_HOOKS_CONF_SRC="${SCRIPT_DIR}/etc/mkinitcpio.conf.d/hooks.conf"
 CMDLINE_SRC="${SCRIPT_DIR}/etc/cmdline.d"
-CMDLINE_FILES="20-rtc-alarm.conf 80-initramfs-async.conf 90-splash.conf"
+CMDLINE_FILES="10-root.conf 20-rtc-alarm.conf 80-initramfs-async.conf 90-splash.conf"
 LOCALE_CONF_SRC="${SCRIPT_DIR}/etc/locale.conf"
+HOSTS_SRC="${SCRIPT_DIR}/etc/hosts"
 ZRAM_CONF_SRC="${SCRIPT_DIR}/etc/systemd/zram-generator.conf.d/90-zram.conf"
 SUDOERS_SRC="${SCRIPT_DIR}/etc/sudoers.d"
 SUDOERS_FILES="00-wheel 01-timeout 02-passwd-tries"
@@ -725,6 +726,11 @@ configure_basic_system() {
   sed "s|@LOCALE@|${LOCALE}|g" "$LOCALE_CONF_SRC" |
     install -D -m 0644 /dev/stdin /mnt/etc/locale.conf
 
+  print_msg "Setting hostname to ${HOSTNAME}"
+  echo "${HOSTNAME}" >/mnt/etc/hostname
+  sed "s|@HOSTNAME@|${HOSTNAME}|g" "$HOSTS_SRC" |
+    install -D -m 0644 /dev/stdin /mnt/etc/hosts
+
   print_msg "Configuring ZRAM"
   install -D -m 0644 "$ZRAM_CONF_SRC" /mnt/etc/systemd/zram-generator.conf.d/90-zram.conf
 
@@ -732,14 +738,6 @@ configure_basic_system() {
 echo "==> Setting timezone to ${TIMEZONE}"
 ln -sf /usr/share/zoneinfo/${TIMEZONE} /etc/localtime
 hwclock --systohc
-
-echo "==> Setting hostname to ${HOSTNAME}"
-echo "${HOSTNAME}" > /etc/hostname
-cat > /etc/hosts <<EOL
-127.0.0.1   localhost
-::1         localhost
-127.0.1.1   ${HOSTNAME}.localdomain ${HOSTNAME}
-EOL
 
 echo "==> Generating locales"
 sed -i 's/#\(en_US.UTF-8\)/\1/' /etc/locale.gen
@@ -1097,11 +1095,13 @@ configure_boot() {
   print_msg "Installing mkinitcpio drop-in hooks.conf"
   install -D -m 0644 "$MKINITCPIO_HOOKS_CONF_SRC" /mnt/etc/mkinitcpio.conf.d/hooks.conf
 
-  arch-chroot /mnt env ROOT_PART="$ROOT_PART" /bin/bash -e <<'EOF'
-# Get root partition UUID for boot configuration
-ROOT_UUID=$(blkid -s UUID -o value "${ROOT_PART}")
-echo "Using root UUID: ${ROOT_UUID}"
+  local root_uuid
+  root_uuid=$(blkid -s UUID -o value "$ROOT_PART")
+  print_msg "Installing kernel command line for root UUID ${root_uuid}"
+  sed "s|@ROOT_UUID@|${root_uuid}|g" "${CMDLINE_SRC}/10-root.conf" |
+    install -D -m 0644 /dev/stdin /mnt/etc/cmdline.d/10-root.conf
 
+  arch-chroot /mnt /bin/bash -e <<'EOF'
 if [ ! -f /boot/vmlinuz-linux ]; then
   echo "ERROR: /boot/vmlinuz-linux not found inside chroot. Kernel install may have failed!" >&2
   echo "Contents of /boot:" >&2
@@ -1110,12 +1110,6 @@ if [ ! -f /boot/vmlinuz-linux ]; then
   pacman -Q | grep ^linux >&2
   exit 1
 fi
-
-echo "==> Adjust cmdline"
-mkdir -p /etc/cmdline.d
-cat > /etc/cmdline.d/10-root.conf <<EOL
-rd.luks.name=${ROOT_UUID}=cryptroot root=/dev/mapper/cryptroot zswap.enabled=0 rw rootfstype=btrfs rootflags=subvol=/@
-EOL
 
 # limine-install deploys the EFI binaries and the removable-media fallback when
 # limine-mkinitcpio-hook is installed. Putting them here first only gives it

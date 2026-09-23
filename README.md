@@ -129,7 +129,8 @@ Notes:
   applied on a normal filesystem -- it builds initramfs images and UKIs under
   `umask 077`, because an initramfs can carry secrets such as a LUKS keyfile.
 - **The kernel command line lives inside the UKI.** It is assembled from every
-  file in `/etc/cmdline.d/` -- `10-root.conf` for the root and LUKS parameters,
+  file in `/etc/cmdline.d/` -- [`10-root.conf`](./etc/cmdline.d/10-root.conf)
+  for the root and LUKS parameters,
   the rest for hibernation and the splash -- and embedded when the UKI is built.
   Limine chainloads the UKI with `protocol: efi` and supplies no command line of
   its own.
