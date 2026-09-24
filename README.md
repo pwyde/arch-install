@@ -446,6 +446,12 @@ Notes:
 - **The reclaim values assume zram.** `vm.page-cluster=0` and
   `vm.swappiness=150` are right for a compressed RAM device and wrong for a
   disk; they belong with the zram configuration, not on their own.
+- **The journal is capped at 500M** in
+  [`etc/systemd/journald.conf.d/`](./etc/systemd/journald.conf.d/). The default
+  is 10% of the filesystem capped at 4G; 500M holds around a month of logs
+  across several boots. systemd marks `/var/log/journal` `+C` itself, and
+  `@log` is a separate subvolume, so journal writes neither fragment under
+  copy-on-write nor enter snapshots of the root.
 - **Core dumps are disabled** in
   [`etc/systemd/coredump.conf.d/`](./etc/systemd/coredump.conf.d/), because a
   dump is the full memory image of the crashed process and would hold keys and
