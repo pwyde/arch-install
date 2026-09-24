@@ -166,6 +166,10 @@ CMDLINE_FILES="10-root.conf 20-rtc-alarm.conf 80-initramfs-async.conf 90-splash.
 LOCALE_CONF_SRC="${SCRIPT_DIR}/etc/locale.conf"
 HOSTS_SRC="${SCRIPT_DIR}/etc/hosts"
 ZRAM_CONF_SRC="${SCRIPT_DIR}/etc/systemd/zram-generator.conf.d/90-zram.conf"
+SYSCTL_SRC="${SCRIPT_DIR}/etc/sysctl.d"
+SYSCTL_FILES="40-net.conf 41-ipv4.conf 45-bbr.conf 50-vm.conf 60-net-hardening.conf 61-kernel-hardening.conf"
+MODULES_LOAD_SRC="${SCRIPT_DIR}/etc/modules-load.d/bbr.conf"
+NM_IPV6_CONF_SRC="${SCRIPT_DIR}/etc/NetworkManager/conf.d/10-ipv6-privacy.conf"
 SUDOERS_SRC="${SCRIPT_DIR}/etc/sudoers.d"
 SUDOERS_FILES="00-wheel 01-timeout 02-passwd-tries"
 SLEEP_HOOK_SRC="${SCRIPT_DIR}/default/systemd/system-sleep/keyboard-backlight"
@@ -367,12 +371,17 @@ validate_inputs() {
     "$SNAPPER_CONFIG_SRC"
     "$SNAPPER_CONFD_SRC"
     "$LIMINE_TOOL_CONF_SRC"
+    "$MODULES_LOAD_SRC"
+    "$NM_IPV6_CONF_SRC"
   )
   for repo_file in $CMDLINE_FILES; do
     repo_files+=("${CMDLINE_SRC}/${repo_file}")
   done
   for repo_file in $SUDOERS_FILES; do
     repo_files+=("${SUDOERS_SRC}/${repo_file}")
+  done
+  for repo_file in $SYSCTL_FILES; do
+    repo_files+=("${SYSCTL_SRC}/${repo_file}")
   done
 
   for repo_file in "${repo_files[@]}"; do
@@ -733,6 +742,19 @@ configure_basic_system() {
 
   print_msg "Configuring ZRAM"
   install -D -m 0644 "$ZRAM_CONF_SRC" /mnt/etc/systemd/zram-generator.conf.d/90-zram.conf
+
+  # Reclaim tuning for swap on zram, network buffers, BBR, and the kernel and
+  # TCP/IP hardening. tcp_bbr has to be registered before sysctl can select it.
+  print_msg "Applying sysctl tuning"
+  local sysctl_file
+  for sysctl_file in $SYSCTL_FILES; do
+    install -D -m 0644 "${SYSCTL_SRC}/${sysctl_file}" "/mnt/etc/sysctl.d/${sysctl_file}"
+  done
+  install -D -m 0644 "$MODULES_LOAD_SRC" /mnt/etc/modules-load.d/bbr.conf
+
+  # Rotating IPv6 addresses rather than ones derived from the interface.
+  print_msg "Configuring NetworkManager"
+  install -D -m 0644 "$NM_IPV6_CONF_SRC" /mnt/etc/NetworkManager/conf.d/10-ipv6-privacy.conf
 
   arch-chroot /mnt /bin/bash -e <<EOF
 echo "==> Setting timezone to ${TIMEZONE}"

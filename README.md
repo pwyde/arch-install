@@ -413,6 +413,45 @@ How it fits the rest of this install:
 - **Console cursor.** `vt.global_cursor_default=0` hides the cursor on text
   consoles after boot too, not just during the splash.
 
+## System tuning
+
+Drop-ins in [`etc/sysctl.d/`](./etc/sysctl.d/), installed to `/etc/sysctl.d/`.
+Arch's own `/usr/lib/sysctl.d/10-arch.conf` already raises the inotify limits
+and `vm.max_map_count`, and systemd's `50-default.conf` covers several
+hardening defaults, so only what those leave out is set here.
+
+| File | Purpose |
+| --- | --- |
+| `40-net.conf` | Core socket buffer maxima and queue lengths |
+| `41-ipv4.conf` | TCP autotuning bounds, Fast Open, MTU probing |
+| `45-bbr.conf` | BBR congestion control paced through `fq` |
+| `50-vm.conf` | Reclaim tuned for swap on zram, bounded writeback |
+| `60-net-hardening.conf` | Syncookies, strict reverse path filtering, no ICMP redirects |
+| `61-kernel-hardening.conf` | Restricted dmesg, kernel pointers and ptrace |
+
+Notes:
+
+- **BBR needs its module first.** sysctl cannot select a congestion control
+  algorithm the kernel has not registered, so
+  [`etc/modules-load.d/bbr.conf`](./etc/modules-load.d/bbr.conf) loads
+  `tcp_bbr`. `fq` is the queueing discipline BBR is designed to pace through.
+- **Reverse path filtering uses the glob form** `net.ipv4.conf.*.rp_filter`
+  rather than `conf.all`. The kernel takes the maximum of `conf.all` and the
+  per-interface value, so setting `conf.all` would pin every interface to
+  strict mode, which breaks VPNs, bridges and asymmetric routes with no way to
+  relax one interface.
+- **TCP timestamps are left on.** Turning them off loses PAWS protection and
+  the round-trip time calculation, and no longer hides uptime now that Linux
+  randomises the offset per connection.
+- **The reclaim values assume zram.** `vm.page-cluster=0` and
+  `vm.swappiness=150` are right for a compressed RAM device and wrong for a
+  disk; they belong with the zram configuration, not on their own.
+- **IPv6 stays enabled**, with rotating addresses from
+  [`etc/NetworkManager/conf.d/10-ipv6-privacy.conf`](./etc/NetworkManager/conf.d/10-ipv6-privacy.conf).
+  Disabling IPv6 through sysctl breaks software that binds `::1` and gains
+  nothing on an IPv4-only network; `ipv6.disable=1` as a kernel parameter is
+  the supported way if it is ever wanted.
+
 ## Security Design
 
 See in-depth documentation [here](./security.md).
