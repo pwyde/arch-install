@@ -172,6 +172,7 @@ MODULES_LOAD_SRC="${SCRIPT_DIR}/etc/modules-load.d/bbr.conf"
 NM_IPV6_CONF_SRC="${SCRIPT_DIR}/etc/NetworkManager/conf.d/10-ipv6-privacy.conf"
 COREDUMP_CONF_SRC="${SCRIPT_DIR}/etc/systemd/coredump.conf.d/10-disable-coredumps.conf"
 JOURNALD_CONF_SRC="${SCRIPT_DIR}/etc/systemd/journald.conf.d/10-journal-size.conf"
+SSHD_CONF_SRC="${SCRIPT_DIR}/etc/ssh/sshd_config.d/10-hardening.conf"
 SUDOERS_SRC="${SCRIPT_DIR}/etc/sudoers.d"
 SUDOERS_FILES="00-wheel 01-timeout 02-passwd-tries"
 SLEEP_HOOK_SRC="${SCRIPT_DIR}/default/systemd/system-sleep/keyboard-backlight"
@@ -377,6 +378,7 @@ validate_inputs() {
     "$NM_IPV6_CONF_SRC"
     "$COREDUMP_CONF_SRC"
     "$JOURNALD_CONF_SRC"
+    "$SSHD_CONF_SRC"
   )
   for repo_file in $CMDLINE_FILES; do
     repo_files+=("${CMDLINE_SRC}/${repo_file}")
@@ -762,6 +764,12 @@ configure_basic_system() {
 
   print_msg "Capping the journal size"
   install -D -m 0644 "$JOURNALD_CONF_SRC" /mnt/etc/systemd/journald.conf.d/10-journal-size.conf
+
+  # A drop-in, so /etc/ssh/sshd_config stays as the package ships it. Keys only,
+  # and only this account, so remote login needs a key placed from the console.
+  print_msg "Hardening sshd"
+  sed "s|@USERNAME@|${USERNAME}|g" "$SSHD_CONF_SRC" |
+    install -D -m 0644 /dev/stdin /mnt/etc/ssh/sshd_config.d/10-hardening.conf
 
   # Rotating IPv6 addresses rather than ones derived from the interface.
   print_msg "Configuring NetworkManager"

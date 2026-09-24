@@ -446,6 +446,19 @@ Notes:
 - **The reclaim values assume zram.** `vm.page-cluster=0` and
   `vm.swappiness=150` are right for a compressed RAM device and wrong for a
   disk; they belong with the zram configuration, not on their own.
+- **sshd is hardened through a drop-in** in
+  [`etc/ssh/sshd_config.d/`](./etc/ssh/sshd_config.d/), leaving
+  `/etc/ssh/sshd_config` as the package ships it so upstream changes still
+  arrive. Keys only, root refused, and `AllowUsers` limited to the account the
+  installer creates -- so **remote login needs a public key placed from the
+  console first**; until then sshd accepts nothing.
+  `Ciphers`, `KexAlgorithms` and `MACs` are deliberately not set: OpenSSH's
+  defaults lead with the hybrid post-quantum exchanges
+  `mlkem768x25519-sha256` and `sntrup761x25519-sha512`, and a hand-written list
+  pins the connection to whatever was current when it was written. X11
+  forwarding stays off for the same reason it is not needed under Wayland --
+  it can only carry X11 clients, and `waypipe` covers remote graphical
+  applications without any sshd setting.
 - **The journal is capped at 500M** in
   [`etc/systemd/journald.conf.d/`](./etc/systemd/journald.conf.d/). The default
   is 10% of the filesystem capped at 4G; 500M holds around a month of logs
