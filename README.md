@@ -446,6 +446,12 @@ Notes:
 - **The reclaim values assume zram.** `vm.page-cluster=0` and
   `vm.swappiness=150` are right for a compressed RAM device and wrong for a
   disk; they belong with the zram configuration, not on their own.
+- **The man-db index rebuild is pinned to a time** by a drop-in in
+  [`etc/systemd/system/man-db.timer.d/`](./etc/systemd/system/man-db.timer.d/),
+  rather than midnight with up to twelve hours of random delay. `OnCalendar` is
+  a list, so the drop-in clears it before setting its own; `Persistent=false`
+  drops the catch-up run after a boot that missed the slot. `man-db` ships its
+  own `timers.target.wants` symlink, so nothing needs enabling.
 - **sshd is hardened through a drop-in** in
   [`etc/ssh/sshd_config.d/`](./etc/ssh/sshd_config.d/), leaving
   `/etc/ssh/sshd_config` as the package ships it so upstream changes still

@@ -173,6 +173,7 @@ NM_IPV6_CONF_SRC="${SCRIPT_DIR}/etc/NetworkManager/conf.d/10-ipv6-privacy.conf"
 COREDUMP_CONF_SRC="${SCRIPT_DIR}/etc/systemd/coredump.conf.d/10-disable-coredumps.conf"
 JOURNALD_CONF_SRC="${SCRIPT_DIR}/etc/systemd/journald.conf.d/10-journal-size.conf"
 SSHD_CONF_SRC="${SCRIPT_DIR}/etc/ssh/sshd_config.d/10-hardening.conf"
+MANDB_TIMER_SRC="${SCRIPT_DIR}/etc/systemd/system/man-db.timer.d/override.conf"
 SUDOERS_SRC="${SCRIPT_DIR}/etc/sudoers.d"
 SUDOERS_FILES="00-wheel 01-timeout 02-passwd-tries"
 SLEEP_HOOK_SRC="${SCRIPT_DIR}/default/systemd/system-sleep/keyboard-backlight"
@@ -379,6 +380,7 @@ validate_inputs() {
     "$COREDUMP_CONF_SRC"
     "$JOURNALD_CONF_SRC"
     "$SSHD_CONF_SRC"
+    "$MANDB_TIMER_SRC"
   )
   for repo_file in $CMDLINE_FILES; do
     repo_files+=("${CMDLINE_SRC}/${repo_file}")
@@ -767,6 +769,11 @@ configure_basic_system() {
 
   # A drop-in, so /etc/ssh/sshd_config stays as the package ships it. Keys only,
   # and only this account, so remote login needs a key placed from the console.
+  # man-db ships its own timers.target.wants symlink, so the timer is already
+  # active and only its schedule needs changing.
+  print_msg "Rescheduling the man-db index rebuild"
+  install -D -m 0644 "$MANDB_TIMER_SRC" /mnt/etc/systemd/system/man-db.timer.d/override.conf
+
   print_msg "Hardening sshd"
   sed "s|@USERNAME@|${USERNAME}|g" "$SSHD_CONF_SRC" |
     install -D -m 0644 /dev/stdin /mnt/etc/ssh/sshd_config.d/10-hardening.conf
