@@ -427,7 +427,7 @@ hardening defaults, so only what those leave out is set here.
 | `45-bbr.conf` | BBR congestion control paced through `fq` |
 | `50-vm.conf` | Reclaim tuned for swap on zram, bounded writeback |
 | `60-net-hardening.conf` | Syncookies, strict reverse path filtering, no ICMP redirects |
-| `61-kernel-hardening.conf` | Restricted dmesg, kernel pointers and ptrace |
+| `61-kernel-hardening.conf` | Restricted dmesg, kernel pointers and ptrace; no suid dumps |
 
 Notes:
 
@@ -446,6 +446,14 @@ Notes:
 - **The reclaim values assume zram.** `vm.page-cluster=0` and
   `vm.swappiness=150` are right for a compressed RAM device and wrong for a
   disk; they belong with the zram configuration, not on their own.
+- **Core dumps are disabled** in
+  [`etc/systemd/coredump.conf.d/`](./etc/systemd/coredump.conf.d/), because a
+  dump is the full memory image of the crashed process and would hold keys and
+  passphrases. `Storage=none` is not enough on its own: without
+  `ProcessSizeMax=0` the core is still written to disk and only removed after
+  processing. `RLIMIT_CORE`, from `limits.conf` or `DefaultLimitCORE`, does
+  nothing here at all -- the kernel ignores it whenever `core_pattern` pipes to
+  a program, which is how systemd collects dumps.
 - **IPv6 stays enabled**, with rotating addresses from
   [`etc/NetworkManager/conf.d/10-ipv6-privacy.conf`](./etc/NetworkManager/conf.d/10-ipv6-privacy.conf).
   Disabling IPv6 through sysctl breaks software that binds `::1` and gains

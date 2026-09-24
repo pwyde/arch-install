@@ -170,6 +170,7 @@ SYSCTL_SRC="${SCRIPT_DIR}/etc/sysctl.d"
 SYSCTL_FILES="40-net.conf 41-ipv4.conf 45-bbr.conf 50-vm.conf 60-net-hardening.conf 61-kernel-hardening.conf"
 MODULES_LOAD_SRC="${SCRIPT_DIR}/etc/modules-load.d/bbr.conf"
 NM_IPV6_CONF_SRC="${SCRIPT_DIR}/etc/NetworkManager/conf.d/10-ipv6-privacy.conf"
+COREDUMP_CONF_SRC="${SCRIPT_DIR}/etc/systemd/coredump.conf.d/10-disable-coredumps.conf"
 SUDOERS_SRC="${SCRIPT_DIR}/etc/sudoers.d"
 SUDOERS_FILES="00-wheel 01-timeout 02-passwd-tries"
 SLEEP_HOOK_SRC="${SCRIPT_DIR}/default/systemd/system-sleep/keyboard-backlight"
@@ -373,6 +374,7 @@ validate_inputs() {
     "$LIMINE_TOOL_CONF_SRC"
     "$MODULES_LOAD_SRC"
     "$NM_IPV6_CONF_SRC"
+    "$COREDUMP_CONF_SRC"
   )
   for repo_file in $CMDLINE_FILES; do
     repo_files+=("${CMDLINE_SRC}/${repo_file}")
@@ -751,6 +753,10 @@ configure_basic_system() {
     install -D -m 0644 "${SYSCTL_SRC}/${sysctl_file}" "/mnt/etc/sysctl.d/${sysctl_file}"
   done
   install -D -m 0644 "$MODULES_LOAD_SRC" /mnt/etc/modules-load.d/bbr.conf
+
+  # A crashed process's memory image never reaches the disk.
+  print_msg "Disabling core dumps"
+  install -D -m 0644 "$COREDUMP_CONF_SRC" /mnt/etc/systemd/coredump.conf.d/10-disable-coredumps.conf
 
   # Rotating IPv6 addresses rather than ones derived from the interface.
   print_msg "Configuring NetworkManager"
