@@ -31,7 +31,7 @@ DEFAULT_SUBVOLUMES="@ @home @cache @log @root"
 # packages 'initramfs' and 'libxtables.so', which have several providers each,
 # and pacstrap runs with --noconfirm, so the choice would otherwise come from
 # whichever provider pacman happens to list first.
-DEFAULT_PACKAGES="base base-devel bash-completion btrfs-progs cryptsetup dosfstools efibootmgr git iptables limine linux linux-firmware man-db man-pages mkinitcpio nano networkmanager openssh plymouth snap-pac snapper sudo terminus-font unzip util-linux vim zram-generator"
+DEFAULT_PACKAGES="base base-devel bash-completion btrfs-progs cryptsetup dosfstools efibootmgr git iptables limine linux linux-firmware man-db man-pages mkinitcpio nano networkmanager openssh plocate plymouth snap-pac snapper sudo terminus-font unzip util-linux vim zram-generator"
 
 # Color variables
 RED=$'\033[91m'
@@ -174,6 +174,7 @@ COREDUMP_CONF_SRC="${SCRIPT_DIR}/etc/systemd/coredump.conf.d/10-disable-coredump
 JOURNALD_CONF_SRC="${SCRIPT_DIR}/etc/systemd/journald.conf.d/10-journal-size.conf"
 SSHD_CONF_SRC="${SCRIPT_DIR}/etc/ssh/sshd_config.d/10-hardening.conf"
 MANDB_TIMER_SRC="${SCRIPT_DIR}/etc/systemd/system/man-db.timer.d/override.conf"
+UPDATEDB_TIMER_SRC="${SCRIPT_DIR}/etc/systemd/system/plocate-updatedb.timer.d/override.conf"
 SUDOERS_SRC="${SCRIPT_DIR}/etc/sudoers.d"
 SUDOERS_FILES="00-wheel 01-timeout 02-passwd-tries"
 SLEEP_HOOK_SRC="${SCRIPT_DIR}/default/systemd/system-sleep/keyboard-backlight"
@@ -381,6 +382,7 @@ validate_inputs() {
     "$JOURNALD_CONF_SRC"
     "$SSHD_CONF_SRC"
     "$MANDB_TIMER_SRC"
+    "$UPDATEDB_TIMER_SRC"
   )
   for repo_file in $CMDLINE_FILES; do
     repo_files+=("${CMDLINE_SRC}/${repo_file}")
@@ -769,10 +771,11 @@ configure_basic_system() {
 
   # A drop-in, so /etc/ssh/sshd_config stays as the package ships it. Keys only,
   # and only this account, so remote login needs a key placed from the console.
-  # man-db ships its own timers.target.wants symlink, so the timer is already
-  # active and only its schedule needs changing.
-  print_msg "Rescheduling the man-db index rebuild"
+  # Both packages ship their own timers.target.wants symlink, so the timers are
+  # already active and only their schedules need changing.
+  print_msg "Rescheduling the index rebuilds"
   install -D -m 0644 "$MANDB_TIMER_SRC" /mnt/etc/systemd/system/man-db.timer.d/override.conf
+  install -D -m 0644 "$UPDATEDB_TIMER_SRC" /mnt/etc/systemd/system/plocate-updatedb.timer.d/override.conf
 
   print_msg "Hardening sshd"
   sed "s|@USERNAME@|${USERNAME}|g" "$SSHD_CONF_SRC" |
