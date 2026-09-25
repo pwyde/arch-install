@@ -506,6 +506,10 @@ Notes:
   Disabling IPv6 through sysctl breaks software that binds `::1` and gains
   nothing on an IPv4-only network; `ipv6.disable=1` as a kernel parameter is
   the supported way if it is ever wanted.
+- **Wi-Fi power save is off**, in the same directory. Letting the radio nap
+  between beacons costs tens to hundreds of milliseconds of latency on an idle
+  link for a fraction of a watt, and some Intel firmware drops the link
+  entirely when it does.
 
 ## Security Design
 

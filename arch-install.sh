@@ -31,7 +31,7 @@ DEFAULT_SUBVOLUMES="@ @home @cache @log @root"
 # packages 'initramfs' and 'libxtables.so', which have several providers each,
 # and pacstrap runs with --noconfirm, so the choice would otherwise come from
 # whichever provider pacman happens to list first.
-DEFAULT_PACKAGES="base base-devel bash-completion btrfs-progs cryptsetup dosfstools efibootmgr git iptables limine linux linux-firmware man-db man-pages mkinitcpio nano networkmanager openssh plocate plymouth snap-pac snapper sudo terminus-font unzip util-linux vim zram-generator"
+DEFAULT_PACKAGES="base base-devel bash-completion btrfs-progs cryptsetup dosfstools efibootmgr git iptables limine linux linux-firmware man-db man-pages mkinitcpio nano networkmanager openssh plocate plymouth snap-pac snapper sudo terminus-font unzip util-linux vim wpa_supplicant zram-generator"
 
 # Color variables
 RED=$'\033[91m'
@@ -169,7 +169,8 @@ ZRAM_CONF_SRC="${SCRIPT_DIR}/etc/systemd/zram-generator.conf.d/90-zram.conf"
 SYSCTL_SRC="${SCRIPT_DIR}/etc/sysctl.d"
 SYSCTL_FILES="40-net.conf 41-ipv4.conf 45-bbr.conf 50-vm.conf 60-net-hardening.conf 61-kernel-hardening.conf"
 MODULES_LOAD_SRC="${SCRIPT_DIR}/etc/modules-load.d/bbr.conf"
-NM_IPV6_CONF_SRC="${SCRIPT_DIR}/etc/NetworkManager/conf.d/10-ipv6-privacy.conf"
+NM_CONF_SRC="${SCRIPT_DIR}/etc/NetworkManager/conf.d"
+NM_CONF_FILES="10-ipv6-privacy.conf 20-wifi-powersave.conf"
 COREDUMP_CONF_SRC="${SCRIPT_DIR}/etc/systemd/coredump.conf.d/10-disable-coredumps.conf"
 JOURNALD_CONF_SRC="${SCRIPT_DIR}/etc/systemd/journald.conf.d/10-journal-size.conf"
 SSHD_CONF_SRC="${SCRIPT_DIR}/etc/ssh/sshd_config.d/10-hardening.conf"
@@ -380,7 +381,6 @@ validate_inputs() {
     "$SNAPPER_CONFD_SRC"
     "$LIMINE_TOOL_CONF_SRC"
     "$MODULES_LOAD_SRC"
-    "$NM_IPV6_CONF_SRC"
     "$COREDUMP_CONF_SRC"
     "$JOURNALD_CONF_SRC"
     "$SSHD_CONF_SRC"
@@ -399,6 +399,9 @@ validate_inputs() {
   done
   for repo_file in $SHUTDOWN_CONF_FILES; do
     repo_files+=("${SHUTDOWN_CONF_SRC}/${repo_file}")
+  done
+  for repo_file in $NM_CONF_FILES; do
+    repo_files+=("${NM_CONF_SRC}/${repo_file}")
   done
 
   for repo_file in "${repo_files[@]}"; do
@@ -801,9 +804,12 @@ configure_basic_system() {
   sed "s|@USERNAME@|${USERNAME}|g" "$SSHD_CONF_SRC" |
     install -D -m 0644 /dev/stdin /mnt/etc/ssh/sshd_config.d/10-hardening.conf
 
-  # Rotating IPv6 addresses rather than ones derived from the interface.
+  # Rotating IPv6 addresses, and no Wi-Fi power save.
   print_msg "Configuring NetworkManager"
-  install -D -m 0644 "$NM_IPV6_CONF_SRC" /mnt/etc/NetworkManager/conf.d/10-ipv6-privacy.conf
+  local nm_file
+  for nm_file in $NM_CONF_FILES; do
+    install -D -m 0644 "${NM_CONF_SRC}/${nm_file}" "/mnt/etc/NetworkManager/conf.d/${nm_file}"
+  done
 
   arch-chroot /mnt /bin/bash -e <<EOF
 echo "==> Setting timezone to ${TIMEZONE}"
