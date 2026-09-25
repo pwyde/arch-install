@@ -456,6 +456,15 @@ Notes:
   not walking the whole filesystem while the machine is still starting up. Both
   packages ship their own `timers.target.wants` symlink, so nothing needs
   enabling.
+- **Shutdown waits seconds, not minutes**, through three drop-ins under
+  [`etc/systemd/`](./etc/systemd/). `DefaultTimeoutStopSec` drops to 5s for
+  system services and again for the session's own, and `user@.service` gets
+  10s: it sets `TimeoutStopSec=120s` in the unit itself, so the system default
+  never reaches it and a stuck session would otherwise stall shutdown for two
+  minutes. The extra five seconds on the manager leave it time to reap its
+  services cleanly before `KillMode=mixed` kills the cgroup. Only units that
+  never set a timeout of their own are affected; anything needing longer, such
+  as a database or a container runtime, declares it and keeps it.
 - **The locate index is scoped** by a drop-in in
   [`etc/systemd/system/plocate-updatedb.service.d/`](./etc/systemd/system/plocate-updatedb.service.d/).
   The kernel implements Btrfs subvolume mounts as bind mounts, which `updatedb`

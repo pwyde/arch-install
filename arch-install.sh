@@ -176,6 +176,8 @@ SSHD_CONF_SRC="${SCRIPT_DIR}/etc/ssh/sshd_config.d/10-hardening.conf"
 MANDB_TIMER_SRC="${SCRIPT_DIR}/etc/systemd/system/man-db.timer.d/override.conf"
 UPDATEDB_TIMER_SRC="${SCRIPT_DIR}/etc/systemd/system/plocate-updatedb.timer.d/override.conf"
 UPDATEDB_SERVICE_SRC="${SCRIPT_DIR}/etc/systemd/system/plocate-updatedb.service.d/override.conf"
+SHUTDOWN_CONF_SRC="${SCRIPT_DIR}/etc/systemd"
+SHUTDOWN_CONF_FILES="system.conf.d/10-faster-shutdown.conf user.conf.d/10-faster-shutdown.conf system/user@.service.d/10-faster-shutdown.conf"
 SUDOERS_SRC="${SCRIPT_DIR}/etc/sudoers.d"
 SUDOERS_FILES="00-wheel 01-timeout 02-passwd-tries"
 SLEEP_HOOK_SRC="${SCRIPT_DIR}/default/systemd/system-sleep/keyboard-backlight"
@@ -394,6 +396,9 @@ validate_inputs() {
   done
   for repo_file in $SYSCTL_FILES; do
     repo_files+=("${SYSCTL_SRC}/${repo_file}")
+  done
+  for repo_file in $SHUTDOWN_CONF_FILES; do
+    repo_files+=("${SHUTDOWN_CONF_SRC}/${repo_file}")
   done
 
   for repo_file in "${repo_files[@]}"; do
@@ -781,6 +786,14 @@ configure_basic_system() {
 
   # Without this the index would skip every Btrfs subvolume and include every
   # snapshot, which is the wrong half of the filesystem in both directions.
+  # Three files: system services, the session's services, and user@.service
+  # itself, which carries its own 120s timeout the default cannot reach.
+  print_msg "Shortening the shutdown timeouts"
+  local shutdown_file
+  for shutdown_file in $SHUTDOWN_CONF_FILES; do
+    install -D -m 0644 "${SHUTDOWN_CONF_SRC}/${shutdown_file}" "/mnt/etc/systemd/${shutdown_file}"
+  done
+
   print_msg "Scoping the locate index"
   install -D -m 0644 "$UPDATEDB_SERVICE_SRC" /mnt/etc/systemd/system/plocate-updatedb.service.d/override.conf
 
