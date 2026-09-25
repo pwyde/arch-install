@@ -456,6 +456,15 @@ Notes:
   not walking the whole filesystem while the machine is still starting up. Both
   packages ship their own `timers.target.wants` symlink, so nothing needs
   enabling.
+- **The locate index is scoped** by a drop-in in
+  [`etc/systemd/system/plocate-updatedb.service.d/`](./etc/systemd/system/plocate-updatedb.service.d/).
+  The kernel implements Btrfs subvolume mounts as bind mounts, which `updatedb`
+  skips by default, so `@home`, `@cache`, `@log` and `@root` would go unindexed
+  while `/` was walked -- see `updatedb.conf(5)`. `/.snapshots` is pruned for
+  the opposite reason: it is in neither `PRUNEPATHS` nor `PRUNEFS`, so five
+  snapshots would each be indexed in full. The run is also skipped on battery.
+  Both go in a drop-in rather than `/etc/updatedb.conf`, which pacman tracks as
+  a backup file whose long `PRUNEFS` list would then have to be maintained.
 - **sshd is hardened through a drop-in** in
   [`etc/ssh/sshd_config.d/`](./etc/ssh/sshd_config.d/), leaving
   `/etc/ssh/sshd_config` as the package ships it so upstream changes still

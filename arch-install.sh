@@ -175,6 +175,7 @@ JOURNALD_CONF_SRC="${SCRIPT_DIR}/etc/systemd/journald.conf.d/10-journal-size.con
 SSHD_CONF_SRC="${SCRIPT_DIR}/etc/ssh/sshd_config.d/10-hardening.conf"
 MANDB_TIMER_SRC="${SCRIPT_DIR}/etc/systemd/system/man-db.timer.d/override.conf"
 UPDATEDB_TIMER_SRC="${SCRIPT_DIR}/etc/systemd/system/plocate-updatedb.timer.d/override.conf"
+UPDATEDB_SERVICE_SRC="${SCRIPT_DIR}/etc/systemd/system/plocate-updatedb.service.d/override.conf"
 SUDOERS_SRC="${SCRIPT_DIR}/etc/sudoers.d"
 SUDOERS_FILES="00-wheel 01-timeout 02-passwd-tries"
 SLEEP_HOOK_SRC="${SCRIPT_DIR}/default/systemd/system-sleep/keyboard-backlight"
@@ -383,6 +384,7 @@ validate_inputs() {
     "$SSHD_CONF_SRC"
     "$MANDB_TIMER_SRC"
     "$UPDATEDB_TIMER_SRC"
+    "$UPDATEDB_SERVICE_SRC"
   )
   for repo_file in $CMDLINE_FILES; do
     repo_files+=("${CMDLINE_SRC}/${repo_file}")
@@ -776,6 +778,11 @@ configure_basic_system() {
   print_msg "Rescheduling the index rebuilds"
   install -D -m 0644 "$MANDB_TIMER_SRC" /mnt/etc/systemd/system/man-db.timer.d/override.conf
   install -D -m 0644 "$UPDATEDB_TIMER_SRC" /mnt/etc/systemd/system/plocate-updatedb.timer.d/override.conf
+
+  # Without this the index would skip every Btrfs subvolume and include every
+  # snapshot, which is the wrong half of the filesystem in both directions.
+  print_msg "Scoping the locate index"
+  install -D -m 0644 "$UPDATEDB_SERVICE_SRC" /mnt/etc/systemd/system/plocate-updatedb.service.d/override.conf
 
   print_msg "Hardening sshd"
   sed "s|@USERNAME@|${USERNAME}|g" "$SSHD_CONF_SRC" |
