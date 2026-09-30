@@ -41,6 +41,7 @@ The script is designed to automate the complete installation process in a single
   entry.
 - Configures a Plymouth boot splash with an Arch Linux theme, which also takes
   the LUKS passphrase at boot.
+- Builds and installs the [paru](https://github.com/Morganamilo/paru) AUR helper.
 - Configures zram swap, `sudo` for the `wheel` group, NetworkManager, OpenSSH
   and weekly TRIM.
 - Provides customizable installation parameters.
@@ -249,6 +250,26 @@ installed on the build machine but is missing on a freshly installed system.
 
 Do not edit the PKGBUILDs or bump `pkgrel`: the versions have to match the AUR's
 for an AUR helper to offer later updates.
+
+## AUR helper
+
+[paru](https://github.com/Morganamilo/paru) is built from the AUR at the end of
+the install, once the system is otherwise complete.
+
+- **Built from source, not `paru-bin`.** paru links `libalpm`, and a prebuilt
+  binary stops working whenever pacman bumps that library's soname.
+- **Only the build runs as the user.** `makepkg` refuses to run as root, and
+  the user has no password-free sudo. Rather than granting a temporary
+  `NOPASSWD` rule that a failed build could leave behind, the steps needing
+  root -- installing `rust`, installing the package, removing `rust` again --
+  run as root around the build.
+- **`rust` is removed afterwards**, unless it was requested with `--packages`.
+  It is only a build dependency, and paru installs it again itself when it
+  next rebuilds from source.
+- **Failure is not fatal.** If the AUR or crates.io cannot be reached, the
+  installer warns and carries on; paru can be built by hand after first boot.
+
+The build takes a few minutes, most of it compiling.
 
 ## Hibernation
 

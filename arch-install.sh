@@ -738,6 +738,10 @@ configure_system() {
   # Enable services
   enable_services
 
+  # Last, and not fatal: an unreachable AUR should not fail an install that is
+  # otherwise complete.
+  install_aur_helper
+
   # Clean up chroot mounts
   cleanup_chroot
 }
@@ -1316,6 +1320,57 @@ configure_snapshots() {
   install -D -m 0644 "$SNAPPER_CONFD_SRC" /mnt/etc/conf.d/snapper
 
   arch-chroot /mnt systemctl enable snapper-cleanup.timer limine-snapper-sync.service
+}
+
+# makepkg refuses to run as root, and the user has no password-free sudo, so
+# only the build runs as the user. Everything that needs root -- the build
+# dependency, the install, removing the dependency again -- runs as root around
+# it, which avoids granting a temporary NOPASSWD rule that could outlive a
+# failed build.
+install_aur_helper() {
+  print_msg "Installing the paru AUR helper"
+
+  if ! arch-chroot /mnt env SNAP_PAC_SKIP=y AUR_USER="$USERNAME" /bin/bash -e <<'EOF'; then
+# /var/tmp rather than /tmp: arch-chroot mounts /tmp as tmpfs, and a Rust build
+# is large enough to matter in RAM.
+build_dir=$(mktemp -d -p /var/tmp paru-build.XXXXXX)
+installed_rust=0
+
+cleanup() {
+  rm -rf "$build_dir"
+  # Only remove rust if this build installed it; --packages may have asked for it.
+  if [ "$installed_rust" -eq 1 ]; then
+    pacman -Rns --noconfirm rust >/dev/null || true
+  fi
+}
+trap cleanup EXIT
+
+# paru's makedepends is cargo, which rust and rustup both provide. Named
+# explicitly so --noconfirm does not pick a provider for us.
+if ! pacman -Q rust &>/dev/null; then
+  pacman -S --needed --noconfirm --asdeps rust
+  installed_rust=1
+fi
+
+chown "$AUR_USER": "$build_dir"
+
+# HOME and CARGO_HOME inside the build directory, so neither the cargo
+# registry nor anything else is left behind in the user's home.
+as_user() {
+  runuser -u "$AUR_USER" -- env HOME="$build_dir" CARGO_HOME="$build_dir/cargo" "$@"
+}
+
+as_user git clone --depth 1 https://aur.archlinux.org/paru.git "$build_dir/paru"
+cd "$build_dir/paru"
+as_user makepkg --noconfirm
+
+# makepkg.conf enables debug, so the build also produces paru-debug.
+mapfile -t packages < <(as_user makepkg --packagelist | grep -v -- '-debug-')
+pacman -U --noconfirm "${packages[@]}"
+EOF
+    print_warning "paru could not be installed. The system is otherwise complete;"
+    print_warning "build it after first boot from https://aur.archlinux.org/paru.git"
+  fi
 }
 
 # Enable services
