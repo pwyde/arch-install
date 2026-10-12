@@ -1161,8 +1161,9 @@ configure_boot() {
     fi
   fi
 
-  # Limine reads it from the root of the boot volume. 'boot():' in the entries
-  # resolves to the partition holding this file.
+  # Limine reads it from the root of the boot volume. It carries only global
+  # options; limine-entry-tool adds the boot entries once its package is
+  # installed.
   print_msg "Installing Limine configuration"
   install -D -m 0644 "$LIMINE_CONF_SRC" /mnt/boot/limine.conf
 

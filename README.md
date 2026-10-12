@@ -101,10 +101,10 @@ Options:
 ## Bootloader
 
 The script installs [Limine](https://wiki.archlinux.org/title/Limine) from the
-official repositories and writes its menu, then installs `limine-mkinitcpio-hook`
+official repositories and writes its global settings, then installs `limine-mkinitcpio-hook`
 and `limine-snapper-sync` (see [Prebuilt packages](#prebuilt-packages)). The
-first deploys Limine to the ESP and builds the UKIs; the second gives snapshots
-their boot entries.
+first deploys Limine to the ESP, builds the UKIs and writes their boot entries;
+the second adds an entry for each snapshot.
 
 The ESP is mounted at **`/boot`**, so the kernel, the UKIs and
 the bootloader all live on the same FAT partition and there is no separate
@@ -117,7 +117,7 @@ the bootloader all live on the same FAT partition and there is no separate
 | `/boot/EFI/BOOT/BOOTX64.EFI` | Removable-media fallback, used if the firmware loses its NVRAM entry |
 | `/boot/EFI/Linux/arch_linux.efi` | UKI built by `mkinitcpio` |
 | `/boot/EFI/Linux/arch_linux-fallback.efi` | Fallback UKI |
-| `/boot/limine.conf` | Menu entries and theming, installed from [`default/limine/limine.conf`](./default/limine/limine.conf) |
+| `/boot/limine.conf` | Theming and default entry from [`default/limine/limine.conf`](./default/limine/limine.conf); boot entries written by `limine-entry-tool` |
 
 Notes:
 
