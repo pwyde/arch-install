@@ -409,6 +409,11 @@ The boot splash is made up of:
     `initramfs_async=0`, working around a kernel 7.1 race in which Plymouth
     exits before it can read `/proc/cmdline` and an encrypted boot falls back
     to a plain text prompt.
+  - [`etc/cmdline.d/85-console.conf`](./etc/cmdline.d/85-console.conf):
+    `console=tty0`. Without any `console=`, systemd-stub appends a serial
+    console itself whenever the firmware's `ConOut` includes a serial port, as
+    it always does under QEMU with OVMF. Plymouth then forces details mode and
+    the LUKS prompt falls back to plain text.
   - [`etc/cmdline.d/90-splash.conf`](./etc/cmdline.d/90-splash.conf):
     `quiet splash loglevel=0 systemd.show_status=false rd.udev.log_level=0 vt.global_cursor_default=0`.
 

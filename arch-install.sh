@@ -162,7 +162,7 @@ LIMINE_CONF_SRC="${SCRIPT_DIR}/default/limine/limine.conf"
 VCONSOLE_LATIN_HOOK_SRC="${SCRIPT_DIR}/etc/initcpio/install/vconsole-latin"
 MKINITCPIO_HOOKS_CONF_SRC="${SCRIPT_DIR}/etc/mkinitcpio.conf.d/hooks.conf"
 CMDLINE_SRC="${SCRIPT_DIR}/etc/cmdline.d"
-CMDLINE_FILES="10-root.conf 20-rtc-alarm.conf 80-initramfs-async.conf 90-splash.conf"
+CMDLINE_FILES="10-root.conf 20-rtc-alarm.conf 80-initramfs-async.conf 85-console.conf 90-splash.conf"
 LOCALE_CONF_SRC="${SCRIPT_DIR}/etc/locale.conf"
 HOSTS_SRC="${SCRIPT_DIR}/etc/hosts"
 ZRAM_CONF_SRC="${SCRIPT_DIR}/etc/systemd/zram-generator.conf.d/90-zram.conf"
@@ -1091,6 +1091,7 @@ configure_plymouth() {
 
   print_msg "Installing Plymouth kernel parameters"
   install -D -m 0644 "${CMDLINE_SRC}/80-initramfs-async.conf" /mnt/etc/cmdline.d/80-initramfs-async.conf
+  install -D -m 0644 "${CMDLINE_SRC}/85-console.conf" /mnt/etc/cmdline.d/85-console.conf
   install -D -m 0644 "${CMDLINE_SRC}/90-splash.conf" /mnt/etc/cmdline.d/90-splash.conf
 
   arch-chroot /mnt /bin/bash -e <<'EOF'
