@@ -10,10 +10,10 @@
 // Mod is Super on bare metal and Alt inside a nested niri window.
 //
 // Swedish layout: niri matches a binding against the symbol a key produces
-// without Shift or AltGr, using the layout configured in
-// 10-input-and-cursor.kdl (layout "se"). A symbol that requires a modifier on
-// a Swedish keyboard cannot trigger a binding, which makes five of niri's
-// defaults unreachable. Each is marked "Swedish:" below, together with a
+// without Shift or AltGr in the active keyboard layout. With the Swedish layout
+// (xkb layout "se"), a symbol that requires a modifier cannot trigger a
+// binding, which makes five of niri's defaults unreachable. With a US layout,
+// they work as written. Each is marked "Swedish:" below, together with a
 // suggested alternative:
 //   Slash         Shift+7    Mod+Shift+Slash
 //   Equal         Shift+0    Mod+Equal, Mod+Shift+Equal

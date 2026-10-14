@@ -12,7 +12,7 @@ input {
         xkb {
             // When this section is empty, niri reads the xkb settings from
             // org.freedesktop.locale1, which `localectl` controls.
-            layout "se"
+            layout "us"
         }
 
         // Uncomment to enable Num Lock at login.
@@ -98,11 +98,3 @@ cursor {
 //     scale 1
 //     position x=1920 y=0             // Place right of eDP-1
 // }
-
-// Virtual machine display.
-output "Virtual-1" {
-    mode "3840x2160@60.000"
-    scale 1.5
-    transform "normal"
-    position x=0 y=0
-}

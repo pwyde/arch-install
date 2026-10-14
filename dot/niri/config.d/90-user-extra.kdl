@@ -34,3 +34,18 @@
 //       position x=0 y=0
 //   }
 // ─────────────────────────────────────────────────────────────────────────────
+
+input {
+    keyboard {
+        xkb {
+            layout "se"
+        }
+    }
+}
+
+output "Virtual-1" {
+    mode "3840x2160@60.000"
+    scale 1.5
+    transform "normal"
+    position x=0 y=0
+}
