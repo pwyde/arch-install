@@ -1,0 +1,253 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// 70 — Key bindings
+// ─────────────────────────────────────────────────────────────────────────────
+// Docs: https://niri-wm.github.io/niri/Configuration:-Key-Bindings
+//
+// Niri's default key bindings on their default keys, with additional bindings
+// for applications. Where Noctalia provides an equivalent function, its IPC
+// command replaces the default program for the launcher, the lock screen, and
+// the volume, media and brightness keys, which also displays Noctalia's OSD.
+// Mod is Super on bare metal and Alt inside a nested niri window.
+//
+// Swedish layout: niri matches a binding against the symbol a key produces
+// without Shift or AltGr, using the layout configured in
+// 10-input-and-cursor.kdl (layout "se"). A symbol that requires a modifier on
+// a Swedish keyboard cannot trigger a binding, which makes five of niri's
+// defaults unreachable. Each is marked "Swedish:" below, together with a
+// suggested alternative:
+//   Slash         Shift+7    Mod+Shift+Slash
+//   Equal         Shift+0    Mod+Equal, Mod+Shift+Equal
+//   BracketLeft   AltGr+8    Mod+BracketLeft
+//   BracketRight  AltGr+9    Mod+BracketRight
+// ─────────────────────────────────────────────────────────────────────────────
+
+binds {
+    // ── Help and session ─────────────────────────────────────────────────────
+
+    // Shows every binding that has a hotkey-overlay-title.
+    // Swedish: unreachable, as / is typed with Shift+7. Mod+Shift+7 corresponds
+    // to "Mod+/" on a Swedish keyboard:
+    // Mod+Shift+7 { show-hotkey-overlay; }
+    Mod+Shift+Slash { show-hotkey-overlay; }
+
+    Super+Alt+L hotkey-overlay-title="Lock the Screen" { spawn-sh "noctalia msg session lock"; }
+    Mod+Shift+E { quit; }
+    Ctrl+Alt+Delete { quit; }
+    Mod+Shift+P { power-off-monitors; }
+
+    // Toggles shortcut inhibition. Applications such as remote desktop clients
+    // can inhibit niri's shortcuts; this binding remains active regardless.
+    Mod+Escape allow-inhibiting=false { toggle-keyboard-shortcuts-inhibit; }
+
+    // ── Applications and Noctalia ────────────────────────────────────────────
+
+    // Mod+T is niri's default terminal binding. Mod+Return opens the same
+    // terminal, following the convention of most tiling window managers.
+    Mod+T hotkey-overlay-title="Open a Terminal: kitty"      { spawn "kitty"; }
+    Mod+Return hotkey-overlay-title="Open a Terminal: kitty" { spawn "kitty"; }
+    // Mod+W replaces niri's default toggle-column-tabbed-display binding. See
+    // the Columns section.
+    Mod+W hotkey-overlay-title="Open Web browser: firefox"   { spawn "firefox"; }
+    Mod+E hotkey-overlay-title="Open file Explorer: dolphin" { spawn "dolphin"; }
+    // Mod+D is niri's default launcher binding and Mod+Space is Noctalia's
+    // recommendation; both open the same launcher. Niri reserves Mod+Space for
+    // switch-layout, which is only relevant with more than one xkb layout.
+    Mod+D hotkey-overlay-title="Run an Application"          { spawn-sh "noctalia msg panel-toggle launcher"; }
+    Mod+Space hotkey-overlay-title="Run an Application"      { spawn-sh "noctalia msg panel-toggle launcher"; }
+    Mod+S hotkey-overlay-title="Noctalia Control Center"     { spawn-sh "noctalia msg panel-toggle control-center"; }
+    // Noctalia recommends Mod+Comma, which niri assigns to
+    // consume-window-into-column.
+    Mod+Shift+S hotkey-overlay-title="Noctalia Settings"     { spawn-sh "noctalia msg settings-toggle"; }
+
+    // Noctalia's window switcher. Bindings in this block take precedence over
+    // niri's built-in switcher, which this binding replaces on Alt+Tab.
+    Alt+Tab { spawn-sh "noctalia msg window-switcher hold"; }
+
+    // ── Volume, media and brightness ─────────────────────────────────────────
+
+    XF86AudioRaiseVolume allow-when-locked=true { spawn-sh "noctalia msg volume-up"; }
+    XF86AudioLowerVolume allow-when-locked=true { spawn-sh "noctalia msg volume-down"; }
+    XF86AudioMute        allow-when-locked=true { spawn-sh "noctalia msg volume-mute"; }
+    XF86AudioMicMute     allow-when-locked=true { spawn-sh "noctalia msg mic-mute"; }
+
+    XF86AudioPlay  allow-when-locked=true { spawn-sh "noctalia msg media toggle"; }
+    XF86AudioPause allow-when-locked=true { spawn-sh "noctalia msg media toggle"; }
+    XF86AudioStop  allow-when-locked=true { spawn-sh "noctalia msg media stop"; }
+    XF86AudioPrev  allow-when-locked=true { spawn-sh "noctalia msg media previous"; }
+    XF86AudioNext  allow-when-locked=true { spawn-sh "noctalia msg media next"; }
+
+    XF86MonBrightnessUp   allow-when-locked=true { spawn-sh "noctalia msg brightness-up"; }
+    XF86MonBrightnessDown allow-when-locked=true { spawn-sh "noctalia msg brightness-down"; }
+
+    XF86TouchpadToggle repeat=false { toggle-touchpad; }
+
+    // ── Overview and windows ─────────────────────────────────────────────────
+
+    Mod+O repeat=false  { toggle-overview; }
+    Mod+Q repeat=false  { close-window; }
+    Alt+F4 repeat=false { close-window; }
+
+    // ── Focus ────────────────────────────────────────────────────────────────
+
+    Mod+Left  { focus-column-left; }
+    Mod+Down  { focus-window-down; }
+    Mod+Up    { focus-window-up; }
+    Mod+Right { focus-column-right; }
+    Mod+H     { focus-column-left; }
+    Mod+J     { focus-window-down; }
+    Mod+K     { focus-window-up; }
+    Mod+L     { focus-column-right; }
+
+    Mod+Home { focus-column-first; }
+    Mod+End  { focus-column-last; }
+
+    // ── Move ─────────────────────────────────────────────────────────────────
+
+    Mod+Ctrl+Left  { move-column-left; }
+    Mod+Ctrl+Down  { move-window-down; }
+    Mod+Ctrl+Up    { move-window-up; }
+    Mod+Ctrl+Right { move-column-right; }
+    Mod+Ctrl+H     { move-column-left; }
+    Mod+Ctrl+J     { move-window-down; }
+    Mod+Ctrl+K     { move-window-up; }
+    Mod+Ctrl+L     { move-column-right; }
+
+    Mod+Ctrl+Home { move-column-to-first; }
+    Mod+Ctrl+End  { move-column-to-last; }
+
+    // ── Monitors ─────────────────────────────────────────────────────────────
+
+    Mod+Shift+Left  { focus-monitor-left; }
+    Mod+Shift+Down  { focus-monitor-down; }
+    Mod+Shift+Up    { focus-monitor-up; }
+    Mod+Shift+Right { focus-monitor-right; }
+    Mod+Shift+H     { focus-monitor-left; }
+    Mod+Shift+J     { focus-monitor-down; }
+    Mod+Shift+K     { focus-monitor-up; }
+    Mod+Shift+L     { focus-monitor-right; }
+
+    Mod+Shift+Ctrl+Left  { move-column-to-monitor-left; }
+    Mod+Shift+Ctrl+Down  { move-column-to-monitor-down; }
+    Mod+Shift+Ctrl+Up    { move-column-to-monitor-up; }
+    Mod+Shift+Ctrl+Right { move-column-to-monitor-right; }
+    Mod+Shift+Ctrl+H     { move-column-to-monitor-left; }
+    Mod+Shift+Ctrl+J     { move-column-to-monitor-down; }
+    Mod+Shift+Ctrl+K     { move-column-to-monitor-up; }
+    Mod+Shift+Ctrl+L     { move-column-to-monitor-right; }
+
+    // ── Workspaces ───────────────────────────────────────────────────────────
+
+    Mod+Page_Down      { focus-workspace-down; }
+    Mod+Page_Up        { focus-workspace-up; }
+    Mod+U              { focus-workspace-down; }
+    Mod+I              { focus-workspace-up; }
+    Mod+Ctrl+Page_Down { move-column-to-workspace-down; }
+    Mod+Ctrl+Page_Up   { move-column-to-workspace-up; }
+    Mod+Ctrl+U         { move-column-to-workspace-down; }
+    Mod+Ctrl+I         { move-column-to-workspace-up; }
+
+    Mod+Shift+Page_Down { move-workspace-down; }
+    Mod+Shift+Page_Up   { move-workspace-up; }
+    Mod+Shift+U         { move-workspace-down; }
+    Mod+Shift+I         { move-workspace-up; }
+
+    // Workspaces are dynamic: an index beyond the last workspace refers to the
+    // empty workspace at the bottom.
+    Mod+1 { focus-workspace 1; }
+    Mod+2 { focus-workspace 2; }
+    Mod+3 { focus-workspace 3; }
+    Mod+4 { focus-workspace 4; }
+    Mod+5 { focus-workspace 5; }
+    Mod+6 { focus-workspace 6; }
+    Mod+7 { focus-workspace 7; }
+    Mod+8 { focus-workspace 8; }
+    Mod+9 { focus-workspace 9; }
+
+    Mod+Ctrl+1 { move-column-to-workspace 1; }
+    Mod+Ctrl+2 { move-column-to-workspace 2; }
+    Mod+Ctrl+3 { move-column-to-workspace 3; }
+    Mod+Ctrl+4 { move-column-to-workspace 4; }
+    Mod+Ctrl+5 { move-column-to-workspace 5; }
+    Mod+Ctrl+6 { move-column-to-workspace 6; }
+    Mod+Ctrl+7 { move-column-to-workspace 7; }
+    Mod+Ctrl+8 { move-column-to-workspace 8; }
+    Mod+Ctrl+9 { move-column-to-workspace 9; }
+
+    // ── Mouse wheel ──────────────────────────────────────────────────────────
+
+    // cooldown-ms prevents a single wheel movement from skipping several
+    // workspaces.
+    Mod+WheelScrollDown      cooldown-ms=150 { focus-workspace-down; }
+    Mod+WheelScrollUp        cooldown-ms=150 { focus-workspace-up; }
+    Mod+Ctrl+WheelScrollDown cooldown-ms=150 { move-column-to-workspace-down; }
+    Mod+Ctrl+WheelScrollUp   cooldown-ms=150 { move-column-to-workspace-up; }
+
+    Mod+WheelScrollRight      { focus-column-right; }
+    Mod+WheelScrollLeft       { focus-column-left; }
+    Mod+Ctrl+WheelScrollRight { move-column-right; }
+    Mod+Ctrl+WheelScrollLeft  { move-column-left; }
+
+    // Mirrors the horizontal scrolling that Shift+wheel produces in most
+    // applications.
+    Mod+Shift+WheelScrollDown      { focus-column-right; }
+    Mod+Shift+WheelScrollUp        { focus-column-left; }
+    Mod+Ctrl+Shift+WheelScrollDown { move-column-right; }
+    Mod+Ctrl+Shift+WheelScrollUp   { move-column-left; }
+
+    // ── Columns ──────────────────────────────────────────────────────────────
+
+    // Moves the focused window into the adjacent column, or out of its current
+    // column.
+    // Swedish: unreachable, as [ and ] are typed with AltGr+8 and AltGr+9. The
+    // same physical keys produce å and the dead diaeresis (¨) without
+    // modifiers:
+    // Mod+aring          { consume-or-expel-window-left; }
+    // Mod+dead_diaeresis { consume-or-expel-window-right; }
+    Mod+BracketLeft  { consume-or-expel-window-left; }
+    Mod+BracketRight { consume-or-expel-window-right; }
+    Mod+Comma  { consume-window-into-column; }
+    Mod+Period { expel-window-from-column; }
+
+    // Displays the windows of the focused column as vertical tabs instead of a
+    // stack. Niri's default binding, Mod+W, opens a web browser in this
+    // configuration; assign another key to enable this function.
+    // Mod+W { toggle-column-tabbed-display; }
+    Mod+C { center-column; }
+    Mod+Ctrl+C { center-visible-columns; }
+
+    // ── Sizing ───────────────────────────────────────────────────────────────
+
+    Mod+R { switch-preset-column-width; }
+    Mod+Shift+R { switch-preset-column-width-back; }
+    Mod+Ctrl+Shift+R { switch-preset-window-height; }
+    Mod+Ctrl+R { reset-window-height; }
+
+    // Swedish: Minus is available, on the key to the right of Period. Equal is
+    // unreachable, as = is typed with Shift+0. Plus requires no modifier, is
+    // located to the right of 0, and forms a natural pair with Minus:
+    // Mod+plus       { set-column-width "+10%"; }
+    // Mod+Shift+plus { set-window-height "+10%"; }
+    Mod+Minus { set-column-width "-10%"; }
+    Mod+Equal { set-column-width "+10%"; }
+    Mod+Shift+Minus { set-window-height "-10%"; }
+    Mod+Shift+Equal { set-window-height "+10%"; }
+
+    Mod+F { maximize-column; }
+    Mod+Shift+F { fullscreen-window; }
+    Mod+M { maximize-window-to-edges; }
+    Mod+Ctrl+F { expand-column-to-available-width; }
+
+    // ── Floating ─────────────────────────────────────────────────────────────
+
+    Mod+V       { toggle-window-floating; }
+    Mod+Shift+V { switch-focus-between-floating-and-tiling; }
+
+    // ── Screenshots ──────────────────────────────────────────────────────────
+
+    // Niri's built-in screenshot UI. Noctalia's annotation editor is an
+    // alternative:
+    // spawn-sh "noctalia msg screenshot-annotate"
+    Print { screenshot; }
+    Ctrl+Print { screenshot-screen; }
+    Alt+Print { screenshot-window; }
+}

@@ -1,0 +1,20 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// 50 — Processes spawned at login
+// ─────────────────────────────────────────────────────────────────────────────
+// Docs: https://niri-wm.github.io/niri/Configuration:-Miscellaneous#spawn-at-startup
+//
+// Each entry runs once when niri starts. For daemons that support it, a systemd
+// user service or an XDG autostart entry is an alternative.
+//
+// spawn-sh-at-startup supports shell pipelines and variable expansion.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Exports XDG_MENU_PREFIX to the systemd user session and rebuilds the sycoca
+// database, giving KDE and Qt applications the correct .desktop entries.
+spawn-at-startup "bash" "-c" "systemctl --user import-environment XDG_MENU_PREFIX && kbuildsycoca6"
+
+// Records clipboard history with cliphist.
+spawn-at-startup "bash" "-c" "wl-paste --watch cliphist store &"
+
+// Starts the Noctalia shell.
+spawn-at-startup "noctalia"

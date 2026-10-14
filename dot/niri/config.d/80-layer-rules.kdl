@@ -1,0 +1,57 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// 80 — Layer rules
+// ─────────────────────────────────────────────────────────────────────────────
+// Docs: https://niri-wm.github.io/niri/Configuration:-Layer-Rules
+//
+// Layer-shell surfaces are used by bars, panels, wallpaper renderers and
+// overlays.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Places the Noctalia wallpaper on the overview backdrop.
+layer-rule {
+  match namespace="^noctalia-wallpaper"
+  place-within-backdrop true
+}
+
+// Noctalia surfaces: blur enabled and xray disabled, for a more realistic
+// result. Noctalia publishes blur regions automatically when
+// ext-background-effects is available.
+layer-rule {
+    match namespace="^noctalia-(bar-[^\"]+|notification|dock|panel|attached-panel|osd)$"
+    background-effect {
+        xray false
+        blur true
+  }
+}
+
+// Noctalia window switcher: blur enabled and xray disabled.
+layer-rule {
+    match namespace="noctalia-window-switcher"
+    background-effect {
+        blur true
+        xray false
+    }
+}
+
+// ── Examples ─────────────────────────────────────────────────────────────────
+// Makes a specific layer surface semi-transparent:
+// layer-rule {
+//     match namespace="waybar"
+//     opacity 0.9
+// }
+//
+// Excludes a layer surface from screen capture:
+// layer-rule {
+//     match namespace="some-private-overlay"
+//     block-out-from "screencast"
+// }
+
+// ── Blur ─────────────────────────────────────────────────────────────────────
+
+// Global blur parameters.
+blur {
+    passes 2       // More passes = stronger blur. Default: 3
+    offset 3.0     // Sample distance per pass. Default: 3.0
+    noise 0.03     // Grain overlay. Default: 0.02
+    saturation 1.0 // Color saturation boost. Default: 1.5
+}

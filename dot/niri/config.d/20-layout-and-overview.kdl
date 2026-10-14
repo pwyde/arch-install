@@ -1,0 +1,114 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// 20 — Layout, gaps, borders, shadows & overview
+// ─────────────────────────────────────────────────────────────────────────────
+// Docs: https://niri-wm.github.io/niri/Configuration:-Layout
+//
+// Niri uses a scrollable tiling layout: windows are arranged in an infinite
+// horizontal strip, navigated by scrolling left and right.
+// ─────────────────────────────────────────────────────────────────────────────
+
+layout {
+    // Gap between windows, and between windows and screen edges (logical px).
+    gaps 25
+
+    // Transparent, letting the wallpaper and backdrop show through.
+    background-color "transparent"
+
+    // How the view scrolls when focusing a column that is off-screen:
+    //   "never"        keeps the focused column at the left or right edge
+    //                  (default)
+    //   "on-overflow"  centers it only when it does not fit on screen together
+    //                  with the previously focused column
+    //   "always"       always centers the focused column
+    center-focused-column "never"
+
+    // Centers a column that is the only one on its workspace.
+    always-center-single-column
+
+    // Widths cycled by switch-preset-column-width (Mod+R). A proportion is a
+    // fraction of the output width, accounting for gaps.
+    preset-column-widths {
+        proportion 0.33333
+        proportion 0.5
+        proportion 0.66667
+    }
+
+    // Heights cycled by switch-preset-window-height (Mod+Ctrl+Shift+R).
+    // Uncomment to define custom height presets.
+    // preset-window-heights {
+    //     proportion 0.33333
+    //     proportion 0.5
+    //     proportion 0.66667
+    // }
+
+    // Default width for new windows. An empty {} lets the application decide.
+    default-column-width {
+        proportion 0.5
+    }
+
+    // ── Focus ring ───────────────────────────────────────────────────────────
+    // Drawn around the focused window on the active monitor; disabled here.
+    // With prefer-no-csd, it is drawn around the window geometry.
+    focus-ring {
+        off
+        width 1
+        active-color   "#808080"
+        inactive-color "#505050"
+
+        // Gradient alternative, in the style of CSS linear-gradient:
+        // active-gradient from="#80c8ff" to="#c7ff7f" angle=45
+        // relative-to="workspace-view" makes the gradient span the whole view.
+    }
+
+    // ── Border ───────────────────────────────────────────────────────────────
+    // Always-visible border, unlike the focus ring, which marks only the active
+    // window; disabled here.
+    border {
+        off
+        width 4
+        active-color   "#707070"
+        inactive-color "#d0d0d0"
+        urgent-color   "#cc4444"
+
+        // Pastel rainbow gradient, interpolated through OKLCH:
+        // active-gradient from="#e5989b" to="#ffb4a2" in="oklch longer hue"
+    }
+
+    // ── Shadow ───────────────────────────────────────────────────────────────
+    // Drop shadow beneath windows, in logical pixels. Windows with client-side
+    // corners may need draw-behind-window, or geometry-corner-radius in a
+    // window rule, to avoid artifacts.
+    shadow {
+        // off
+        softness 30
+        spread 5
+        offset x=0 y=5
+        color "#0007"
+        // draw-behind-window true
+    }
+
+    // ── Struts ───────────────────────────────────────────────────────────────
+    // Reserves space at the screen edges, similar to permanent outer gaps.
+    // Left and right struts keep the neighbouring columns partly visible.
+    struts {
+        // left 64
+        // right 64
+        // top 64
+        // bottom 64
+    }
+}
+
+// ── Niri's built-in overview ─────────────────────────────────────────────────
+// Opened with Mod+O, the top-left hot corner, or a four-finger swipe up.
+// Shows a zoomed-out view of the workspaces.
+overview {
+    zoom 0.75
+
+    // Solid color between workspaces. Default: transparent.
+    // backdrop-color "#777777"
+
+    // Disables the shadow behind each workspace in the overview.
+    // workspace-shadow {
+    //     off
+    // }
+}

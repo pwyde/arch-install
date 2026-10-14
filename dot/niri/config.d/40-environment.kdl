@@ -1,0 +1,31 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// 40 — Environment variables
+// ─────────────────────────────────────────────────────────────────────────────
+// Docs: https://niri-wm.github.io/niri/Configuration:-Miscellaneous#environment
+//
+// Set for every process that niri spawns, including spawn-at-startup entries
+// and key binding commands. TTY and SSH sessions do not inherit them.
+// ─────────────────────────────────────────────────────────────────────────────
+
+environment {
+    // Identifies the running compositor, for xdg-desktop-portal and others.
+    XDG_CURRENT_DESKTOP "niri"
+
+    // Plasma's application menu prefix lets kbuildsycoca6 index .desktop
+    // files, which the Open With menus in Dolphin and Nautilus rely on.
+    XDG_MENU_PREFIX "plasma-"
+
+    // Qt applications use Wayland natively, without an XWayland fallback.
+    QT_QPA_PLATFORM "wayland"
+
+    // Electron applications (Chrome, VS Code, Discord) select Wayland
+    // automatically.
+    ELECTRON_OZONE_PLATFORM_HINT "auto"
+
+    // Qt theming: "kde" reads colors from kdeglobals and requires
+    // plasma-integration.
+    QT_QPA_PLATFORMTHEME "kde"
+
+    // Darkly is a Qt style that follows the kdeglobals color scheme.
+    // QT_STYLE_OVERRIDE "Darkly"
+}

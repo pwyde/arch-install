@@ -1,0 +1,55 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Niri Configuration
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// The configuration is split into modular files under config.d/, each covering
+// one area. Niri reloads the configuration automatically when a file is saved.
+//
+//   10  Input, touchpad, mouse, cursor
+//   20  Layout, gaps, borders, shadows, overview
+//   30  Window rules (corner radius, per-application adjustments)
+//   40  Environment variables (Qt, XDG, theming)
+//   50  Processes spawned at login
+//   60  Animations (spring physics tuning)
+//   70  Key bindings (Noctalia and window management)
+//   80  Layer rules (Noctalia surfaces and blur)
+//   90  Local additions and overrides
+//
+// Docs: https://niri-wm.github.io/niri/Configuration:-Introduction
+// KDL format: https://kdl.dev
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Asks applications to omit client-side decorations, letting niri draw borders
+// and focus rings around them. This also corrects border and focus ring
+// rendering behind semitransparent windows. Restart applications after
+// changing this setting.
+prefer-no-csd
+
+// Hides the hotkey overlay that niri otherwise shows at startup.
+hotkey-overlay {
+    skip-at-startup
+}
+
+// Allows notification actions and window activation from Noctalia.
+debug {
+    honor-xdg-activation-with-invalid-serial
+}
+
+// Destination for niri's built-in screenshots (Print, Ctrl+Print, Alt+Print).
+screenshot-path "~/Pictures/Screenshots/Screenshot_%Y%m%d_%H%M%S.png"
+
+// Xwayland support for X11 applications, provided by xwayland-satellite.
+xwayland-satellite {
+    path "xwayland-satellite"
+}
+
+// ── Modular includes ─────────────────────────────────────────────────────────
+include "config.d/10-input-and-cursor.kdl"
+include "config.d/20-layout-and-overview.kdl"
+include "config.d/30-window-rules.kdl"
+include "config.d/40-environment.kdl"
+include "config.d/50-startup.kdl"
+include "config.d/60-animations.kdl"
+include "config.d/70-binds.kdl"
+include "config.d/80-layer-rules.kdl"
+include "config.d/90-user-extra.kdl"
