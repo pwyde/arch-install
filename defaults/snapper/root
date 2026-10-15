@@ -1,8 +1,8 @@
 # Snapshots of the root subvolume for pre-update recovery, kept to 5.
 #
 # No timeline: snapshots are taken around pacman transactions by snap-pac, not
-# on a schedule. Each snapshot becomes a Limine boot entry, so the count is
-# kept low deliberately -- see MAX_SNAPSHOT_ENTRIES in
+# on a schedule. Each snapshot becomes a Limine boot entry, which is why the
+# count is deliberately low; see MAX_SNAPSHOT_ENTRIES in
 # /etc/limine-entry-tool.d/.
 SUBVOLUME="/"
 FSTYPE="btrfs"

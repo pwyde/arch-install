@@ -1,4 +1,4 @@
-# Arch Linux Plymouth Theme Script
+# Arch Linux Plymouth theme.
 
 Window.SetBackgroundTopColor(0.0, 0.0, 0.0);
 Window.SetBackgroundBottomColor(0.0, 0.0, 0.0);
@@ -7,65 +7,70 @@ logo.image = Image("logo.png");
 logo.sprite = Sprite(logo.image);
 logo.sprite.SetOpacity(1);
 
-# Use these to adjust the progress bar timing
-global.fake_progress_limit = 0.7;  # Target percentage for fake progress (0.0 to 1.0)
-global.fake_progress_duration = 15.0;  # Duration in seconds to reach limit
+# Progress bar timing.
+# Fraction of the bar the simulated progress reaches, 0.0 to 1.0.
+global.fake_progress_limit = 0.7;
+# Seconds the simulated progress takes to reach that fraction.
+global.fake_progress_duration = 15.0;
 
-# Progress bar animation variables
+# Progress bar animation state.
 global.animation_frame = 0;
 global.fake_progress = 0.0;
 global.real_progress = 0.0;
 global.fake_progress_active = 0;
-global.fake_progress_start_time = 0.0;  # Track when fake progress started
-global.password_shown = 0;  # Track if password dialog has been shown
-global.max_progress = 0.0;  # Track the maximum progress reached to prevent backwards movement
+# Boot duration at the first progress update after simulated progress starts.
+global.fake_progress_start_time = 0.0;
+# Set once the password dialog has been shown.
+global.password_shown = 0;
+# Highest progress shown, which keeps the bar from moving backwards.
+global.max_progress = 0.0;
 
-# Window size the sprites were last laid out for
+# Window size the sprites were last laid out for.
 global.layout_width = 0;
 global.layout_height = 0;
 
 fun refresh_callback() {
-  # Displays can show up after this script ran, e.g. a Thunderbolt monitor
-  # whose DisplayPort tunnel comes up after plymouthd started. The window
-  # grows to the largest display, so re-center everything when it changes.
+  # Displays can appear after this script has run, e.g. a Thunderbolt monitor
+  # whose DisplayPort tunnel comes up after plymouthd started. The window grows
+  # to the largest display, and everything is re-centered when its size
+  # changes.
   if (Window.GetWidth() != global.layout_width || Window.GetHeight() != global.layout_height) {
     layout();
   }
 
   global.animation_frame++;
 
-  # Animate fake progress to limit over time with easing
+  # Animates the simulated progress towards its limit, with easing.
   if (global.fake_progress_active == 1) {
-    # Calculate elapsed time since start
-    elapsed_time = global.animation_frame / 50.0;  # Convert frames to seconds (50 FPS)
+    # Elapsed time, from the frame count at 50 frames per second.
+    elapsed_time = global.animation_frame / 50.0;
 
-    # Calculate linear progress ratio (0 to 1) based on time
+    # Linear progress ratio, 0 to 1.
     time_ratio = elapsed_time / global.fake_progress_duration;
     if (time_ratio > 1.0) time_ratio = 1.0;
 
-    # Apply easing curve: ease-out quadratic
-    # Formula: 1 - (1 - x)^2
+    # Ease-out quadratic: 1 - (1 - x)^2.
     eased_ratio = 1 - ((1 - time_ratio) * (1 - time_ratio));
 
-    # Calculate fake progress based on eased ratio
+    # Simulated progress from the eased ratio.
     global.fake_progress = eased_ratio * global.fake_progress_limit;
 
-    # Update progress bar with fake progress
+    # Updates the bar with the simulated progress.
     update_progress_bar(global.fake_progress);
   }
 }
 
 Plymouth.SetRefreshFunction(refresh_callback);
 
-#----------------------------------------- Helper Functions --------------------------------
+#----------------------------------------- Helper functions --------------------
 
 fun update_progress_bar(progress) {
-  # Only update if progress is moving forward
+  # Updates only while the progress moves forward.
   if (progress > global.max_progress) {
     global.max_progress = progress;
 
     width = Math.Int(progress_bar.original_image.GetWidth() * progress);
-    if (width < 1) width = 1;  # Ensure minimum width of 1 pixel
+    if (width < 1) width = 1;  # At least one pixel wide
 
     progress_bar.image = progress_bar.original_image.Scale(width, progress_bar.original_image.GetHeight());
     progress_bar.sprite.SetImage(progress_bar.image);
@@ -99,7 +104,7 @@ fun hide_password_dialog() {
 fun start_fake_progress() {
   global.fake_progress_active = 1;
 
-  # Reset fake progress
+  # Resets the simulated progress.
   global.animation_frame = 0;
   global.max_progress = 0.0;
   global.fake_progress = 0.0;
@@ -110,7 +115,7 @@ fun stop_fake_progress() {
   global.fake_progress_active = 0;
 }
 
-#----------------------------------------- Dialogue --------------------------------
+#----------------------------------------- Dialogue ----------------------------
 
 lock.image = Image("lock.png");
 entry.image = Image("entry.png");
@@ -119,15 +124,15 @@ bullet.image = Image("bullet.png");
 entry.sprite = Sprite(entry.image);
 entry.sprite.SetOpacity(0);
 
-# Scale lock to be slightly shorter than entry field height
-# Original lock is 84x96, entry height determines scale
+# The lock is scaled to 80% of the entry field's height, keeping the 84x96
+# aspect ratio of the original image.
 lock.height = entry.image.GetHeight() * 0.8;
 lock.width = 84 * (lock.height / 96);
 
 lock.sprite = Sprite(lock.image.Scale(lock.width, lock.height));
 lock.sprite.SetOpacity(0);
 
-# Bullet array
+# Bullet sprites, created as characters are typed.
 bullet.sprites = [];
 
 fun position_bullet(index) {
@@ -137,10 +142,10 @@ fun position_bullet(index) {
 fun display_normal_callback() {
   hide_password_dialog();
 
-  # Get current mode
   mode = Plymouth.GetMode();
 
-  # Only show progress bar for boot and resume modes
+  # The progress bar returns only in boot and resume mode, and only after the
+  # password dialog.
   if ((mode == "boot" || mode == "resume") && global.password_shown == 1) {
     show_progress_bar();
     start_fake_progress();
@@ -148,19 +153,19 @@ fun display_normal_callback() {
 }
 
 fun display_password_callback(prompt, bullets) {
-  global.password_shown = 1;  # Mark that password dialog has been shown
+  global.password_shown = 1;  # Marks the dialog as shown
 
-  # Stop fake progress when password dialog appears
+  # Simulated progress stops while the password dialog is shown.
   stop_fake_progress();
   hide_progress_bar();
   show_password_dialog();
 
-  # Clear all bullets first
+  # Hides every bullet first.
   for (index = 0; bullet.sprites[index]; index++) {
     bullet.sprites[index].SetOpacity(0);
   }
 
-  # Create and show bullets for current password (max 21)
+  # Shows one bullet per typed character, up to 21.
   max_bullets = 21;
   bullets_to_show = bullets;
   if (bullets_to_show > max_bullets) {
@@ -169,7 +174,7 @@ fun display_password_callback(prompt, bullets) {
 
   for (index = 0; index < bullets_to_show; index++) {
     if (!bullet.sprites[index]) {
-      # Scale bullet image to 7x7 pixels
+      # Bullet image scaled to 7x7 pixels.
       bullet.sprites[index] = Sprite(bullet.image.Scale(7, 7));
       position_bullet(index);
     }
@@ -181,7 +186,7 @@ fun display_password_callback(prompt, bullets) {
 Plymouth.SetDisplayNormalFunction(display_normal_callback);
 Plymouth.SetDisplayPasswordFunction(display_password_callback);
 
-#----------------------------------------- Progress Bar --------------------------------
+#----------------------------------------- Progress bar ------------------------
 
 progress_box.image = Image("progress_box.png");
 progress_box.sprite = Sprite(progress_box.image);
@@ -193,15 +198,16 @@ progress_bar.image = progress_bar.original_image.Scale(1, progress_bar.original_
 progress_bar.sprite.SetOpacity(0);
 
 fun progress_callback(duration, progress) {
-  # Track when fake progress starts
-  # Needed because duration and progress freeze during drive decryption
+  # Records the boot duration when simulated progress starts. Duration and
+  # progress freeze while the drive is being unlocked.
   if (global.fake_progress_start_time == 0.0) {
     global.fake_progress_start_time = duration;
   }
 
   global.real_progress = progress;
 
-  # Use real progress once its unfrozen and exceeds fake progress
+  # Switches to real progress once it is unfrozen and exceeds the simulated
+  # progress.
   if (duration > global.fake_progress_start_time && progress > global.fake_progress) {
     stop_fake_progress();
     update_progress_bar(progress);
@@ -210,9 +216,9 @@ fun progress_callback(duration, progress) {
 
 Plymouth.SetBootProgressFunction(progress_callback);
 
-#----------------------------------------- Layout --------------------------------
+#----------------------------------------- Layout ------------------------------
 
-# Center the logo, dialogue and progress bar for the current window size
+# Centers the logo, dialogue and progress bar for the current window size.
 fun layout() {
   global.layout_width = Window.GetWidth();
   global.layout_height = Window.GetHeight();
@@ -243,7 +249,7 @@ fun layout() {
 
 layout();
 
-#----------------------------------------- Message --------------------------------
+#----------------------------------------- Message -----------------------------
 
 message_sprite = Sprite();
 message_sprite.SetPosition(10, 10, 10000);
