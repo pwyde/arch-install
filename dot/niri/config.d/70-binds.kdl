@@ -79,7 +79,8 @@ binds {
     XF86MonBrightnessUp   allow-when-locked=true { spawn-sh "noctalia msg brightness-up"; }
     XF86MonBrightnessDown allow-when-locked=true { spawn-sh "noctalia msg brightness-down"; }
 
-    XF86TouchpadToggle repeat=false { toggle-touchpad; }
+    // Used with laptops with key for toggling the touchpad.
+    // XF86TouchpadToggle repeat=false { toggle-touchpad; }
 
     // ── Overview and windows ─────────────────────────────────────────────────
 
