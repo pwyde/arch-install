@@ -17,23 +17,23 @@
 
 set -euo pipefail
 
-# Define default variables
+# Defaults, overridden by the command-line options.
 DEFAULT_DISK=$(lsblk -dpno NAME | grep -vE '/dev/(loop|zram|sr|ram)' | head -n1)
 DEFAULT_HOSTNAME="arch-linux"
 DEFAULT_USERNAME="admin"
 DEFAULT_TIMEZONE="Europe/Stockholm"
 DEFAULT_KEYMAP="sv-latin1"
 DEFAULT_LOCALE="sv_SE.UTF-8"
-# No snapshots subvolume here on purpose: 'snapper create-config' creates its
-# own /.snapshots and refuses to run when the path already exists.
+# No snapshots subvolume is listed: 'snapper create-config' creates its own
+# /.snapshots and refuses to run when the path already exists.
 DEFAULT_SUBVOLUMES="@ @home @cache @log @root"
 # mkinitcpio and iptables are named explicitly. They provide the virtual
-# packages 'initramfs' and 'libxtables.so', which have several providers each,
-# and pacstrap runs with --noconfirm, so the choice would otherwise come from
-# whichever provider pacman happens to list first.
+# packages 'initramfs' and 'libxtables.so', which have several providers each.
+# pacstrap runs with --noconfirm, which would otherwise leave the choice to
+# whichever provider pacman lists first.
 DEFAULT_PACKAGES="base base-devel bash-completion btrfs-progs cryptsetup dosfstools efibootmgr git iptables limine linux linux-firmware man-db man-pages mkinitcpio nano networkmanager openssh plocate plymouth snap-pac snapper sudo terminus-font unzip util-linux vim wpa_supplicant zram-generator"
 
-# Color variables
+# Terminal colors.
 RED=$'\033[91m'
 GREEN=$'\033[92m'
 # 24-bit #1793D1, the Arch blue used by the Limine menu and the Plymouth theme.
@@ -44,8 +44,9 @@ YELLOW=$'\033[93m'
 WHITE=$'\033[1;97m'
 NO_COLOR=$'\033[0m'
 
-# Set once this script opens the LUKS container, so cleanup only closes one it
-# opened itself and never an unrelated cryptroot that was already mapped.
+# Set once this script opens the LUKS container. Cleanup closes a container
+# only when this script opened it, never an unrelated cryptroot that was already
+# mapped.
 CRYPTROOT_OPENED=0
 # Set by the first step that writes to the disk. Until then a failure has
 # nothing to undo, and reporting a cleanup would only obscure the real error.
@@ -70,16 +71,16 @@ print_error() {
   echo -e "${RED}==> ERROR:${NO_COLOR}${WHITE}" "${@}" "${NO_COLOR}" >&2
 }
 
-# Cleanup function for unexpected exits
+# Cleans up after a failed run.
 cleanup() {
   local exit_code=$?
 
-  # Argument, validation and confirmation failures all land here before
-  # anything on the disk has changed, so they stay quiet.
+  # Argument, validation and confirmation failures all end here before anything
+  # on the disk has changed, and stay quiet.
   if [ "$exit_code" -ne 0 ] && [ "${DISK_MODIFIED:-0}" -eq 1 ]; then
     print_error "Script exited with error code $exit_code. Performing cleanup..."
 
-    # Clean up chroot special mounts first
+    # The chroot's virtual filesystems first.
     if mountpoint -q /mnt/proc 2>/dev/null ||
       mountpoint -q /mnt/sys 2>/dev/null ||
       mountpoint -q /mnt/dev 2>/dev/null ||
@@ -94,7 +95,7 @@ cleanup() {
       gpgconf --homedir /mnt/etc/pacman.d/gnupg --kill all &>/dev/null || true
     fi
 
-    # Unmount all filesystems if they exist
+    # The target filesystems, if mounted.
     if mountpoint -q /mnt 2>/dev/null; then
       print_msg "Unmounting filesystems"
       umount -Rf /mnt 2>/dev/null || true
@@ -133,25 +134,24 @@ EXTRA_PACKAGES=""
 NON_INTERACTIVE=0
 MICROCODE=""
 
-# ESP mount options. FAT has no permission bits, so they come from the mount:
-# files 0600, directories 0700, all owned by root. This matches what mkinitcpio
-# would have given them on a normal filesystem -- it builds initramfs images and
-# UKIs under `umask 077` precisely because an initramfs can carry secrets such as
-# a LUKS keyfile. Without this the kernel and the UKIs on /boot are
-# world-readable.
+# ESP mount options. FAT has no permission bits; the mount supplies them: files
+# 0600, directories 0700, all owned by root. This matches what mkinitcpio would
+# set on a normal filesystem, where it builds initramfs images and UKIs under
+# `umask 077` because an initramfs can carry secrets such as a LUKS keyfile.
+# Without these options, the kernel and the UKIs on /boot are world-readable.
 ESP_MOUNT_OPTS="fmask=0177,dmask=0077"
 
 # Btrfs mount options applied to every subvolume.
-#   compress=zstd:3 - btrfs's own default level, a better ratio than level 1 for
-#     a modest CPU cost. It only affects newly written data, so it is worth
-#     setting correctly at install time rather than later.
+#   compress=zstd:3 - btrfs's own default level, a better ratio than level 1
+#     for a modest CPU cost. It applies only to newly written data, which makes
+#     install time the right moment to set it.
 #   noatime - every atime update on a CoW filesystem is a metadata write that
-#     also makes snapshots diverge from their parent for no content change.
-#   nodiscard - the LUKS container is opened with --allow-discards, so the
-#     device supports TRIM and btrfs would otherwise turn on continuous
-#     discard=async by default (kernel 6.2+). Arch, Debian and Red Hat all
-#     recommend periodic TRIM instead, so fstrim.timer is enabled rather than
-#     trimming on every delete.
+#     also makes snapshots diverge from their parent without any change in
+#     content.
+#   nodiscard - the LUKS container is opened with --allow-discards, which
+#     makes the device support TRIM, and btrfs would otherwise enable
+#     continuous discard=async by default (kernel 6.2+). Arch, Debian and Red
+#     Hat all recommend periodic TRIM instead, which fstrim.timer provides.
 BTRFS_MOUNT_OPTS="compress=zstd:3,noatime,nodiscard"
 
 # Repository files
@@ -188,18 +188,18 @@ SNAPPER_CONFIG_SRC="${SCRIPT_DIR}/defaults/snapper/root"
 SNAPPER_CONFD_SRC="${SCRIPT_DIR}/etc/conf.d/snapper"
 LIMINE_TOOL_CONF_SRC="${SCRIPT_DIR}/etc/limine-entry-tool.d/50-arch.conf"
 # Prebuilt AUR packages. They are compiled with GraalVM native-image, which is
-# far too heavy to run during an install; see README.md for how to rebuild them.
+# too heavy to run during an install; README.md describes how to rebuild them.
 LIMINE_PKG_SRC="${SCRIPT_DIR}/packages"
 LIMINE_PKGS="limine-mkinitcpio-hook limine-snapper-sync"
 
 # Password variables
 USER_PASSWORD=""
 ROOT_PASSWORD=""
-# Names whichever accounts fell back to 'changeme', so print_summary can repeat
-# it at the end, where a warning from the password prompt has long scrolled off.
+# Names the accounts that fell back to 'changeme'. print_summary repeats this at
+# the end, where a warning from the password prompt has long scrolled off.
 PASSWORD_FALLBACK=""
 
-# Help function
+# Help text.
 show_help() {
   cat <<EOF
 Usage: $(basename "$0") [options]
@@ -223,8 +223,9 @@ EOF
   exit 0
 }
 
-# Every option below takes a value. Without this an omitted one dies with a raw
-# "$2: unbound variable" from set -u, which names neither the option nor itself.
+# Every option below takes a value. Without this check, an omitted value fails
+# with a bare "$2: unbound variable" from set -u, which does not name the
+# option.
 require_value() {
   if [ -z "${2:-}" ]; then
     print_error "Option $1 requires a value."
@@ -233,7 +234,7 @@ require_value() {
   fi
 }
 
-# Process command line arguments
+# Parses the command-line options.
 parse_args() {
   DISK="$DEFAULT_DISK"
   HOSTNAME="$DEFAULT_HOSTNAME"
@@ -330,13 +331,14 @@ validate_secure_boot() {
       print_msg "Secure Boot is disabled"
       ;;
     *)
-      # No SecureBoot variable means the firmware does not implement Secure Boot.
+      # No SecureBoot variable: the firmware does not implement Secure Boot.
       print_warning "Could not determine the Secure Boot state; assuming it is disabled."
       ;;
   esac
 }
 
-# systemd-firstboot --root only checks the keymap name is well-formed, not that it exists.
+# systemd-firstboot --root only checks that the keymap name is well-formed,
+# not that the keymap exists.
 validate_keymap() {
   if [ -z "$(find /usr/share/kbd/keymaps -name "${KEYMAP}.map*" -print -quit 2>/dev/null)" ]; then
     print_error "Keymap '${KEYMAP}' is not installed."
@@ -344,21 +346,21 @@ validate_keymap() {
   fi
 }
 
-# Validate inputs
+# Validates the options and the live environment.
 validate_inputs() {
-  # Check if disk exists
+  # The target disk must exist.
   if [ ! -b "$DISK" ]; then
     print_error "Disk $DISK does not exist or is not a block device."
     exit 1
   fi
 
-  # Check if we're running as root
+  # Root privileges are required.
   if [ "$(id -u)" -ne 0 ]; then
     print_error "This script must be run as root."
     exit 1
   fi
 
-  # Check if we're booted in UEFI mode
+  # The live system must be booted in UEFI mode.
   if [ ! -d /sys/firmware/efi/efivars ]; then
     print_error "System not booted in UEFI mode. This script requires UEFI boot."
     exit 1
@@ -424,7 +426,7 @@ validate_inputs() {
     fi
   done
 
-  # Check for required tools
+  # Tools required on the live system.
   for tool in sgdisk cryptsetup mkfs.fat mkfs.btrfs; do
     if ! command -v "$tool" &>/dev/null; then
       print_error "Required tool '$tool' not found. Please install it first."
@@ -434,13 +436,13 @@ validate_inputs() {
 }
 
 setup_luks() {
-  # Prompt for LUKS passphrase if not already set
+  # Prompts for the LUKS passphrase unless it is already set.
   if [ -z "${LUKS_PASSPHRASE:-}" ]; then
     read -rs -p "Enter LUKS passphrase: " LUKS_PASSPHRASE
-    echo # ensure a newline after prompt
+    echo # Ends the line after the hidden input
   fi
 
-  # Attempt to open the LUKS container non-interactively
+  # Opens the container with the passphrase on stdin.
   if ! echo "$LUKS_PASSPHRASE" | cryptsetup open "$ROOT_PART" cryptroot --key-file=-; then
     print_error "Failed to open LUKS container."
     print_msg "This might be due to a previous LUKS header still being detected."
@@ -449,9 +451,9 @@ setup_luks() {
   CRYPTROOT_OPENED=1
 }
 
-# Setup partitions based on disk
+# Derives the partition names and the microcode package.
 setup_partitions() {
-  # Derive partition names based on disk
+  # NVMe and eMMC devices put a 'p' between the disk name and the number.
   if [[ "$DISK" =~ nvme || "$DISK" =~ mmcblk ]]; then
     EFI_PART="${DISK}p1"
     ROOT_PART="${DISK}p2"
@@ -460,7 +462,7 @@ setup_partitions() {
     ROOT_PART="${DISK}2"
   fi
 
-  # Auto-detect CPU type for microcode
+  # Microcode package for the CPU vendor.
   if grep -q GenuineIntel /proc/cpuinfo; then
     MICROCODE="intel-ucode"
   elif grep -q AuthenticAMD /proc/cpuinfo; then
@@ -471,7 +473,7 @@ setup_partitions() {
   fi
 }
 
-# Confirm before proceeding
+# Asks for confirmation before the disk is erased.
 confirm_operation() {
   if [ "$NON_INTERACTIVE" -eq 0 ]; then
     echo "WARNING: This will erase ALL data on $DISK"
@@ -487,18 +489,18 @@ confirm_operation() {
   fi
 }
 
-# Create disk partitions
+# Partitions the disk: a 2 GiB ESP and a LUKS partition.
 create_partitions() {
   DISK_MODIFIED=1
   print_msg "Creating partitions on $DISK"
 
-  # Make sure the disk is not in use
+  # Unmounts the disk's partitions and disables swap.
   for part in $(lsblk -npo NAME "$DISK" | tail -n +2); do
     umount "$part" 2>/dev/null || true
   done
   swapoff -a || true
 
-  # Close any existing LUKS containers
+  # Closes any open LUKS containers.
   for mapper in /dev/mapper/*; do
     [ -e "$mapper" ] || continue
     if [ "$mapper" != "/dev/mapper/control" ]; then
@@ -506,21 +508,21 @@ create_partitions() {
     fi
   done
 
-  # Create new partition table - FIXED PARTITIONING
+  # New GPT partition table.
   print_msg "Creating new GPT partition table on $DISK"
-  sgdisk --zap-all "$DISK" # Zap existing partitions
-  sgdisk --clear "$DISK"   # Create fresh GPT
+  sgdisk --zap-all "$DISK" # Removes the existing GPT and MBR
+  sgdisk --clear "$DISK"   # Writes a new, empty GPT
   sleep 1
 
-  # Create EFI System Partition - 2GB
+  # EFI System Partition, 2 GiB.
   print_msg "Creating EFI System Partition"
   sgdisk --new=1:0:+2048M --typecode=1:ef00 --change-name=1:"EFI System" "$DISK"
 
-  # Create root partition (rest of disk)
+  # Root partition, the rest of the disk.
   print_msg "Creating root partition"
   sgdisk --new=2:0:0 --typecode=2:8309 --change-name=2:"Linux LUKS" "$DISK"
 
-  # Make sure the kernel knows about the new partition table
+  # Makes the kernel reread the new partition table.
   print_msg "Informing kernel of partition table change"
   partprobe "$DISK"
   sleep 3
@@ -528,7 +530,7 @@ create_partitions() {
   print_msg "Checking new partition table"
   sgdisk --print "$DISK"
 
-  # Ensure partitions exist before proceeding
+  # Waits up to ten seconds for both partitions to appear.
   for _ in $(seq 1 10); do
     if [ -b "$EFI_PART" ] && [ -b "$ROOT_PART" ]; then
       break
@@ -545,12 +547,12 @@ create_partitions() {
   fi
 }
 
-# Format partitions
+# Formats the ESP and creates the LUKS container.
 format_partitions() {
   print_msg "Format EFI partition with FAT32"
   mkfs.fat -F32 -n "EFI" "$EFI_PART"
 
-  # Check if cryptroot is already open and close it
+  # Closes cryptroot if it is already open.
   if [ -e "/dev/mapper/cryptroot" ]; then
     print_msg "Found existing cryptroot mapping, attempting to close it..."
     umount -R /mnt 2>/dev/null || true
@@ -561,19 +563,19 @@ format_partitions() {
     }
   fi
 
-  # Check if the partition is already a LUKS container
+  # An existing LUKS header is wiped first.
   if cryptsetup isLuks "$ROOT_PART" 2>/dev/null; then
     print_msg "Partition $ROOT_PART already has a LUKS header, removing it..."
-    # Force wipe the first few MB where LUKS header exists
+    # Overwrites the first 10 MiB, where the LUKS header is stored.
     dd if=/dev/zero of="$ROOT_PART" bs=1M count=10 status=progress
     sync
   fi
 
-  # Create LUKS container
+  # Creates the LUKS container.
   print_msg "Creating new LUKS container on $ROOT_PART..."
   cryptsetup luksFormat --type luks2 -v "$ROOT_PART"
 
-  # Open the container
+  # Opens the container.
   print_msg "Opening LUKS container..."
   if ! cryptsetup --allow-discards --persistent open "$ROOT_PART" cryptroot; then
     print_error "Failed to open LUKS container."
@@ -583,7 +585,7 @@ format_partitions() {
   CRYPTROOT_OPENED=1
 }
 
-# Setup Btrfs filesystem with subvolumes
+# Creates the Btrfs filesystem and its subvolumes.
 setup_btrfs() {
   print_msg "Format and layout Btrfs"
   mkfs.btrfs -L "ArchRoot" /dev/mapper/cryptroot
@@ -601,11 +603,11 @@ setup_btrfs() {
   umount /mnt
 }
 
-# Mount all filesystems
+# Mounts the subvolumes and the ESP under /mnt.
 mount_filesystems() {
   print_msg "Mount subvolumes"
 
-  # Mount root subvolume first
+  # The root subvolume first.
   print_msg "Mounting root subvolume"
   mount -o "subvol=@,$BTRFS_MOUNT_OPTS" /dev/mapper/cryptroot /mnt || {
     print_error "Failed to mount root subvolume"
@@ -621,14 +623,14 @@ mount_filesystems() {
   print_msg "Mounting EFI partition to /mnt/boot"
   mount -o "$ESP_MOUNT_OPTS" "$EFI_PART" "/mnt/boot"
 
-  # Create directories and mount other subvolumes if they exist
+  # The remaining subvolumes, each on its own mount point.
   print_msg "Mounting other subvolumes"
   for subvol in $SUBVOLUMES; do
     if [[ "$subvol" != "@" ]]; then
-      # Convert '@subvol' format to '/subvol' path format
+      # Mount point for the subvolume: '@home' becomes '/home'.
       local mountpoint
 
-      # For special cases
+      # @cache and @log mount below /var; the others at /<name>.
       case "$subvol" in
       @home) mountpoint="/home" ;;
       @cache) mountpoint="/var/cache" ;;
@@ -648,8 +650,8 @@ mount_filesystems() {
     fi
   done
 
-  # A fresh subvolume is 0755, but root's home is meant to be 0750, and pacman
-  # warns about the difference when it installs the filesystem package.
+  # A fresh subvolume is 0755, but root's home should be 0750; pacman warns
+  # about the difference when it installs the filesystem package.
   if mountpoint -q /mnt/root; then
     chmod 0750 /mnt/root
   fi
@@ -658,19 +660,19 @@ mount_filesystems() {
   mount | grep "/mnt"
 }
 
-# Install base system
+# Installs the base system with pacstrap.
 install_base_system() {
   print_msg "Install base system"
   local PACKAGES="$DEFAULT_PACKAGES $MICROCODE $EXTRA_PACKAGES"
   print_msg "Installing packages: $PACKAGES"
 
-  # Ensure pacman keyring is initialized
+  # Initializes the live system's pacman keyring.
   pacman-key --init
   pacman-key --populate archlinux
 
-  # The ESP is /boot, so pacstrap writes the kernel straight onto it. If it is
-  # not mounted yet the kernel lands on the Btrfs root and is then shadowed the
-  # moment the ESP is mounted over it, leaving an unbootable system.
+  # The ESP is /boot, and pacstrap writes the kernel straight onto it. If the
+  # ESP is not mounted yet, the kernel lands on the Btrfs root and is shadowed
+  # the moment the ESP is mounted over it, leaving an unbootable system.
   if ! mountpoint -q "/mnt/boot"; then
     print_error "EFI partition is not mounted at /mnt/boot."
     print_error "It must be mounted before pacstrap, or the kernel will be installed to the wrong filesystem."
@@ -678,13 +680,13 @@ install_base_system() {
     exit 1
   fi
 
-  # Install base packages
+  # Base packages.
   print_msg "Running pacstrap to install packages (this may take a while)"
 
-  # pacstrap passes --noconfirm unless -i is given, so this needs no flag of its
-  # own to run unattended. SNAP_PAC_SKIP reaches the alpm hooks through pacman's
-  # environment: snapper has no configuration yet, so its post-transaction hook
-  # would only fail noisily in the target.
+  # pacstrap passes --noconfirm unless -i is given and runs unattended without
+  # a flag of its own. SNAP_PAC_SKIP reaches the alpm hooks through pacman's
+  # environment: snapper has no configuration yet, and its post-transaction
+  # hook would only fail noisily in the target.
   # shellcheck disable=SC2086
   SNAP_PAC_SKIP=y pacstrap -K /mnt $PACKAGES || {
     print_error "pacstrap failed. Check internet connection and package names."
@@ -694,7 +696,7 @@ install_base_system() {
   print_msg "Generate fstab"
   genfstab -U /mnt >>/mnt/etc/fstab
 
-  # Verify fstab was created properly
+  # genfstab must have produced a non-empty fstab.
   if [ ! -s /mnt/etc/fstab ]; then
     print_error "fstab generation failed or produced empty file"
     exit 1
@@ -704,17 +706,18 @@ install_base_system() {
   cat /mnt/etc/fstab
 }
 
-# Configure the system - split into smaller functions for better error handling
+# Configures the installed system, one function per area.
 configure_system() {
   print_msg "Starting system configuration"
 
-  # Prepare chroot environment once for all chroot operations
+  # Mounts the chroot's virtual filesystems once for all chroot steps.
   prepare_chroot
 
-  # Basic system configuration (timezone, locale, hostname)
+  # Time zone, locale, hostname and system tuning.
   configure_basic_system
 
-  # User setup (root, normal user, wheel group) - now with password prompting outside chroot
+  # Users: root and the regular user in the wheel group. Passwords are prompted
+  # for outside the chroot.
   prompt_for_passwords
   configure_users
 
@@ -737,22 +740,23 @@ configure_system() {
 
   configure_snapshots
 
-  # Enable services
+  # System services.
   enable_services
 
   # Last, and not fatal: an unreachable AUR should not fail an install that is
   # otherwise complete.
   install_aur_helper
 
-  # Clean up chroot mounts
+  # Unmounts the chroot's virtual filesystems.
   cleanup_chroot
 }
 
-# Configure basic system settings
+# Configures the time zone, locale, hostname and system tuning.
 configure_basic_system() {
   print_msg "Configuring basic system settings"
 
-  # Outside the chroot: --root makes systemd-firstboot skip reloading the console over D-Bus.
+  # Outside the chroot: with --root, systemd-firstboot skips reloading the
+  # console over D-Bus.
   print_msg "Setting keymap to ${KEYMAP}"
   validate_keymap
   systemd-firstboot --root=/mnt --keymap="${KEYMAP}"
@@ -785,16 +789,12 @@ configure_basic_system() {
   print_msg "Capping the journal size"
   install -D -m 0644 "$JOURNALD_CONF_SRC" /mnt/etc/systemd/journald.conf.d/10-journal-size.conf
 
-  # A drop-in, so /etc/ssh/sshd_config stays as the package ships it. Keys only,
-  # and only this account, so remote login needs a key placed from the console.
-  # Both packages ship their own timers.target.wants symlink, so the timers are
-  # already active and only their schedules need changing.
+  # Both packages ship their own timers.target.wants symlink: the timers are
+  # already active, and only their schedules change.
   print_msg "Rescheduling the index rebuilds"
   install -D -m 0644 "$MANDB_TIMER_SRC" /mnt/etc/systemd/system/man-db.timer.d/override.conf
   install -D -m 0644 "$UPDATEDB_TIMER_SRC" /mnt/etc/systemd/system/plocate-updatedb.timer.d/override.conf
 
-  # Without this the index would skip every Btrfs subvolume and include every
-  # snapshot, which is the wrong half of the filesystem in both directions.
   # Three files: system services, the session's services, and user@.service
   # itself, which carries its own 120s timeout the default cannot reach.
   print_msg "Shortening the shutdown timeouts"
@@ -803,9 +803,13 @@ configure_basic_system() {
     install -D -m 0644 "${SHUTDOWN_CONF_SRC}/${shutdown_file}" "/mnt/etc/systemd/${shutdown_file}"
   done
 
+  # Without this, the index would skip every Btrfs subvolume and include every
+  # snapshot: the wrong half of the filesystem in both directions.
   print_msg "Scoping the locate index"
   install -D -m 0644 "$UPDATEDB_SERVICE_SRC" /mnt/etc/systemd/system/plocate-updatedb.service.d/override.conf
 
+  # A drop-in, leaving /etc/ssh/sshd_config as the package ships it. Keys only,
+  # and only this account: remote login needs a key placed from the console.
   print_msg "Hardening sshd"
   sed "s|@USERNAME@|${USERNAME}|g" "$SSHD_CONF_SRC" |
     install -D -m 0644 /dev/stdin /mnt/etc/ssh/sshd_config.d/10-hardening.conf
@@ -838,16 +842,16 @@ pacman -Sy
 EOF
 }
 
-# Prompt for passwords outside of chroot
+# Prompts for both passwords, outside the chroot.
 prompt_for_passwords() {
-  # Initialize password variables
+  # Cleared before each prompt.
   USER_PASSWORD=""
   USER_PASSWORD_CONFIRM=""
   ROOT_PASSWORD=""
   ROOT_PASSWORD_CONFIRM=""
   PASSWORD_FALLBACK=""
 
-  # Skip prompts in non-interactive mode
+  # Non-interactive mode sets temporary passwords instead of prompting.
   if [ "$NON_INTERACTIVE" -eq 1 ]; then
     print_msg "Non-interactive mode: Setting default temporary passwords"
     USER_PASSWORD="changeme"
@@ -901,20 +905,20 @@ prompt_for_passwords() {
   fi
 }
 
-# Prepare chroot environment by mounting necessary filesystems
+# Mounts the virtual filesystems the chroot steps need.
 prepare_chroot() {
   print_msg "Preparing chroot environment"
 
-  # Check if /mnt is mounted
+  # The target must be mounted.
   if ! mountpoint -q /mnt; then
     print_error "/mnt is not mounted. Please mount the root filesystem first."
     exit 1
   fi
 
-  # Create necessary mount points if they do not exist
+  # Creates any missing mount points.
   mkdir -p /mnt/{proc,sys,dev,run}
 
-  # Mount virtual filesystems if not already mounted
+  # Mounts each virtual filesystem not already mounted.
   if ! mountpoint -q /mnt/proc; then
     mount -t proc proc /mnt/proc
   fi
@@ -933,11 +937,11 @@ prepare_chroot() {
   print_msg "Chroot environment prepared"
 }
 
-# Clean up chroot mounts when done
+# Unmounts the chroot's virtual filesystems.
 cleanup_chroot() {
   print_msg "Cleaning up chroot mounts"
 
-  # Only unmount if they exist and are mounted
+  # Only those currently mounted.
   if mountpoint -q /mnt/run 2>/dev/null; then
     umount -l /mnt/run
   fi
@@ -952,15 +956,15 @@ cleanup_chroot() {
   fi
 }
 
-# Configure users with passwords provided from outside chroot
+# Creates the user and sets both passwords, prompted for outside the chroot.
 configure_users() {
   print_msg "Configuring users"
 
-  # Ensure chroot environment is prepared
+  # Mounts the chroot's virtual filesystems, unless already mounted.
   prepare_chroot
 
-  # Created before the passwords are set, so a rerun that finds the account
-  # already there still refreshes both.
+  # The account is created before the passwords are set: a rerun that finds the
+  # account already present still refreshes both.
   if arch-chroot /mnt id "$USERNAME" &>/dev/null; then
     print_msg "User ${USERNAME} already exists, skipping creation"
   else
@@ -980,11 +984,11 @@ configure_users() {
     install -D -m 0440 "${SUDOERS_SRC}/${sudoers_file}" "/mnt/etc/sudoers.d/${sudoers_file}"
   done
 
-  # Clean up chroot mounts when done with this step
+  # Unmounts the chroot's virtual filesystems.
   cleanup_chroot
 }
 
-# Configure hibernation
+# Configures hibernation.
 #
 # A swapfile the size of RAM in its own Btrfs subvolume, an fstab entry at
 # pri=0, and resume= parameters for the initramfs.
@@ -1002,7 +1006,8 @@ configure_users() {
 configure_hibernation() {
   print_msg "Configuring hibernation"
 
-  # Turns the keyboard backlight off before hibernating. See script file.
+  # Turns the keyboard backlight off before hibernating; the hook itself
+  # explains why.
   if [ -f /sys/power/image_size ]; then
     print_msg "Installing keyboard-backlight system-sleep hook"
     install -D -m 0755 "$SLEEP_HOOK_SRC" /mnt/usr/lib/systemd/system-sleep/keyboard-backlight
@@ -1018,30 +1023,30 @@ SWAP_SUBVOLUME="/swap"
 SWAP_FILE="/swap/swapfile"
 
 # A Btrfs subvolume cannot be snapshotted while it holds an active swapfile,
-# so the swapfile gets a subvolume of its own. Nested under @, it is also left
-# out of snapshots of the root subvolume. +C (NODATACOW) is required: Btrfs
-# swapfiles cannot be copy-on-write, checksummed or compressed.
+# which is why the swapfile gets a subvolume of its own. Nested under @, it is
+# also left out of snapshots of the root subvolume. +C (NODATACOW) is required:
+# Btrfs swapfiles cannot be copy-on-write, checksummed or compressed.
 if ! btrfs subvolume show "$SWAP_SUBVOLUME" &>/dev/null; then
   echo "==> Creating Btrfs subvolume $SWAP_SUBVOLUME"
   btrfs subvolume create "$SWAP_SUBVOLUME"
   chattr +C "$SWAP_SUBVOLUME"
 fi
 
-# Sized to total RAM so a full memory image fits.
+# Sized to total RAM, large enough for a full memory image.
 if ! swaplabel "$SWAP_FILE" &>/dev/null; then
   echo "==> Creating swapfile in Btrfs subvolume"
   MEM_TOTAL_KB="$(awk '/MemTotal/ {print $2}' /proc/meminfo)k"
   btrfs filesystem mkswapfile -s "$MEM_TOTAL_KB" "$SWAP_FILE"
 fi
 
-# pri=0 sits below zram (priority 100), so everyday swapping goes to compressed
-# RAM and this file is effectively reserved for hibernation images.
+# pri=0 sits below zram (priority 100): everyday swapping goes to compressed
+# RAM, and this file is effectively reserved for hibernation images.
 if ! grep -Fq "$SWAP_FILE" /etc/fstab; then
   echo "==> Adding swapfile to /etc/fstab"
   printf "\n# Btrfs swapfile for system hibernation\n%s none swap defaults,pri=0 0 0\n" "$SWAP_FILE" >>/etc/fstab
 fi
 
-# Tell the initramfs where the hibernation image is. Without these, resume only
+# Tells the initramfs where the hibernation image is. Without these, resume only
 # happens late (after the GPU drivers load) and fails. The offset is physical,
 # relative to the unlocked LUKS device -- which is why it comes from
 # map-swapfile and not filefrag.
@@ -1057,7 +1062,7 @@ else
 fi
 EOF
 
-  # The live ISO runs on the target hardware, so /sys/power/mem_sleep reports
+  # The live ISO runs on the target hardware, and /sys/power/mem_sleep reports
   # the same suspend modes the installed system will see.
   if grep -q "\[s2idle\]" /sys/power/mem_sleep 2>/dev/null; then
     print_msg "Enabling ACPI RTC alarm for s2idle suspend"
@@ -1065,7 +1070,7 @@ EOF
   fi
 }
 
-# Configure Plymouth
+# Configures Plymouth.
 #
 # The theme in /usr/share/plymouth/themes/, Theme= in
 # /etc/plymouth/plymouthd.conf, the plymouth mkinitcpio hook and the quiet-boot
@@ -1084,7 +1089,7 @@ configure_plymouth() {
 
   local theme_dir="/mnt/usr/share/plymouth/themes/arch-linux"
 
-  # The whole theme directory is copied, so files added to it need no script
+  # The whole theme directory is copied; files added to it need no script
   # change. --no-preserve gives root-owned files 0644 and directories 0755.
   print_msg "Installing Plymouth theme"
   install -d -m 0755 "$theme_dir"
@@ -1105,11 +1110,11 @@ echo "Default theme: $(plymouth-set-default-theme)"
 EOF
 }
 
-# Configure boot
+# Installs the Limine configuration, the initramfs hooks and the command line.
 configure_boot() {
   print_msg "Configuring boot"
 
-  # Ensure the EFI partition is mounted
+  # The ESP must be mounted at /mnt/boot.
   if ! mountpoint -q "/mnt/boot"; then
     print_warning "EFI partition not mounted at /mnt/boot. Attempting to mount."
     mkdir -p "/mnt/boot"
@@ -1144,7 +1149,7 @@ configure_boot() {
     fi
   fi
 
-  # Check that the ESP partition is formatted as FAT
+  # The ESP must be formatted as FAT.
   if ! file -sL "$(findmnt -n -o SOURCE --first-only "/mnt/boot")" | grep -q "FAT"; then
     print_warning "WARNING: EFI System Partition is not formatted as FAT filesystem."
     print_msg "Current filesystem type: $(file -sL "$(findmnt -n -o SOURCE --first-only "/mnt/boot")")"
@@ -1196,12 +1201,12 @@ if [ ! -f /boot/vmlinuz-linux ]; then
   exit 1
 fi
 
-# limine-install deploys the EFI binaries and the removable-media fallback when
-# limine-mkinitcpio-hook is installed. Putting them here first only gives it
-# something to back up as limine_x64.bak on an otherwise fresh ESP.
+# The EFI binaries and the removable-media fallback are not copied here.
+# limine-install deploys them when limine-mkinitcpio-hook is installed; copying
+# them first would only give it a limine_x64.bak to create on a fresh ESP.
 
 echo "==> Removing stale Limine UEFI boot entries"
-# The disk was just repartitioned, so any entry with this label points at a
+# The disk was just repartitioned: any entry with this label points at a
 # partition that no longer exists. Registering the new one is left to
 # limine-install, which runs when limine-mkinitcpio-hook is installed; creating
 # one here as well would leave the firmware with two entries of the same name.
@@ -1236,7 +1241,8 @@ assemble_cmdline() {
 
 # limine-entry-tool reads a command line only from /etc/kernel/cmdline or
 # /proc/cmdline, never from /etc/cmdline.d/. Inside the installer /proc/cmdline
-# is the live ISO's, so the real one has to be written where the tool looks.
+# belongs to the live ISO, which is why the real one is written where the tool
+# looks.
 configure_limine_tool() {
   local cmdline
 
@@ -1270,9 +1276,9 @@ install_limine_hooks() {
   install -d -m 0755 /mnt/var/cache/pacman/pkg
   cp "${LIMINE_PKG_SRC}"/*.pkg.tar.zst /mnt/var/cache/pacman/pkg/
 
-  # SNAP_PAC_SKIP stops snap-pac taking pre/post snapshots of this transaction.
-  # Snapper has no configuration yet, so its hooks only fail noisily in the
-  # chroot with 'fatal library error, lookup self'.
+  # SNAP_PAC_SKIP stops snap-pac from taking pre/post snapshots of this
+  # transaction. Snapper has no configuration yet, and its hooks would only fail
+  # noisily in the chroot with 'fatal library error, lookup self'.
   arch-chroot /mnt env SNAP_PAC_SKIP=y bash -c \
     'pacman -U --noconfirm /var/cache/pacman/pkg/limine-mkinitcpio-hook-*.pkg.tar.zst /var/cache/pacman/pkg/limine-snapper-sync-*.pkg.tar.zst'
 
@@ -1281,7 +1287,7 @@ install_limine_hooks() {
   # in place before this runs.
   arch-chroot /mnt /bin/bash -e <<'EOF'
 # The hook overrides mkinitcpio's pacman hook and builds the UKIs by calling
-# mkinitcpio directly, so the preset pacstrap generated is never read again.
+# mkinitcpio directly; the preset pacstrap generated is never read again.
 # Leaving it behind invites a manual 'mkinitcpio -P' to write UKIs that
 # disagree with the entries in limine.conf.
 rm -f /etc/mkinitcpio.d/linux.preset
@@ -1326,8 +1332,8 @@ configure_snapshots() {
   arch-chroot /mnt systemctl enable snapper-cleanup.timer limine-snapper-sync.service
 }
 
-# makepkg refuses to run as root, and the user has no password-free sudo, so
-# only the build runs as the user. Everything that needs root -- the build
+# makepkg refuses to run as root, and the user has no password-free sudo. Only
+# the build therefore runs as the user. Everything that needs root -- the build
 # dependency, the install, removing the dependency again -- runs as root around
 # it, which avoids granting a temporary NOPASSWD rule that could outlive a
 # failed build.
@@ -1342,15 +1348,16 @@ installed_rust=0
 
 cleanup() {
   rm -rf "$build_dir"
-  # Only remove rust if this build installed it; --packages may have asked for it.
+  # rust is removed only if this build installed it; --packages may have
+  # requested it.
   if [ "$installed_rust" -eq 1 ]; then
     pacman -Rns --noconfirm rust >/dev/null || true
   fi
 }
 trap cleanup EXIT
 
-# paru's makedepends is cargo, which rust and rustup both provide. Named
-# explicitly so --noconfirm does not pick a provider for us.
+# paru's makedepends is cargo, which rust and rustup both provide. rust is named
+# explicitly to keep --noconfirm from choosing a provider.
 if ! pacman -Q rust &>/dev/null; then
   pacman -S --needed --noconfirm --asdeps rust
   installed_rust=1
@@ -1358,8 +1365,8 @@ fi
 
 chown "$AUR_USER": "$build_dir"
 
-# HOME and CARGO_HOME inside the build directory, so neither the cargo
-# registry nor anything else is left behind in the user's home.
+# HOME and CARGO_HOME point inside the build directory, leaving neither the
+# cargo registry nor anything else behind in the user's home.
 as_user() {
   runuser -u "$AUR_USER" -- env HOME="$build_dir" CARGO_HOME="$build_dir/cargo" "$@"
 }
@@ -1368,7 +1375,7 @@ as_user git clone --depth 1 https://aur.archlinux.org/paru.git "$build_dir/paru"
 cd "$build_dir/paru"
 as_user makepkg --noconfirm
 
-# makepkg.conf enables debug, so the build also produces paru-debug.
+# makepkg.conf enables debug, and the build also produces paru-debug.
 mapfile -t packages < <(as_user makepkg --packagelist | grep -v -- '-debug-')
 pacman -U --noconfirm "${packages[@]}"
 EOF
@@ -1377,51 +1384,52 @@ EOF
   fi
 }
 
-# Enable services
+# Enables the system services.
 enable_services() {
   print_msg "Enabling services"
   arch-chroot /mnt /bin/bash -e <<EOF
 systemctl enable systemd-resolved systemd-timesyncd systemd-zram-setup@zram0.service sshd NetworkManager
 systemctl mask systemd-networkd
 
-# Periodic TRIM. The filesystems are mounted 'nodiscard', so freed blocks are
-# discarded once a week in one batch instead of on every delete -- the shape
-# Arch, Debian and Red Hat all recommend. It reaches the SSD because the LUKS
+# Periodic TRIM. The filesystems are mounted 'nodiscard': freed blocks are
+# discarded once a week in one batch instead of on every delete, as Arch,
+# Debian and Red Hat all recommend. TRIM reaches the SSD because the LUKS
 # container is opened with --allow-discards.
 systemctl enable fstrim.timer
 EOF
 }
 
-# Verify installation
+# Checks that the installed system has everything it needs to boot.
 verify_installation() {
   print_msg "Verifying critical components"
 
-  # Check if EFI directory exists
+  # The ESP must contain an EFI directory.
   if [ ! -d "/mnt/boot/EFI" ]; then
     print_error "WARNING: EFI directory not found! Boot will not work properly."
     print_error "Please check that the EFI partition is properly mounted at /mnt/boot."
   fi
 
-  # Check boot files
+  # Boot files.
   print_msg "Checking boot files"
   if [ ! -f "/mnt/boot/EFI/Linux/arch_linux.efi" ]; then
     print_error "UKI not found at /boot/EFI/Linux/arch_linux.efi! System won't boot."
     print_error "Rebuild it with: arch-chroot /mnt limine-mkinitcpio"
   fi
 
-  # Check for bootloader
+  # Bootloader.
   if [ ! -f "/mnt/boot/EFI/limine/limine_x64.efi" ] && [ ! -f "/mnt/boot/EFI/BOOT/BOOTX64.EFI" ]; then
     print_error "Limine not found! System won't boot."
     print_error "Reinstall it with: arch-chroot /mnt limine-install"
   fi
 
-  # Check for bootloader configuration
+  # Bootloader configuration.
   if [ ! -f "/mnt/boot/limine.conf" ]; then
     print_error "Limine configuration not found at /boot/limine.conf!"
     print_error "Rebuild it with: arch-chroot /mnt limine-mkinitcpio"
   fi
 
-  # The UKI carries its own command line, so confirm it actually got embedded.
+  # The UKI embeds the command line assembled from /etc/cmdline.d/. This checks
+  # that the root and LUKS parameters are in the source file.
   print_msg "Checking kernel command line"
   if ! grep -q "rd.luks.name" /mnt/etc/cmdline.d/10-root.conf 2>/dev/null; then
     print_warning "No rd.luks.name in /etc/cmdline.d/10-root.conf; the UKI may not unlock the disk."
@@ -1436,8 +1444,9 @@ verify_installation() {
     fi
   fi
 
-  # Plymouth only shows the theme plymouthd.conf names, and only if the hook is
-  # in the UKI; either missing still boots, just to a plain text PIN prompt.
+  # Plymouth shows only the theme plymouthd.conf names, and only if the hook is
+  # in the UKI; with either missing, the system still boots, to a plain-text
+  # passphrase prompt.
   print_msg "Checking Plymouth setup"
   if ! grep -qx "Theme=arch-linux" /mnt/etc/plymouth/plymouthd.conf 2>/dev/null; then
     print_warning "Plymouth theme is not set to 'arch-linux' in /etc/plymouth/plymouthd.conf."
@@ -1446,7 +1455,7 @@ verify_installation() {
     print_warning "plymouth is missing from HOOKS in /etc/mkinitcpio.conf.d/hooks.conf; there will be no boot splash."
   fi
 
-  # Check for essential files
+  # Essential files.
   print_msg "Checking for essential files"
   # shellcheck disable=SC2043
   for file in /mnt/etc/fstab; do
@@ -1455,13 +1464,13 @@ verify_installation() {
     fi
   done
 
-  # Check user setup
+  # User setup.
   print_msg "Checking user setup"
   if ! arch-chroot /mnt id "$USERNAME" &>/dev/null; then
     print_warning "User $USERNAME not properly created."
   fi
 
-  # Show formatted EFI partition info
+  # ESP details, recorded in the log.
   if mountpoint -q "/mnt/boot"; then
     print_msg "EFI partition information:"
     file -sL "$(findmnt -n -o SOURCE --first-only "/mnt/boot")"
@@ -1491,8 +1500,8 @@ check_shell_nesting() {
 # recorded, and password prompts do not echo.
 #
 # The timestamp in the file name is the first run's. A later run in the same
-# checkout appends to that file, so one log covers an install that needed
-# several attempts; script(1) marks where each run starts and ends.
+# checkout appends to that file: one log covers an install that needed several
+# attempts, and script(1) marks where each run starts and ends.
 start_logging() {
   local arg
   for arg in "$@"; do
@@ -1519,8 +1528,8 @@ start_logging() {
 }
 
 print_logo() {
-  # Colour is set around the heredoc rather than inside it, so the heredoc
-  # stays quoted and the art is never subject to expansion.
+  # Colour is set around the heredoc rather than inside it: the heredoc stays
+  # quoted, and the art is never subject to expansion.
   printf '%s' "$BLUE"
   cat <<'EOF'
                     ▄
@@ -1549,9 +1558,9 @@ EOF
   echo
 }
 
-# Print installation summary
-# Last of all, the copy carries the log up to this point. A failure here does
-# not undo a finished install, which is why it only warns.
+# Copies the repository, including the log up to this point, to the new user's
+# home. It runs last; a failure only warns, since it does not undo a finished
+# install.
 copy_installer_to_home() {
   local name target
   name=$(basename "$SCRIPT_DIR")
@@ -1566,6 +1575,7 @@ copy_installer_to_home() {
   fi
 }
 
+# Prints the installation summary.
 print_summary() {
   echo
   echo "${WHITE}===${BLUE} iNSTALLATiON SUMMARY ${WHITE}===${NO_COLOR}"
@@ -1625,7 +1635,7 @@ print_summary() {
   echo "${BLUE}==>${WHITE} Secure Boot is not configured by this script; leave it disabled in BIOS for now. ${NO_COLOR}"
   echo "${BLUE}==>${WHITE} After reboot, log in as ${USERNAME}${NO_COLOR}"
 
-  # Troubleshooting tips if boot issues were detected
+  # Troubleshooting tips when a boot file is missing.
   if [ ! -f "/mnt/boot/EFI/Linux/arch_linux.efi" ] || [ ! -f "/mnt/boot/EFI/BOOT/BOOTX64.EFI" ]; then
     echo
     echo "${WHITE}===${BLUE} BOOT TROUBLESHOOTiNG ${WHITE}===${NO_COLOR}"
@@ -1642,9 +1652,10 @@ print_summary() {
   fi
 }
 
-# Main function
+# Runs every installation step in order.
 main() {
-  # Before the re-run under script(1), whose process would fail the parent check.
+  # Runs before the re-run under script(1), whose process would fail the
+  # parent check.
   if [ -z "${ARCH_INSTALL_LOG:-}" ]; then
     check_shell_nesting
     start_logging "$@"
@@ -1673,5 +1684,5 @@ main() {
   copy_installer_to_home
 }
 
-# Run the script
+# Entry point.
 main "$@"
