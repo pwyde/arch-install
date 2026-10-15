@@ -1,0 +1,8 @@
+[wallpaper]
+transition = ["fade"]
+
+[lockscreen]
+transition = ["fade"]
+
+[theme]
+source = "wallpaper"
