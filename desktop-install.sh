@@ -249,9 +249,22 @@ install_greeter_config() {
 
 # Only enabled: starting greetd now would stop getty@tty1, and with it a login
 # session on the first virtual terminal.
+#
+# In a virtual machine, wlroots draws the greeter's cursor upside down on the
+# virtio-gpu hardware cursor plane (wlroots issue 3921). The greeter's
+# compositor then draws the cursor itself instead.
 configure_greetd() {
   print_msg "Configuring greetd to start the Noctalia greeter"
   sudo install -D -m 0644 "$GREETD_CONF_SRC" /etc/greetd/config.toml
+
+  if systemd-detect-virt --vm --quiet; then
+    print_msg "Virtual machine detected; disabling hardware cursors in the greeter"
+    sudo sed -i 's|^command = "/usr/bin/noctalia-greeter-session"$|command = "env WLR_NO_HARDWARE_CURSORS=1 /usr/bin/noctalia-greeter-session"|' /etc/greetd/config.toml
+    if ! sudo grep -q 'WLR_NO_HARDWARE_CURSORS=1' /etc/greetd/config.toml; then
+      print_warning "Could not disable hardware cursors; the greeter cursor may appear upside down."
+    fi
+  fi
+
   sudo systemctl enable greetd.service
 }
 
