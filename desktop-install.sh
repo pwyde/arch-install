@@ -161,14 +161,13 @@ confirm_operation() {
   if [ "$NON_INTERACTIVE" -eq 0 ]; then
     echo "The following will be installed and configured:"
     echo "  - The niri compositor and its session services"
-    echo "  - The Noctalia shell and greeter, kitty, fonts and a cursor theme"
+    echo "  - The Noctalia shell and greeter, kitty, a font and a cursor theme"
     if [ -n "$EXTRA_PACKAGES" ]; then
       echo "  - Additional packages: $EXTRA_PACKAGES"
     fi
-    echo "  - Wallpapers in $WALLPAPERS_DEST"
-    echo "  - Configuration files in $DOTFILES_DEST"
+    echo "  - Wallpapers and configuration files copied to the home directory"
     echo
-    echo "WARNING: Existing files with the same names in $DOTFILES_DEST are overwritten."
+    echo "WARNING: Existing files with the same names in $DOTFILES_DEST will be overwritten."
     read -r -p "Are you sure you want to continue? (y/N) " REPLY
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
