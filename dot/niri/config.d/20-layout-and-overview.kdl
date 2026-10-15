@@ -79,7 +79,7 @@ layout {
     // corners may need draw-behind-window, or geometry-corner-radius in a
     // window rule, to avoid artifacts.
     shadow {
-        // off
+        on
         softness 30
         spread 5
         offset x=0 y=5
