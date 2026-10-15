@@ -18,24 +18,28 @@ installation fails.
 
 ## Features
 
-- GPT partitioning: a 2 GiB EFI System Partition mounted at `/boot`, and a
-  LUKS2-encrypted root partition on the remaining space.
-- Btrfs with configurable subvolumes for `/`, `/home`, `/var/cache`,
-  `/var/log` and `/root`, compressed with zstd.
+- Automatically detects the target disk and erases existing data.
+- CPU microcode for Intel or AMD, detected automatically.
+- GPT partitioning:
+  - 2 GiB EFI System Partition mounted at `/boot`.
+  - LUKS2-encrypted root partition on the remaining space.
+- Btrfs with configurable subvolumes compressed with zstd:
+  - `/`
+  - `/home`
+  - `/var/cache`
+  - `/var/log`
+  - `/root`
 - UKIs built by `mkinitcpio` with a systemd-based initramfs, booted directly
   by Limine.
 - Snapper snapshots around every pacman transaction, each bootable from the
   Limine menu.
 - Hibernation to a Btrfs swapfile the size of RAM, alongside zram swap.
-- A Plymouth boot splash with an Arch Linux theme, which also takes the LUKS
-  passphrase.
-- CPU microcode for Intel or AMD, detected automatically.
+- A Plymouth boot splash that also takes the LUKS passphrase.
 - System tuning and hardening: sysctl, sshd, journald, core dumps, shutdown
   timeouts and periodic TRIM.
 - The [paru](https://github.com/Morganamilo/paru) AUR helper, built from
   source.
-- A complete log of the installation, copied with the installer to the new
-  user's home directory.
+- A complete log of the installation.
 
 ## Requirements
 
@@ -50,24 +54,25 @@ installation fails.
 Boot the Arch Linux installation image, then clone the repository and run the
 installer as root:
 
-```
+```bash
 git clone --depth 1 https://github.com/pwyde/arch-install
 cd arch-install
 ./arch-install.sh
 ```
 
-A shallow clone (`--depth 1`) is recommended. The repository contains prebuilt
-packages, and a full clone would also fetch every previous version of them.
+> [!NOTE]
+> A shallow clone (`--depth 1`) is recommended. The repository contains prebuilt
+> packages, and a full clone would also fetch every previous version of them.
 
 The installer prompts for the LUKS passphrase and for the user and root
-passwords, and asks for confirmation before the disk is erased.
+passwords.
 
 > [!WARNING]
-> All data on the target disk is erased.
+> All data on the target disk will be erased.
 
 ## Usage
 
-```
+```text
 ./arch-install.sh --help
 
 Usage: arch-install.sh [options]
@@ -87,7 +92,7 @@ Options:
 
 Example:
 
-```
+```bash
 ./arch-install.sh --disk /dev/sda --hostname arch-linux --username patrik
 ```
 
