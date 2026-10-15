@@ -1,14 +1,17 @@
-[wallpaper]
-transition = ["fade"]
-
 [lockscreen]
 transition = ["fade"]
-
-[theme]
-source = "wallpaper"
 
 [shell]
 polkit_agent = true
 
 [shell.greeter_sync]
 auto_sync = true
+
+[theme]
+source = "wallpaper"
+
+[wallpaper]
+transition = ["fade"]
+
+[wallpaper.default]
+path = "/home/patrik/Pictures/Wallpapers/glacier-2560x1600.jpg"
