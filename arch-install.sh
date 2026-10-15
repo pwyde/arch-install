@@ -188,7 +188,8 @@ SNAPPER_CONFIG_SRC="${SCRIPT_DIR}/defaults/snapper/root"
 SNAPPER_CONFD_SRC="${SCRIPT_DIR}/etc/conf.d/snapper"
 LIMINE_TOOL_CONF_SRC="${SCRIPT_DIR}/etc/limine-entry-tool.d/50-arch.conf"
 # Prebuilt AUR packages. They are compiled with GraalVM native-image, which is
-# too heavy to run during an install; README.md describes how to rebuild them.
+# too heavy to run during an install; ARCHITECTURE.md describes how to rebuild
+# them.
 LIMINE_PKG_SRC="${SCRIPT_DIR}/packages"
 LIMINE_PKGS="limine-mkinitcpio-hook limine-snapper-sync"
 
@@ -421,7 +422,7 @@ validate_inputs() {
     pkg_files=("${LIMINE_PKG_SRC}/${pkg_name}"-*.pkg.tar.zst)
     if [ ! -f "${pkg_files[0]}" ]; then
       print_error "Missing prebuilt package: ${LIMINE_PKG_SRC}/${pkg_name}-*.pkg.tar.zst"
-      print_error "See README.md for how to build it."
+      print_error "See ARCHITECTURE.md for how to build it."
       exit 1
     fi
   done
