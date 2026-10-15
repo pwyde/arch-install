@@ -156,6 +156,8 @@ BTRFS_MOUNT_OPTS="compress=zstd:3,noatime,nodiscard"
 
 # Repository files
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Inside the repository, which is copied to the new user's home on success.
+LOG_DIR="${SCRIPT_DIR}/logs"
 PLYMOUTH_THEME_SRC="${SCRIPT_DIR}/default/plymouth/arch-linux"
 PLYMOUTHD_CONF_SRC="${SCRIPT_DIR}/etc/plymouth/plymouthd.conf"
 LIMINE_CONF_SRC="${SCRIPT_DIR}/default/limine/limine.conf"
@@ -1482,6 +1484,40 @@ check_shell_nesting() {
   fi
 }
 
+# Re-runs the installer under script(1), which records everything printed on
+# the terminal to the log. A pipe through tee would also capture it, but pacman,
+# cryptsetup and makepkg change behaviour when output is not a terminal, losing
+# progress bars and colour. Typed passwords are never logged: input is not
+# recorded, and password prompts do not echo.
+#
+# The timestamp in the file name is the first run's. A later run in the same
+# checkout appends to that file, so one log covers an install that needed
+# several attempts; script(1) marks where each run starts and ends.
+start_logging() {
+  local arg
+  for arg in "$@"; do
+    case "$arg" in -h | --help) return 0 ;; esac
+  done
+
+  if ! command -v script &>/dev/null; then
+    print_warning "script(1) is not available; continuing without a log file."
+    return 0
+  fi
+
+  mkdir -p "$LOG_DIR"
+  local log_file
+  log_file=$(find "$LOG_DIR" -maxdepth 1 -name 'arch-install-*.log' | sort | tail -n 1)
+  if [ -z "$log_file" ]; then
+    log_file="${LOG_DIR}/arch-install-$(date +%Y%m%d-%H%M%S).log"
+  fi
+  print_msg "Logging to ${log_file}"
+
+  # script(1) runs the command through $SHELL; bash, to match the quoting.
+  local command
+  command=$(printf '%q ' env ARCH_INSTALL_LOG="$log_file" "${SCRIPT_DIR}/$(basename "$0")" "$@")
+  exec env SHELL=/bin/bash script --quiet --append --flush --return --command "$command" "$log_file"
+}
+
 print_logo() {
   # Colour is set around the heredoc rather than inside it, so the heredoc
   # stays quoted and the art is never subject to expansion.
@@ -1514,6 +1550,22 @@ EOF
 }
 
 # Print installation summary
+# Last of all, the copy carries the log up to this point. A failure here does
+# not undo a finished install, which is why it only warns.
+copy_installer_to_home() {
+  local name target
+  name=$(basename "$SCRIPT_DIR")
+  target="/home/${USERNAME}/${name}"
+
+  print_msg "Copying the installer and its log to ${target}"
+  if mkdir -p "/mnt${target}" && cp -a "${SCRIPT_DIR}/." "/mnt${target}/"; then
+    arch-chroot /mnt chown -R "${USERNAME}:" "$target" ||
+      print_warning "Copied, but ownership of ${target} could not be set."
+  else
+    print_warning "Could not copy the installer to ${target}."
+  fi
+}
+
 print_summary() {
   echo
   echo "${WHITE}===${BLUE} iNSTALLATiON SUMMARY ${WHITE}===${NO_COLOR}"
@@ -1592,7 +1644,11 @@ print_summary() {
 
 # Main function
 main() {
-  check_shell_nesting
+  # Before the re-run under script(1), whose process would fail the parent check.
+  if [ -z "${ARCH_INSTALL_LOG:-}" ]; then
+    check_shell_nesting
+    start_logging "$@"
+  fi
 
   print_logo
 
@@ -1614,6 +1670,7 @@ main() {
 
   verify_installation
   print_summary
+  copy_installer_to_home
 }
 
 # Run the script

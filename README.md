@@ -46,6 +46,8 @@ The script is designed to automate the complete installation process in a single
   and weekly TRIM.
 - Provides customizable installation parameters.
 - Provides cleanup functionality when the installation fails.
+- Logs the whole installation, and copies the installer and its log to the new
+  user's home directory.
 
 ## Instructions
 
@@ -97,6 +99,28 @@ Options:
 - **`--yes`** sets both the user and root password to `changeme`. So does an
   empty or mismatched password at the prompt; the summary at the end lists which
   accounts got it.
+
+## Logging
+
+Everything the installer prints is recorded in
+`logs/arch-install-<timestamp>.log`, next to the script.
+
+- **The whole terminal is recorded.** The installer re-runs itself under
+  `script(1)`, which logs what a terminal would show, including the output of
+  pacman, cryptsetup and makepkg. A pipe through `tee` would also capture it,
+  but those tools change behaviour when their output is not a terminal.
+- **Passwords are not recorded.** `script(1)` logs output, not input, and
+  password prompts do not echo what is typed.
+- **Reruns append.** The timestamp in the file name is the first run's; a
+  later run in the same checkout appends to that file, so an install that
+  needed several attempts has one log. `script(1)` marks where each run starts
+  and ends, with its exit code.
+- **The log travels with the installer.** On success the repository, log
+  included, is copied to `~/arch-install` in the new user's home. A failure to
+  copy only warns, since the install itself is complete by then.
+
+The log contains terminal control sequences: progress bars, colour. `cat` or
+`less -R` display it as it appeared.
 
 ## Bootloader
 
