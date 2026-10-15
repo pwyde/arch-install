@@ -8,24 +8,6 @@ theme_mode = "dark"
 corner_radius_scale = 1.0
 font_family = "sans-serif"
 
-[appearance.palette]
-error = "#FFB4AB"
-hover = "#DEBDD2"
-on_error = "#690005"
-on_hover = "#40293A"
-on_primary = "#293044"
-on_secondary = "#2E3039"
-on_surface = "#E4E2E3"
-on_surface_variant = "#C6C6CD"
-on_tertiary = "#40293A"
-outline = "#45464D"
-primary = "#BFC6DF"
-secondary = "#C5C6D1"
-shadow = "#000000"
-surface = "#131315"
-surface_variant = "#1F1F21"
-tertiary = "#DEBDD2"
-
 [clock]
 enabled = true
 position = "above-panel"

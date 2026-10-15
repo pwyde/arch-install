@@ -12,6 +12,3 @@ source = "wallpaper"
 
 [wallpaper]
 transition = ["fade"]
-
-[wallpaper.default]
-path = "~/Pictures/Wallpapers/glacier-2560x1600.jpg"
