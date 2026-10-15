@@ -141,7 +141,7 @@ the bootloader all live on the same FAT partition and there is no separate
 | `/boot/EFI/BOOT/BOOTX64.EFI` | Removable-media fallback, used if the firmware loses its NVRAM entry |
 | `/boot/EFI/Linux/arch_linux.efi` | UKI built by `mkinitcpio` |
 | `/boot/EFI/Linux/arch_linux-fallback.efi` | Fallback UKI |
-| `/boot/limine.conf` | Theming and default entry from [`default/limine/limine.conf`](./default/limine/limine.conf); boot entries written by `limine-entry-tool` |
+| `/boot/limine.conf` | Theming and default entry from [`defaults/limine/limine.conf`](./defaults/limine/limine.conf); boot entries written by `limine-entry-tool` |
 
 Notes:
 
@@ -225,7 +225,7 @@ a failed upgrade can be booted out of rather than repaired from a live ISO.
   It creates its own `/.snapshots` subvolume, which is why the installer creates
   no such subvolume itself.
 - **The retention policy** comes from
-  [`default/snapper/root`](./default/snapper/root): five snapshots, no timeline.
+  [`defaults/snapper/root`](./defaults/snapper/root): five snapshots, no timeline.
   Snapshots are taken by `snap-pac` around pacman transactions rather than on a
   schedule, so each entry in the menu corresponds to an upgrade.
 - **`limine-mkinitcpio-hook` and `limine-snapper-sync`** are installed from
@@ -314,7 +314,7 @@ Hibernation is set up as follows:
   must be physical and relative to the unlocked LUKS device.
 - `rtc_cmos.use_acpi_alarm=1` on systems that suspend with s2idle, needed for
   suspend-then-hibernate.
-- The [`keyboard-backlight`](./default/systemd/system-sleep/keyboard-backlight)
+- The [`keyboard-backlight`](./defaults/systemd/system-sleep/keyboard-backlight)
   system-sleep hook, installed to
   `/usr/lib/systemd/system-sleep/`, which turns the keyboard backlight off
   before hibernating (some ASUS controllers otherwise block the S4 power-off).
@@ -385,7 +385,7 @@ The Limine menu and the Plymouth splash draw on the Arch Linux colors against a
 black background. Arch publishes no formal color scheme; the accent is the blue
 of the official logo, and the gray matches archlinux.org.
 
-| Color | Limine ([`limine.conf`](./default/limine/limine.conf)) | Plymouth theme |
+| Color | Limine ([`limine.conf`](./defaults/limine/limine.conf)) | Plymouth theme |
 | --- | --- | --- |
 | `#000000` | `term_background`, `backdrop`, palette black | window background |
 | `#999999` | `term_foreground`, `term_foreground_bright` | password field, bullets, lock icon, messages |
@@ -417,7 +417,7 @@ The boot splash is made up of:
 - **The `arch-linux` theme** (display name "Arch Linux"), installed to
   `/usr/share/plymouth/themes/arch-linux/`.
   The files live in this repository under
-  [`default/plymouth/arch-linux/`](./default/plymouth/arch-linux/), derived from
+  [`defaults/plymouth/arch-linux/`](./defaults/plymouth/arch-linux/), derived from
   an MIT-licensed theme, recolored to the Arch Linux colors and carrying the
   Arch Linux logo (see below). The
   installer therefore has to run from a full checkout of this repository; it
