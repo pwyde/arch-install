@@ -70,10 +70,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_DIR="${SCRIPT_DIR}/logs"
 WALLPAPERS_SRC="${SCRIPT_DIR}/assets/wallpapers"
 DOTFILES_SRC="${SCRIPT_DIR}/dots/.config"
+GREETER_CONF_SRC="${SCRIPT_DIR}/defaults/noctalia-greeter/greeter.toml"
+GREETD_CONF_SRC="${SCRIPT_DIR}/etc/greetd/config.toml"
 
 # Destinations
 WALLPAPERS_DEST="${HOME}/Pictures/Wallpapers"
 DOTFILES_DEST="${HOME}/.config"
+GREETER_STATE_DIR="/var/lib/noctalia-greeter"
 
 # Help text.
 show_help() {
@@ -154,6 +157,13 @@ validate_inputs() {
       exit 1
     fi
   done
+  for src in "$GREETER_CONF_SRC" "$GREETD_CONF_SRC"; do
+    if [ ! -f "$src" ]; then
+      print_error "Missing repository file: $src"
+      print_error "Run the script from a full checkout of the repository."
+      exit 1
+    fi
+  done
 }
 
 # Asks for confirmation before anything is installed or overwritten.
@@ -165,6 +175,8 @@ confirm_operation() {
     if [ -n "$EXTRA_PACKAGES" ]; then
       echo "  - Additional packages: $EXTRA_PACKAGES"
     fi
+    echo "  - The greetd login manager with the Noctalia greeter, from the next boot"
+    echo "  - Appearance sync to the greeter without a password prompt"
     echo "  - Wallpapers and configuration files copied to the home directory"
     echo
     echo "WARNING: Existing files with the same names in $DOTFILES_DEST will be overwritten."
@@ -211,6 +223,49 @@ install_compositor() {
 install_desktop_shell() {
   print_msg "Installing the Noctalia desktop shell"
   paru_install "$DEFAULT_SHELL_PACKAGES"
+}
+
+# The package's install hook creates the state directory, mode 0750 and owned
+# by the greetd user, which appearance sync requires. greeter.toml takes the
+# same owner with mode 0644, as upstream sets it. The hook rewrites the file on
+# every upgrade but keeps its settings.
+install_greeter_config() {
+  print_msg "Installing the greeter configuration"
+
+  local owner group
+  if ! owner=$(stat -c '%U' "$GREETER_STATE_DIR" 2>/dev/null); then
+    print_error "$GREETER_STATE_DIR does not exist; the noctalia-greeter install hook did not run."
+    exit 1
+  fi
+  if [ "$owner" = "root" ]; then
+    print_error "$GREETER_STATE_DIR is owned by root instead of the greetd user."
+    print_error "Repair it with: sudo /usr/share/noctalia-greeter/setup_greeter_system.sh"
+    exit 1
+  fi
+  group=$(stat -c '%G' "$GREETER_STATE_DIR")
+
+  sudo install -m 0644 -o "$owner" -g "$group" "$GREETER_CONF_SRC" "${GREETER_STATE_DIR}/greeter.toml"
+}
+
+# Only enabled: starting greetd now would stop getty@tty1, and with it a login
+# session on the first virtual terminal.
+configure_greetd() {
+  print_msg "Configuring greetd to start the Noctalia greeter"
+  sudo install -D -m 0644 "$GREETD_CONF_SRC" /etc/greetd/config.toml
+  sudo systemctl enable greetd.service
+}
+
+# Adds a Polkit rule that lets this account sync its appearance to the greeter
+# without an administrator prompt. The rule covers only the constrained sync
+# action. Not fatal: without it, each sync asks for the password instead.
+enable_passwordless_sync() {
+  local user
+  user=$(id -un)
+
+  print_msg "Enabling passwordless appearance sync for ${user}"
+  if ! sudo noctalia-greeter passwordless-sync enable "$user"; then
+    print_warning "Passwordless sync could not be enabled; each sync will ask for the password."
+  fi
 }
 
 install_extra_packages() {
@@ -314,7 +369,7 @@ print_summary() {
     echo "${WHITE}Additional packages:${NO_COLOR} ${EXTRA_PACKAGES}"
   fi
   echo
-  echo "${BLUE}==>${WHITE} Done. Log out and start the session from a TTY with: niri-session${NO_COLOR}"
+  echo "${BLUE}==>${WHITE} Done. Reboot to start the greeter.${NO_COLOR}"
 }
 
 # Runs every installation step in order.
@@ -334,6 +389,10 @@ main() {
   install_compositor
   install_desktop_shell
   install_extra_packages
+
+  install_greeter_config
+  configure_greetd
+  enable_passwordless_sync
 
   create_user_dirs
   copy_wallpapers
