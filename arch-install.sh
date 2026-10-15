@@ -1,5 +1,5 @@
 #!/bin/bash
-# arch-install.sh v1.0
+# arch-install.sh
 #
 # A comprehensive Arch Linux installation script with LUKS encryption,
 # Btrfs subvolumes, the Limine bootloader and Unified Kernel Image (UKI).
