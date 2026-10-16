@@ -20,7 +20,7 @@ set -euo pipefail
 # The Wayland compositor and the session services it relies on.
 DEFAULT_COMPOSITOR_PACKAGES="niri nirimod-git pipewire pipewire-jack pipewire-pulse pipewire-alsa wireplumber wl-clipboard xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-gtk xdg-desktop-portal-kde xdg-user-dirs xdg-utils xwayland-satellite ddcutil playerctl brightnessctl"
 # The desktop shell and the applications and themes it is configured for.
-DEFAULT_SHELL_PACKAGES="noctalia noctalia-greeter kitty dolphin kate konsole ark spectacle gwenview plasma-integration breeze ttf-jetbrains-mono-nerd xcursor-pro-cursor-theme"
+DEFAULT_SHELL_PACKAGES="noctalia noctalia-greeter kitty dolphin kate konsole ark gwenview plasma-integration breeze ttf-jetbrains-mono-nerd xcursor-pro-cursor-theme"
 
 # Terminal colors.
 RED=$'\033[91m'
@@ -172,7 +172,7 @@ confirm_operation() {
     echo "The following will be installed and configured:"
     echo "  - The niri compositor and its session services"
     echo "  - The Noctalia shell and greeter, KDE theming, a font and a cursor theme"
-    echo "  - Applications: kitty, Dolphin, Kate, Konsole, Ark, Spectacle and Gwenview"
+    echo "  - Applications: kitty, Dolphin, Kate, Konsole, Ark and Gwenview"
     if [ -n "$EXTRA_PACKAGES" ]; then
       echo "  - Additional packages: $EXTRA_PACKAGES"
     fi
