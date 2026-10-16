@@ -2,6 +2,7 @@
 transition = ["fade"]
 
 [shell]
+font_family = "Roboto Flex"
 polkit_agent = true
 
 [shell.greeter_sync]
