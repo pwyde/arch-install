@@ -31,7 +31,7 @@ DEFAULT_SUBVOLUMES="@ @home @cache @log @root"
 # packages 'initramfs' and 'libxtables.so', which have several providers each.
 # pacstrap runs with --noconfirm, which would otherwise leave the choice to
 # whichever provider pacman lists first.
-DEFAULT_PACKAGES="base base-devel bash-completion btrfs-progs cryptsetup dosfstools efibootmgr git iptables limine linux linux-firmware man-db man-pages mkinitcpio nano networkmanager openssh plocate plymouth snap-pac snapper sudo terminus-font unzip util-linux vim wpa_supplicant zram-generator"
+DEFAULT_PACKAGES="base base-devel bash-completion btrfs-progs cryptsetup dosfstools efibootmgr git iptables limine linux linux-firmware man-db man-pages mkinitcpio nano networkmanager openssh plocate plymouth snap-pac snapper sudo unzip util-linux vim wpa_supplicant zram-generator"
 
 # Terminal colors.
 RED=$'\033[91m'
