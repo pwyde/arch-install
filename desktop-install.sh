@@ -20,7 +20,7 @@ set -euo pipefail
 # The Wayland compositor and the session services it relies on.
 DEFAULT_COMPOSITOR_PACKAGES="niri nirimod-git pipewire pipewire-jack pipewire-pulse pipewire-alsa wireplumber wl-clipboard xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-gtk xdg-desktop-portal-kde xdg-user-dirs xdg-utils xwayland-satellite ddcutil playerctl brightnessctl"
 # The desktop shell and the applications and themes it is configured for.
-DEFAULT_SHELL_PACKAGES="noctalia noctalia-greeter kitty dolphin kate konsole ark gwenview plasma-integration breeze ttf-jetbrains-mono-nerd xcursor-pro-cursor-theme"
+DEFAULT_SHELL_PACKAGES="noctalia noctalia-greeter kitty dolphin kate konsole ark gwenview libgsf plasma-integration breeze adw-gtk-theme ttf-jetbrains-mono-nerd xcursor-pro-cursor-theme"
 
 # Terminal colors.
 RED=$'\033[91m'
@@ -69,13 +69,13 @@ STARTED=0
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOG_DIR="${SCRIPT_DIR}/logs"
 WALLPAPERS_SRC="${SCRIPT_DIR}/assets/wallpapers"
-DOTFILES_SRC="${SCRIPT_DIR}/dots/.config"
+DOTFILES_SRC="${SCRIPT_DIR}/dots"
 GREETER_CONF_SRC="${SCRIPT_DIR}/defaults/noctalia-greeter/greeter.toml"
 GREETD_CONF_SRC="${SCRIPT_DIR}/etc/greetd/config.toml"
 
 # Destinations
 WALLPAPERS_DEST="${HOME}/Pictures/Wallpapers"
-DOTFILES_DEST="${HOME}/.config"
+DOTFILES_DEST="${HOME}"
 GREETER_STATE_DIR="/var/lib/noctalia-greeter"
 
 # Help text.
@@ -171,7 +171,8 @@ confirm_operation() {
   if [ "$NON_INTERACTIVE" -eq 0 ]; then
     echo "The following will be installed and configured:"
     echo "  - The niri compositor and its session services"
-    echo "  - The Noctalia shell and greeter, KDE theming, a font and a cursor theme"
+    echo "  - The Noctalia shell and greeter"
+    echo "  - KDE and GTK theming, a font and a cursor theme"
     echo "  - Applications: kitty, Dolphin, Kate, Konsole, Ark and Gwenview"
     if [ -n "$EXTRA_PACKAGES" ]; then
       echo "  - Additional packages: $EXTRA_PACKAGES"
@@ -180,7 +181,8 @@ confirm_operation() {
     echo "  - Appearance sync to the greeter without a password prompt"
     echo "  - Wallpapers and configuration files copied to the home directory"
     echo
-    echo "WARNING: Existing files with the same names in $DOTFILES_DEST will be overwritten."
+    echo "WARNING: Existing files with the same names in ~/.config and ~/.local/share"
+    echo "         will be overwritten."
     read -r -p "Are you sure you want to continue? (y/N) " REPLY
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -302,10 +304,11 @@ copy_wallpapers() {
   cp -rT "$WALLPAPERS_SRC" "$WALLPAPERS_DEST"
 }
 
-# Merges into ~/.config: files from the repository replace files of the same
-# name, and every other file is left in place.
+# Merges dots/ into the home directory, which covers ~/.config and
+# ~/.local/share. Files from the repository replace files of the same name, and
+# every other file is left in place.
 copy_dotfiles() {
-  print_msg "Copying the configuration files to $DOTFILES_DEST"
+  print_msg "Copying the configuration files to the home directory"
   mkdir -p "$DOTFILES_DEST"
   cp -rT "$DOTFILES_SRC" "$DOTFILES_DEST"
 }
