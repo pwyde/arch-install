@@ -1,0 +1,14 @@
+[MainWindow0][Toolbar mainToolBar]
+ToolButtonStyle=IconOnly
+
+[MainWindow0 Settings]
+WindowState=8
+
+[MainWindow0 Settings][Toolbar mainToolBar]
+ToolButtonStyle=IconOnly
+
+[Open Documents]
+Count=0
+
+[Open MainWindows]
+Count=1
