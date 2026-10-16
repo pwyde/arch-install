@@ -47,10 +47,11 @@ layout {
     }
 
     // ── Focus ring ───────────────────────────────────────────────────────────
-    // Drawn around the focused window on the active monitor; disabled here.
-    // With prefer-no-csd, it is drawn around the window geometry.
+    // Drawn around the focused window on the active monitor, outside the
+    // border. With prefer-no-csd, it is drawn around the window geometry.
+    // noctalia.kdl replaces these colors; uncomment off to disable the ring.
     focus-ring {
-        off
+        // off
         width 1
         active-color   "#808080"
         inactive-color "#505050"
@@ -62,9 +63,10 @@ layout {
 
     // ── Border ───────────────────────────────────────────────────────────────
     // Always-visible border, unlike the focus ring, which marks only the active
-    // window; disabled here.
+    // window. noctalia.kdl replaces these colors; uncomment off to disable the
+    // border.
     border {
-        off
+        // off
         width 4
         active-color   "#707070"
         inactive-color "#d0d0d0"

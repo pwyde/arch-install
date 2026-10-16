@@ -25,12 +25,6 @@ window-rule {
     clip-to-geometry false
 }
 
-// Dims unfocused windows slightly to distinguish the focused window.
-window-rule {
-    match is-active=false
-    opacity 0.9
-}
-
 // Opens the Noctalia settings window as a floating window.
 window-rule {
     match app-id="dev.noctalia.Noctalia"
