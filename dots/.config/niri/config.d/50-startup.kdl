@@ -13,5 +13,10 @@
 // .desktop entries. XDG_MENU_PREFIX comes from ~/.config/environment.d/.
 spawn-at-startup "kbuildsycoca6"
 
+// Starts the KDE Connect daemon at login, which lets paired devices find this
+// computer at any time. Without it, D-Bus starts the daemon only when a KDE
+// Connect feature is used, such as Send to Device in Dolphin.
+// spawn-at-startup "kdeconnectd"
+
 // Starts the Noctalia shell.
 spawn-at-startup "noctalia"
