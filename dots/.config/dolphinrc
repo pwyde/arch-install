@@ -1,5 +1,3 @@
-MenuBar=Disabled
-
 [CompactMode]
 IconSize=22
 
@@ -7,9 +5,9 @@ IconSize=22
 IconSize=22
 
 [General]
+DoubleClickViewAction=none
 ShowFullPathInTitlebar=true
 ShowStatusBar=FullWidth
-Version=202
 
 [KFileDialog Settings]
 Places Icons Auto-resize=false
@@ -22,4 +20,4 @@ MenuBar=Disabled
 ToolButtonStyle=IconOnly
 
 [PreviewSettings]
-Plugins=glycin-image-rs,appimagethumbnail,audiothumbnail,glycin-heif,comicbookthumbnail,cursorthumbnail,djvuthumbnail,ebookthumbnail,exrthumbnail,directorythumbnail,fontthumbnail,imagethumbnail,jpegthumbnail,glycin-jxl,kraorathumbnail,windowsexethumbnail,windowsimagethumbnail,opendocumentthumbnail,glycin-svg,svgthumbnail
+Plugins=glycin-image-rs,appimagethumbnail,audiothumbnail,glycin-heif,comicbookthumbnail,cursorthumbnail,djvuthumbnail,ebookthumbnail,exrthumbnail,directorythumbnail,fontthumbnail,imagethumbnail,jpegthumbnail,glycin-jxl,kraorathumbnail,windowsexethumbnail,windowsimagethumbnail,opendocumentthumbnail,glycin-svg,svgthumbnail,gsf-office
