@@ -40,6 +40,14 @@ window-rule {
     open-floating true
 }
 
+// Opens the Open With dialog of Dolphin, Kate and other KDE applications as a
+// floating window. The titles are KIO's English ones; with another language
+// in LC_MESSAGES, the pattern needs the translated titles.
+window-rule {
+    match app-id=r#"^org\.kde\."# title=r#"^(Open With|Choose Application)"#
+    open-floating true
+}
+
 // Blurs the background of all applications, with xray disabled for a more
 // realistic result.
 window-rule {
