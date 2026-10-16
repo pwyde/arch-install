@@ -10,5 +10,8 @@ auto_sync = true
 [theme]
 source = "wallpaper"
 
+[theme.templates]
+builtin_ids = ["kcolorscheme"]
+
 [wallpaper]
 transition = ["fade"]
