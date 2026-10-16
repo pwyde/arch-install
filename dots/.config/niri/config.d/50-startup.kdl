@@ -13,8 +13,5 @@
 // database, giving KDE and Qt applications the correct .desktop entries.
 spawn-at-startup "bash" "-c" "systemctl --user import-environment XDG_MENU_PREFIX && kbuildsycoca6"
 
-// Records clipboard history with cliphist.
-spawn-at-startup "bash" "-c" "wl-paste --watch cliphist store &"
-
 // Starts the Noctalia shell.
 spawn-at-startup "noctalia"
