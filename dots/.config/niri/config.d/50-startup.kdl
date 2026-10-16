@@ -9,9 +9,9 @@
 // spawn-sh-at-startup supports shell pipelines and variable expansion.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Exports XDG_MENU_PREFIX to the systemd user session and rebuilds the sycoca
-// database, giving KDE and Qt applications the correct .desktop entries.
-spawn-at-startup "bash" "-c" "systemctl --user import-environment XDG_MENU_PREFIX && kbuildsycoca6"
+// Rebuilds the sycoca database, giving KDE and Qt applications the correct
+// .desktop entries. XDG_MENU_PREFIX comes from ~/.config/environment.d/.
+spawn-at-startup "kbuildsycoca6"
 
 // Starts the Noctalia shell.
 spawn-at-startup "noctalia"

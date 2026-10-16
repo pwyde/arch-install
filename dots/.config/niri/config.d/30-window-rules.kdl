@@ -33,6 +33,13 @@ window-rule {
     default-window-height { fixed 920; }
 }
 
+// Opens the KDE Wallet dialogs as floating windows. niri opens new floating
+// windows at the center of the screen.
+window-rule {
+    match app-id=r#"^org\.kde\.(ksecretd|kwalletd6)$"#
+    open-floating true
+}
+
 // Blurs the background of all applications, with xray disabled for a more
 // realistic result.
 window-rule {
