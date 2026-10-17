@@ -6,7 +6,7 @@ scheme = "Synced"
 hide_logo = true
 theme_mode = "dark"
 corner_radius_scale = 1.0
-font_family = "Roboto Flex"
+font_family = "Adwaita Sans"
 
 [clock]
 enabled = true
