@@ -1,0 +1,14 @@
+[KDE]
+contrast=4
+
+[General]
+ColorScheme=Noctalia
+Name=noctalia
+XftHintStyle=hintslight
+TerminalApplication=kitty -1
+XftSubPixel=none
+fixed=JetBrainsMono Nerd Font,10,-1,5,50,0,0,0,0,0
+font=Adwaita Sans,10,-1,5,50,0,0,0,0,0
+menuFont=Adwaita Sans,10,-1,5,50,0,0,0,0,0
+smallestReadableFont=Adwaita Sans,9,-1,5,50,0,0,0,0,0
+toolBarFont=Adwaita Sans,10,-1,5,50,0,0,0,0,0
