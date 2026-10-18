@@ -1,5 +1,6 @@
 [KDE]
 contrast=4
+widgetStyle=Darkly
 
 [General]
 ColorScheme=Noctalia

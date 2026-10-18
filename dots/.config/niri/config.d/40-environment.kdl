@@ -19,7 +19,4 @@ environment {
     // Electron applications (Chrome, VS Code, Discord) select Wayland
     // automatically.
     ELECTRON_OZONE_PLATFORM_HINT "auto"
-
-    // Darkly is a Qt style that follows the kdeglobals color scheme.
-    // QT_STYLE_OVERRIDE "Darkly"
 }
