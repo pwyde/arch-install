@@ -13,6 +13,7 @@ source = "wallpaper"
 
 [theme.templates]
 builtin_ids = ["gtk3", "gtk4", "kcolorscheme", "kitty", "niri"]
+community_ids = ["konsole"]
 
 [wallpaper]
 transition = ["fade"]
