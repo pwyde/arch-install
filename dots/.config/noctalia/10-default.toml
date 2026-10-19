@@ -29,6 +29,9 @@ transition = ["fade"]
 [widget.clock]
 format = "{:%a %d %b} {:%H:%M}"
 
+[widget.cpu]
+show_value = false
+
 [widget.launcher]
 glyph = "navigation-search"
 
@@ -36,4 +39,19 @@ glyph = "navigation-search"
 hide_when_no_media = true
 
 [widget.network]
+show_label = false
+
+[widget.network_rx]
+show_value = false
+
+[widget.network_tx]
+show_value = false
+
+[widget.ram]
+show_value = false
+
+[widget.temp]
+show_value = false
+
+[widget.volume]
 show_label = false
