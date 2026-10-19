@@ -14,11 +14,11 @@
     { "type": "custom", "key": "╭───────────╮" },
     {
       "type": "title",
-      "key": "│ {#31} User    {#keys}│",
+      "key": "│ {#31}󰀄 User    {#keys}│",
       "format": "{user-name}"
     },
     {
-      "type": "host",
+      "type": "title",
       "key": "│ \u001b[1;34m󰌢 Host   {#keys}│",
       "format": "{host-name}"
     },
@@ -28,7 +28,7 @@
     },
     {
       "type": "kernel",
-      "key": "│ {#35} Kernel  {#keys}│"
+      "key": "│ {#35}󰌽 Kernel  {#keys}│"
     },
     {
       "type": "uptime",
@@ -40,19 +40,19 @@
     },
     {
       "type": "wm",
-      "key": "│ {#36} WM      {#keys}│"
+      "key": "│ {#36}󰖯 WM      {#keys}│"
     },
     {
       "type": "terminal",
-      "key": "│ {#31} Terminal{#keys}│"
+      "key": "│ {#31}󰆍 Terminal{#keys}│"
     },
     {
       "type": "shell",
-      "key": "│ {#32} Shell   {#keys}│"
+      "key": "│ {#32}󱆃 Shell   {#keys}│"
     },
     {
       "type": "terminalfont",
-      "key": "│ {#32} Font    {#keys}│"
+      "key": "│ {#32}󰛖 Font    {#keys}│"
     },
     {
       "type": "icons",
@@ -61,7 +61,7 @@
     },
     {
       "type": "cursor",
-      "key": "│ {#33} Cursor  {#keys}│"
+      "key": "│ {#33}󰇀 Cursor  {#keys}│"
     },
     {
       "type": "cpu",
@@ -74,7 +74,7 @@
     },
     {
       "type": "memory",
-      "key": "│ {#36} Memory  {#keys}│"
+      "key": "│ {#36}󰘚 Memory  {#keys}│"
     },
     {
       "type": "swap",
@@ -91,7 +91,7 @@
     },
     {
       "type": "bluetooth",
-      "key": "│ {#31} BlueT   {#keys}│"
+      "key": "│ {#31}󰂯 BlueT   {#keys}│"
     },
     {
       "type": "display",
@@ -108,7 +108,7 @@
     { "type": "custom", "key": "├───────────┤" },
     {
       "type": "colors",
-      "key": "│ {#39} Colors  {#keys}│",
+      "key": "│ {#39}󰏘 Colors  {#keys}│",
       "symbol": "circle"
     },
     { "type": "custom", "key": "╰───────────╯" }
