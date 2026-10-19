@@ -9,7 +9,7 @@
 
 layout {
     // Gap between windows, and between windows and screen edges (logical px).
-    gaps 25
+    gaps 15
 
     // Transparent, letting the wallpaper and backdrop show through.
     background-color "transparent"
