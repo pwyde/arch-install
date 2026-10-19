@@ -1,3 +1,10 @@
+[bar.default]
+capsule = true
+center = ["workspaces"]
+end = ["tray", "media", "volume", "notifications", "clipboard", "network", "clock", "session"]
+margin_edge = 5
+start = ["launcher", "cpu", "ram", "network_rx", "network_tx", "temp"]
+
 [lockscreen]
 transition = ["fade"]
 
@@ -14,7 +21,19 @@ wallpaper_scheme = "m3-tonal-spot"
 
 [theme.templates]
 builtin_ids = ["gtk3", "gtk4", "kcolorscheme", "kitty", "niri"]
-community_ids = ["konsole"]
+community_ids = ["papirus-icons", "konsole"]
 
 [wallpaper]
 transition = ["fade"]
+
+[widget.clock]
+format = "{:%a %d %b} {:%H:%M}"
+
+[widget.launcher]
+glyph = "navigation-search"
+
+[widget.media]
+hide_when_no_media = true
+
+[widget.network]
+show_label = false
