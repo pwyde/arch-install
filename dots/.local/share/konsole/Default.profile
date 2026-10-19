@@ -6,6 +6,7 @@ WordModeAscii=true
 CursorShape=1
 
 [General]
+Command=/usr/bin/fish
 LocalTabTitleFormat=%w
 Name=Default
 Parent=FALLBACK/
