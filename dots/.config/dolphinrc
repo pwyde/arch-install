@@ -19,5 +19,8 @@ MenuBar=Disabled
 [MainWindow][Toolbar mainToolBar]
 ToolButtonStyle=IconOnly
 
+[PlacesPanel]
+IconSize=16
+
 [PreviewSettings]
 Plugins=glycin-image-rs,appimagethumbnail,audiothumbnail,glycin-heif,comicbookthumbnail,cursorthumbnail,djvuthumbnail,ebookthumbnail,exrthumbnail,directorythumbnail,fontthumbnail,imagethumbnail,jpegthumbnail,glycin-jxl,kraorathumbnail,windowsexethumbnail,windowsimagethumbnail,opendocumentthumbnail,glycin-svg,svgthumbnail,gsf-office
