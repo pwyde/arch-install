@@ -1,30 +1,89 @@
 [bar.default]
 capsule = true
-center = ["workspaces"]
-end = ["tray", "media", "volume", "notifications", "clipboard", "network", "clock", "session"]
-margin_edge = 5
-start = ["launcher", "cpu", "ram", "network_rx", "network_tx", "temp"]
+center = [ "workspaces" ]
+end = [ "tray", "media", "volume", "notifications", "clipboard", "network", "clock" ]
+margin_edge = 15
+margin_ends = 15
+start = [ "launcher", "group:g1", "group:g2" ]
+
+[[bar.default.capsule_group]]
+accordion = false
+accordion_direction = "end"
+border_width = 1.0
+enabled = true
+fill = "surface_variant"
+id = "g1"
+members = [ "cpu", "ram", "sysmon", "temp" ]
+opacity = 1.0
+padding = 6.0
+
+[[bar.default.capsule_group]]
+accordion = false
+accordion_direction = "end"
+border_width = 1.0
+enabled = true
+fill = "surface_variant"
+id = "g2"
+members = [ "network_rx", "network_tx" ]
+opacity = 1.0
+padding = 6.0
+
+[brightness]
+enable_ddcutil = true
+
+[calendar]
+enabled = true
+
+[control_center.calendar]
+show_week_numbers = true
+
+[idle]
+behavior_order = [ "lock", "screen-off", "lock-and-suspend" ]
+pre_action_fade_seconds = 5
+
+[idle.behavior.lock]
+action = "lock"
+enabled = true
+timeout = 900.0
+
+[idle.behavior.lock-and-suspend]
+action = "lock_and_suspend"
+enabled = true
+timeout = 3600.0
+
+[idle.behavior.screen-off]
+action = "screen_off"
+enabled = true
+timeout = 1800.0
+
+[location]
+address = "Stockholm, Sweden"
 
 [lockscreen]
-transition = ["fade"]
+transition = [ "fade" ]
 
 [shell]
 font_family = "Inter"
 polkit_agent = true
+screen_time_enabled = true
 
 [shell.greeter_sync]
 auto_sync = true
+
+[shell.panel]
+session_position = "center"
 
 [theme]
 source = "wallpaper"
 wallpaper_scheme = "m3-tonal-spot"
 
 [theme.templates]
-builtin_ids = ["gtk3", "gtk4", "kcolorscheme", "kitty", "niri"]
-community_ids = ["papirus-icons", "konsole"]
+builtin_ids = [ "gtk3", "gtk4", "kcolorscheme", "kitty", "niri" ]
+community_ids = [ "papirus-icons", "konsole" ]
 
 [wallpaper]
-transition = ["fade"]
+directory = "~/Pictures/Wallpapers"
+transition = [ "fade" ]
 
 [widget.clock]
 format = "{:%a %d %b} {:%H:%M}"
@@ -49,6 +108,10 @@ show_value = false
 
 [widget.ram]
 show_value = false
+
+[widget.sysmon]
+show_value = false
+stat = "disk_used"
 
 [widget.temp]
 show_value = false
