@@ -6,7 +6,7 @@ scheme = "Synced"
 hide_logo = true
 theme_mode = "dark"
 corner_radius_scale = 1.0
-font_family = "Adwaita Sans"
+font_family = "Inter"
 
 [clock]
 enabled = true

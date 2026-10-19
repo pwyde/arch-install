@@ -2,7 +2,7 @@
 transition = ["fade"]
 
 [shell]
-font_family = "Adwaita Sans"
+font_family = "Inter"
 polkit_agent = true
 
 [shell.greeter_sync]
