@@ -7,9 +7,11 @@
 // overlays.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Places the Noctalia wallpaper on the overview backdrop.
+// Places Noctalia's backdrop, a blurred and tinted copy of the wallpaper, on
+// the overview backdrop. The wallpaper itself stays on the workspaces. Requires
+// [backdrop] enabled = true in the Noctalia configuration.
 layer-rule {
-  match namespace="^noctalia-wallpaper"
+  match namespace="^noctalia-backdrop"
   place-within-backdrop true
 }
 

@@ -1,3 +1,6 @@
+[backdrop]
+enabled = true
+
 [bar.default]
 capsule = true
 center = [ "workspaces" ]
