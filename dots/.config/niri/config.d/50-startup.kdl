@@ -18,5 +18,11 @@ spawn-at-startup "kbuildsycoca6"
 // Connect feature is used, such as Send to Device in Dolphin.
 // spawn-at-startup "kdeconnectd"
 
+// Passes the session environment to the KWallet daemon that PAM started at
+// login, which completes its startup with the wallet already unlocked. Plasma
+// runs this from its own startup, which niri does not use. Listed before
+// Noctalia, which reads its storage key from the wallet.
+spawn-at-startup "/usr/lib/pam_kwallet_init"
+
 // Starts the Noctalia shell.
 spawn-at-startup "noctalia"

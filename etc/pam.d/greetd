@@ -1,0 +1,20 @@
+#%PAM-1.0
+#
+# The greetd package's PAM configuration, with KWallet unlocked from the login
+# password. At the first login, pam_kwallet5 creates the kdewallet wallet with
+# that password; at every later login it opens it. The Secret Service, and with
+# it Noctalia's encrypted storage, then finds an unlocked default collection.
+# Both pam_kwallet5 lines are optional, which keeps login working if the module
+# fails.
+#
+# The pam_systemd line is the one noctalia-greeter's install hook adds when it
+# is missing. Keeping it here leaves the hook nothing to change on upgrades.
+
+auth       required     pam_securetty.so
+auth       requisite    pam_nologin.so
+auth       include      system-local-login
+auth       optional     pam_kwallet5.so
+account    include      system-local-login
+session    include      system-local-login
+session    optional     pam_kwallet5.so auto_start
+session    required     pam_systemd.so
