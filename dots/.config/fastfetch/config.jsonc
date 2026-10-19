@@ -19,7 +19,7 @@
     },
     {
       "type": "title",
-      "key": "│ \u001b[1;34m󰌢 Host   {#keys}│",
+      "key": "│ \u001b[1;34m󰌢 Host    {#keys}│",
       "format": "{host-name}"
     },
     {
