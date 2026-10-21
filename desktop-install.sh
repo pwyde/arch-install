@@ -20,7 +20,7 @@ set -euo pipefail
 # The Wayland compositor and the session services it relies on.
 DEFAULT_COMPOSITOR_PACKAGES="niri nirimod-git pipewire pipewire-jack pipewire-pulse pipewire-alsa wireplumber wl-clipboard xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-gtk xdg-desktop-portal-kde xdg-user-dirs xdg-utils xwayland-satellite ddcutil playerctl brightnessctl"
 # The desktop shell and the applications and themes it is configured for.
-DEFAULT_SHELL_PACKAGES="noctalia noctalia-greeter kitty fish starship fastfetch jq btop superfile dolphin kate konsole ark gwenview libgsf kio-admin purpose kdeconnect kwallet-pam systemsettings plasma-integration breeze darkly adw-gtk-theme papirus-icon-theme-git nwg-look python-pywalfox ttf-jetbrains-mono-nerd inter-font xcursor-pro-cursor-theme"
+DEFAULT_SHELL_PACKAGES="noctalia noctalia-greeter kitty fish starship fastfetch jq btop superfile dolphin kate konsole ark gwenview libgsf kio-admin purpose kdeconnect kwallet-pam systemsettings plasma-integration breeze darkly adw-gtk-theme papirus-icon-theme-git nwg-look python-pywalfox ttf-jetbrains-mono-nerd inter-font noto-fonts noto-fonts-emoji ttf-liberation xcursor-pro-cursor-theme"
 
 # Terminal colors.
 RED=$'\033[91m'
@@ -90,6 +90,7 @@ DOTFILES_SRC="${SCRIPT_DIR}/dots"
 GREETER_CONF_SRC="${SCRIPT_DIR}/defaults/noctalia-greeter/greeter.toml"
 GREETD_CONF_SRC="${SCRIPT_DIR}/etc/greetd/config.toml"
 GREETD_PAM_SRC="${SCRIPT_DIR}/etc/pam.d/greetd"
+FONTCONFIG_SRC="${SCRIPT_DIR}/etc/fonts/conf.d/50-generic-families.conf"
 
 # Destinations
 WALLPAPERS_DEST="${HOME}/Pictures/Wallpapers"
@@ -395,7 +396,7 @@ validate_inputs() {
       exit 1
     fi
   done
-  for src in "$GREETER_CONF_SRC" "$GREETD_CONF_SRC" "$GREETD_PAM_SRC"; do
+  for src in "$GREETER_CONF_SRC" "$GREETD_CONF_SRC" "$GREETD_PAM_SRC" "$FONTCONFIG_SRC"; do
     if [ ! -f "$src" ]; then
       print_error "Missing repository file: $src"
       print_error "Run the script from a full checkout of the repository."
@@ -571,6 +572,13 @@ set_login_shell() {
   fi
   print_msg "Setting fish as the login shell for ${user}"
   sudo chsh -s "$FISH_SHELL" "$user"
+}
+
+# Chooses the fonts for sans-serif, serif, monospace and the system-ui names,
+# which web pages mostly rely on. Applies to every user of the system.
+configure_fonts() {
+  print_msg "Setting the fonts for the generic font families"
+  sudo install -D -m 0644 "$FONTCONFIG_SRC" /etc/fonts/conf.d/50-generic-families.conf
 }
 
 # Adds a Polkit rule that lets this account sync its appearance to the greeter
@@ -842,6 +850,7 @@ main() {
 
   install_greeter_config
   configure_greetd
+  configure_fonts
   enable_passwordless_sync
   set_login_shell
 
