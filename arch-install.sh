@@ -183,6 +183,7 @@ SHUTDOWN_CONF_SRC="${SCRIPT_DIR}/etc/systemd"
 SHUTDOWN_CONF_FILES="system.conf.d/10-faster-shutdown.conf user.conf.d/10-faster-shutdown.conf system/user@.service.d/10-faster-shutdown.conf"
 SUDOERS_SRC="${SCRIPT_DIR}/etc/sudoers.d"
 XDG_PROFILE_SRC="${SCRIPT_DIR}/etc/profile.d/00-xdg.sh"
+DEFAULTS_PROFILE_SRC="${SCRIPT_DIR}/etc/profile.d/10-defaults.sh"
 XDG_BASH_PROFILE_SRC="${SCRIPT_DIR}/etc/profile.d/zz-xdg-bash.sh"
 USER_BASHRC_SRC="${SCRIPT_DIR}/defaults/bash/bashrc"
 SUDOERS_FILES="00-wheel 01-timeout 02-passwd-tries"
@@ -396,6 +397,7 @@ validate_inputs() {
     "$UPDATEDB_TIMER_SRC"
     "$UPDATEDB_SERVICE_SRC"
     "$XDG_PROFILE_SRC"
+    "$DEFAULTS_PROFILE_SRC"
     "$XDG_BASH_PROFILE_SRC"
     "$USER_BASHRC_SRC"
   )
@@ -819,6 +821,10 @@ configure_basic_system() {
   print_msg "Setting the XDG Base Directories"
   install -D -m 0644 "$XDG_PROFILE_SRC" /mnt/etc/profile.d/00-xdg.sh
   install -D -m 0644 "$XDG_BASH_PROFILE_SRC" /mnt/etc/profile.d/zz-xdg-bash.sh
+
+  # Editor, pager and colored man pages for every login.
+  print_msg "Setting the default programs"
+  install -D -m 0644 "$DEFAULTS_PROFILE_SRC" /mnt/etc/profile.d/10-defaults.sh
 
   # A drop-in, leaving /etc/ssh/sshd_config as the package ships it. Keys only,
   # and only this account: remote login needs a key placed from the console.
