@@ -96,6 +96,7 @@ WALLPAPERS_DEST="${HOME}/Pictures/Wallpapers"
 DOTFILES_DEST="${HOME}"
 GREETER_STATE_DIR="/var/lib/noctalia-greeter"
 NIRI_USER_EXTRA="${DOTFILES_DEST}/.config/niri/config.d/90-user-extra.kdl"
+NIRI_BINDS="${DOTFILES_DEST}/.config/niri/config.d/70-binds.kdl"
 NOCTALIA_CONFIG="${DOTFILES_DEST}/.config/noctalia/10-default.toml"
 # systemd's table of keyboard layouts, and the XKB rules listing every layout's
 # variants, from xkeyboard-config.
@@ -597,6 +598,40 @@ copy_dotfiles() {
 # Runs after copy_dotfiles, which restores the repository's version of the file
 # and keeps a rerun from adding the block twice. niri reads 90-user-extra.kdl
 # last, and its xkb section replaces the one in 10-input-and-cursor.kdl.
+# Swaps the five bindings 70-binds.kdl marks "Swedish:" for their alternatives:
+# with the se layout, the US bindings use symbols that need Shift or AltGr,
+# which niri cannot match. Each line is matched whole; a missing one is reported
+# and its pair left as it is.
+configure_swedish_binds() {
+  [ "$XKB_LAYOUT" = "se" ] || return 0
+
+  print_msg "Switching the niri key bindings to the Swedish layout"
+  local -a pairs=(
+    'Mod+Shift+Slash { show-hotkey-overlay; }|Mod+Shift+7 { show-hotkey-overlay; }'
+    'Mod+BracketLeft  { consume-or-expel-window-left; }|Mod+aring          { consume-or-expel-window-left; }'
+    'Mod+BracketRight { consume-or-expel-window-right; }|Mod+dead_diaeresis { consume-or-expel-window-right; }'
+    'Mod+Equal { set-column-width "+10%"; }|Mod+plus       { set-column-width "+10%"; }'
+    'Mod+Shift+Equal { set-window-height "+10%"; }|Mod+Shift+plus { set-window-height "+10%"; }'
+  )
+  local pair us se rendered
+  for pair in "${pairs[@]}"; do
+    us="    ${pair%%|*}"
+    se="    ${pair#*|}"
+    if ! grep -qxF -- "$us" "$NIRI_BINDS" || ! grep -qxF -- "    // ${pair#*|}" "$NIRI_BINDS"; then
+      print_warning "Binding not found in ${NIRI_BINDS}, left unchanged: ${pair%%|*}"
+      continue
+    fi
+    rendered=$(mktemp)
+    awk -v us="$us" -v se="$se" '
+      $0 == us { print "    // " substr(us, 5); next }
+      $0 == "    // " substr(se, 5) { print se; next }
+      { print }
+    ' "$NIRI_BINDS" >"$rendered"
+    cat "$rendered" >"$NIRI_BINDS"
+    rm -f "$rendered"
+  done
+}
+
 configure_keyboard_layout() {
   [ -n "$XKB_LAYOUT" ] || return 0
 
@@ -762,6 +797,7 @@ main() {
   copy_wallpapers
   copy_dotfiles
   configure_keyboard_layout
+  configure_swedish_binds
   configure_displays
   configure_location
 
