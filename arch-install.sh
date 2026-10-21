@@ -182,6 +182,9 @@ UPDATEDB_SERVICE_SRC="${SCRIPT_DIR}/etc/systemd/system/plocate-updatedb.service.
 SHUTDOWN_CONF_SRC="${SCRIPT_DIR}/etc/systemd"
 SHUTDOWN_CONF_FILES="system.conf.d/10-faster-shutdown.conf user.conf.d/10-faster-shutdown.conf system/user@.service.d/10-faster-shutdown.conf"
 SUDOERS_SRC="${SCRIPT_DIR}/etc/sudoers.d"
+XDG_PROFILE_SRC="${SCRIPT_DIR}/etc/profile.d/00-xdg.sh"
+XDG_BASH_PROFILE_SRC="${SCRIPT_DIR}/etc/profile.d/zz-xdg-bash.sh"
+USER_BASHRC_SRC="${SCRIPT_DIR}/defaults/bash/bashrc"
 SUDOERS_FILES="00-wheel 01-timeout 02-passwd-tries"
 SLEEP_HOOK_SRC="${SCRIPT_DIR}/defaults/systemd/system-sleep/keyboard-backlight"
 SNAPPER_CONFIG_SRC="${SCRIPT_DIR}/defaults/snapper/root"
@@ -392,6 +395,9 @@ validate_inputs() {
     "$MANDB_TIMER_SRC"
     "$UPDATEDB_TIMER_SRC"
     "$UPDATEDB_SERVICE_SRC"
+    "$XDG_PROFILE_SRC"
+    "$XDG_BASH_PROFILE_SRC"
+    "$USER_BASHRC_SRC"
   )
   for repo_file in $CMDLINE_FILES; do
     repo_files+=("${CMDLINE_SRC}/${repo_file}")
@@ -809,6 +815,11 @@ configure_basic_system() {
   print_msg "Scoping the locate index"
   install -D -m 0644 "$UPDATEDB_SERVICE_SRC" /mnt/etc/systemd/system/plocate-updatedb.service.d/override.conf
 
+  # XDG Base Directory variables for every login, including the niri session.
+  print_msg "Setting the XDG Base Directories"
+  install -D -m 0644 "$XDG_PROFILE_SRC" /mnt/etc/profile.d/00-xdg.sh
+  install -D -m 0644 "$XDG_BASH_PROFILE_SRC" /mnt/etc/profile.d/zz-xdg-bash.sh
+
   # A drop-in, leaving /etc/ssh/sshd_config as the package ships it. Keys only,
   # and only this account: remote login needs a key placed from the console.
   print_msg "Hardening sshd"
@@ -972,6 +983,22 @@ configure_users() {
     print_msg "Creating user ${USERNAME}"
     arch-chroot /mnt useradd -m -G wheel -s /bin/bash "$USERNAME"
   fi
+
+  # less and Python write their history into the XDG state directory, which
+  # neither creates. Created as the user, which gives it the right owner.
+  arch-chroot /mnt runuser -u "$USERNAME" -- mkdir -p -m 0700 "/home/${USERNAME}/.local/state"
+
+  # Bash reads the user's configuration from XDG directories instead of the
+  # skeleton files useradd copied, which are removed while still unchanged.
+  print_msg "Moving the bash configuration to XDG directories"
+  local skel_file
+  for skel_file in .bashrc .bash_profile .bash_logout; do
+    if cmp -s "/mnt/home/${USERNAME}/${skel_file}" "/mnt/etc/skel/${skel_file}"; then
+      rm -f "/mnt/home/${USERNAME}/${skel_file}"
+    fi
+  done
+  install -D -m 0644 "$USER_BASHRC_SRC" "/mnt/home/${USERNAME}/.config/bash/bashrc"
+  arch-chroot /mnt chown -R "${USERNAME}:" "/home/${USERNAME}/.config"
 
   # Both passwords reach chpasswd on stdin. Interpolated into a command string
   # they break on any quote character the passphrase happens to contain.
