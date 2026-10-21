@@ -82,7 +82,7 @@ wallpaper_scheme = "m3-tonal-spot"
 
 [theme.templates]
 builtin_ids = [ "btop", "gtk3", "gtk4", "kcolorscheme", "kitty", "niri", "starship" ]
-community_ids = [ "papirus-icons", "konsole", "fastfetch" ]
+community_ids = [ "fastfetch", "papirus-icons", "konsole", "superfile" ]
 
 [wallpaper]
 directory = "~/Pictures/Wallpapers"
