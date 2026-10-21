@@ -95,6 +95,7 @@ GREETD_PAM_SRC="${SCRIPT_DIR}/etc/pam.d/greetd"
 WALLPAPERS_DEST="${HOME}/Pictures/Wallpapers"
 DOTFILES_DEST="${HOME}"
 GREETER_STATE_DIR="/var/lib/noctalia-greeter"
+FISH_SHELL="/usr/bin/fish"
 NIRI_USER_EXTRA="${DOTFILES_DEST}/.config/niri/config.d/90-user-extra.kdl"
 NIRI_BINDS="${DOTFILES_DEST}/.config/niri/config.d/70-binds.kdl"
 NOCTALIA_CONFIG="${DOTFILES_DEST}/.config/noctalia/10-default.toml"
@@ -415,6 +416,7 @@ confirm_operation() {
     fi
     echo "  - The greetd login manager with the Noctalia greeter, from the next boot"
     echo "  - Appearance sync to the greeter without a password prompt"
+    echo "  - Fish as the login shell"
     echo "  - Wallpapers and configuration files copied to the home directory"
     if [ -n "$XKB_LAYOUT" ]; then
       echo "  - Keyboard layout in niri: ${XKB_LAYOUT}${XKB_VARIANT:+ ($XKB_VARIANT)}"
@@ -556,6 +558,23 @@ configure_greetd() {
 # Adds a Polkit rule that lets this account sync its appearance to the greeter
 # without an administrator prompt. The rule covers only the constrained sync
 # action. Not fatal: without it, each sync asks for the password instead.
+# fish's package lists /usr/bin/fish in /etc/shells, which chsh requires. The
+# environment /etc/profile sets up for login shells comes from
+# ~/.config/fish/conf.d/00-profile.fish, as fish does not read that file.
+set_login_shell() {
+  local user current
+  user=$(id -un)
+  current=$(getent passwd "$user" | cut -d: -f7)
+  [ "$current" != "$FISH_SHELL" ] || return 0
+
+  if ! grep -qx "$FISH_SHELL" /etc/shells; then
+    print_error "${FISH_SHELL} is not listed in /etc/shells."
+    exit 1
+  fi
+  print_msg "Setting fish as the login shell for ${user}"
+  sudo chsh -s "$FISH_SHELL" "$user"
+}
+
 enable_passwordless_sync() {
   local user
   user=$(id -un)
@@ -792,6 +811,7 @@ main() {
   install_greeter_config
   configure_greetd
   enable_passwordless_sync
+  set_login_shell
 
   create_user_dirs
   copy_wallpapers
