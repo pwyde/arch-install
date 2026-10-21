@@ -99,6 +99,7 @@ FISH_SHELL="/usr/bin/fish"
 NIRI_USER_EXTRA="${DOTFILES_DEST}/.config/niri/config.d/90-user-extra.kdl"
 NIRI_BINDS="${DOTFILES_DEST}/.config/niri/config.d/70-binds.kdl"
 NOCTALIA_CONFIG="${DOTFILES_DEST}/.config/noctalia/10-default.toml"
+GTK3_SETTINGS="${DOTFILES_DEST}/.config/gtk-3.0/settings.ini"
 # systemd's table of keyboard layouts, and the XKB rules listing every layout's
 # variants, from xkeyboard-config.
 KBD_MODEL_MAP="/usr/share/systemd/kbd-model-map"
@@ -555,9 +556,6 @@ configure_greetd() {
   sudo systemctl enable greetd.service
 }
 
-# Adds a Polkit rule that lets this account sync its appearance to the greeter
-# without an administrator prompt. The rule covers only the constrained sync
-# action. Not fatal: without it, each sync asks for the password instead.
 # fish's package lists /usr/bin/fish in /etc/shells, which chsh requires. The
 # environment /etc/profile sets up for login shells comes from
 # ~/.config/fish/conf.d/00-profile.fish, as fish does not read that file.
@@ -575,6 +573,9 @@ set_login_shell() {
   sudo chsh -s "$FISH_SHELL" "$user"
 }
 
+# Adds a Polkit rule that lets this account sync its appearance to the greeter
+# without an administrator prompt. The rule covers only the constrained sync
+# action. Not fatal: without it, each sync asks for the password instead.
 enable_passwordless_sync() {
   local user
   user=$(id -un)
@@ -614,9 +615,6 @@ copy_dotfiles() {
   cp -rT "$DOTFILES_SRC" "$DOTFILES_DEST"
 }
 
-# Runs after copy_dotfiles, which restores the repository's version of the file
-# and keeps a rerun from adding the block twice. niri reads 90-user-extra.kdl
-# last, and its xkb section replaces the one in 10-input-and-cursor.kdl.
 # Swaps the five bindings 70-binds.kdl marks "Swedish:" for their alternatives:
 # with the se layout, the US bindings use symbols that need Shift or AltGr,
 # which niri cannot match. Each line is matched whole; a missing one is reported
@@ -651,6 +649,40 @@ configure_swedish_binds() {
   done
 }
 
+# On Wayland, GTK 3 takes the theme, icons, cursor and fonts from GSettings,
+# and its values replace those in settings.ini, which only X11 applications
+# then follow. The keys are filled from settings.ini and stored by dconf in
+# ~/.config/dconf/user. Runs after copy_dotfiles, which installs the file.
+configure_gtk_settings() {
+  print_msg "Applying the GTK settings to GSettings"
+  local -A keys=(
+    [gtk-theme-name]=gtk-theme
+    [gtk-icon-theme-name]=icon-theme
+    [gtk-cursor-theme-name]=cursor-theme
+    [gtk-cursor-theme-size]=cursor-size
+    [gtk-font-name]=font-name
+  )
+  local setting value
+  for setting in "${!keys[@]}"; do
+    value=$(awk -F= -v key="$setting" '$1 == key { print $2; exit }' "$GTK3_SETTINGS")
+    [ -n "$value" ] || continue
+    gsettings set org.gnome.desktop.interface "${keys[$setting]}" "$value"
+  done
+
+  # Dark variant and grayscale antialiasing, as in settings.ini.
+  gsettings set org.gnome.desktop.interface color-scheme prefer-dark
+  gsettings set org.gnome.desktop.interface font-antialiasing grayscale
+  gsettings set org.gnome.desktop.interface font-hinting slight
+
+  # Without a session bus, gsettings stores nothing and only warns.
+  if [ "$(gsettings get org.gnome.desktop.interface color-scheme)" != "'prefer-dark'" ]; then
+    print_warning "The GTK settings could not be stored; GTK applications may use the default theme."
+  fi
+}
+
+# Runs after copy_dotfiles, which restores the repository's version of the file
+# and keeps a rerun from adding the block twice. niri reads 90-user-extra.kdl
+# last, and its xkb section replaces the one in 10-input-and-cursor.kdl.
 configure_keyboard_layout() {
   [ -n "$XKB_LAYOUT" ] || return 0
 
@@ -816,6 +848,7 @@ main() {
   create_user_dirs
   copy_wallpapers
   copy_dotfiles
+  configure_gtk_settings
   configure_keyboard_layout
   configure_swedish_binds
   configure_displays
