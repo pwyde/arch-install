@@ -91,6 +91,7 @@ GREETER_CONF_SRC="${SCRIPT_DIR}/defaults/noctalia-greeter/greeter.toml"
 GREETD_CONF_SRC="${SCRIPT_DIR}/etc/greetd/config.toml"
 GREETD_PAM_SRC="${SCRIPT_DIR}/etc/pam.d/greetd"
 FONTCONFIG_SRC="${SCRIPT_DIR}/etc/fonts/conf.d/50-generic-families.conf"
+NIRI_SESSION_SRC="${SCRIPT_DIR}/defaults/wayland-sessions/niri.desktop"
 
 # Destinations
 WALLPAPERS_DEST="${HOME}/Pictures/Wallpapers"
@@ -396,7 +397,7 @@ validate_inputs() {
       exit 1
     fi
   done
-  for src in "$GREETER_CONF_SRC" "$GREETD_CONF_SRC" "$GREETD_PAM_SRC" "$FONTCONFIG_SRC"; do
+  for src in "$GREETER_CONF_SRC" "$GREETD_CONF_SRC" "$GREETD_PAM_SRC" "$FONTCONFIG_SRC" "$NIRI_SESSION_SRC"; do
     if [ ! -f "$src" ]; then
       print_error "Missing repository file: $src"
       print_error "Run the script from a full checkout of the repository."
@@ -553,6 +554,9 @@ configure_greetd() {
   # already patched; the repository's version includes that change.
   print_msg "Unlocking KWallet at login through PAM"
   sudo install -m 0644 "$GREETD_PAM_SRC" /etc/pam.d/greetd
+
+  print_msg "Keeping the niri session output off the screen"
+  sudo install -D -m 0644 "$NIRI_SESSION_SRC" /usr/local/share/wayland-sessions/niri.desktop
 
   sudo systemctl enable greetd.service
 }
