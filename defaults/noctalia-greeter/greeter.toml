@@ -14,6 +14,13 @@ position = "above-panel"
 time_format = "{:%H:%M}"
 date_format = "%A, %x"
 
+[output]
+height = @OUTPUT_HEIGHT@
+name = "@OUTPUT_NAME@"
+refresh_rate = @OUTPUT_REFRESH_RATE@
+scale = @OUTPUT_SCALE@
+width = @OUTPUT_WIDTH@
+
 [cursor]
 size = 24
 theme = "XCursor-Pro-Dark"

@@ -74,7 +74,7 @@ LOCATION_ADDRESS=""
 DISPLAYS=()
 SCALES=()
 POSITIONS=()
-declare -A OUTPUT_MODE=() OUTPUT_SCALE=() OUTPUT_POSITION=()
+declare -A OUTPUT_MODE=() OUTPUT_RATE=() OUTPUT_SCALE=() OUTPUT_POSITION=()
 OUTPUT_ORDER=()
 # Refresh rate for a --display entry without one.
 DEFAULT_REFRESH_RATE="60.000"
@@ -259,6 +259,7 @@ validate_displays() {
     fi
 
     OUTPUT_MODE[$connector]="${resolution}@${rate:-$DEFAULT_REFRESH_RATE}"
+    OUTPUT_RATE[$connector]="$rate"
     add_output "$connector"
   done
 
@@ -472,6 +473,16 @@ install_desktop_shell() {
   paru_install "$DEFAULT_SHELL_PACKAGES"
 }
 
+# Adds a sed expression to the caller's edits array: the placeholder takes the
+# value, or its line is deleted when the value is empty.
+set_or_delete() {
+  if [ -n "$2" ]; then
+    edits+=(-e "s/${1}/${2}/")
+  else
+    edits+=(-e "/${1}/d")
+  fi
+}
+
 # The package's install hook creates the state directory, mode 0750 and owned
 # by the greetd user, which appearance sync requires. greeter.toml takes the
 # same owner with mode 0644, as upstream sets it. The hook rewrites the file on
@@ -491,10 +502,26 @@ install_greeter_config() {
   fi
   group=$(stat -c '%G' "$GREETER_STATE_DIR")
 
-  # The login screen uses the same keyboard layout as the niri session.
-  local rendered
+  # The login screen uses the same keyboard layout as the niri session, and the
+  # first connector given with --display, --scale or --position. A setting not
+  # given loses its line, which leaves the greeter's own default: the preferred
+  # mode's refresh rate and an automatic scale. Without any of the options, the
+  # whole [output] section goes, and the greeter shows on every monitor.
+  local rendered connector="${OUTPUT_ORDER[0]:-}" mode resolution
+  local -a edits=(-e "s/@XKB_LAYOUT@/${XKB_LAYOUT:-$DEFAULT_XKB_LAYOUT}/")
+  if [ -z "$connector" ]; then
+    edits+=(-e '/^\[output\]$/,/^$/d')
+  else
+    mode="${OUTPUT_MODE[$connector]:-}"
+    resolution="${mode%@*}"
+    edits+=(-e "s/@OUTPUT_NAME@/${connector}/")
+    set_or_delete "@OUTPUT_WIDTH@" "${resolution:+${resolution%x*}}"
+    set_or_delete "@OUTPUT_HEIGHT@" "${resolution:+${resolution#*x}}"
+    set_or_delete "@OUTPUT_REFRESH_RATE@" "${OUTPUT_RATE[$connector]:-}"
+    set_or_delete "@OUTPUT_SCALE@" "${OUTPUT_SCALE[$connector]:-}"
+  fi
   rendered=$(mktemp)
-  sed "s/@XKB_LAYOUT@/${XKB_LAYOUT:-$DEFAULT_XKB_LAYOUT}/" "$GREETER_CONF_SRC" >"$rendered"
+  sed "${edits[@]}" "$GREETER_CONF_SRC" >"$rendered"
   sudo install -m 0644 -o "$owner" -g "$group" "$rendered" "${GREETER_STATE_DIR}/greeter.toml"
   rm -f "$rendered"
 }
