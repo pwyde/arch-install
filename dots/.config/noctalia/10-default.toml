@@ -60,7 +60,7 @@ enabled = true
 timeout = 1800.0
 
 [location]
-address = "Stockholm, Sweden"
+address = "@LOCATION_ADDRESS@"
 
 [lockscreen]
 transition = [ "fade" ]

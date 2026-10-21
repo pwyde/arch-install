@@ -66,6 +66,9 @@ XKB_LAYOUT=""
 XKB_VARIANT=""
 # The layout without --xkb-layout, matching niri's 10-input-and-cursor.kdl.
 DEFAULT_XKB_LAYOUT="us"
+# Address from --address, which Noctalia geocodes for weather, night light and
+# automatic dark mode. Empty leaves Noctalia without a location, its default.
+LOCATION_ADDRESS=""
 # Raw --display, --scale and --position entries, and the validated settings
 # written to niri for each connector, in the order the connectors first appear.
 DISPLAYS=()
@@ -93,6 +96,7 @@ WALLPAPERS_DEST="${HOME}/Pictures/Wallpapers"
 DOTFILES_DEST="${HOME}"
 GREETER_STATE_DIR="/var/lib/noctalia-greeter"
 NIRI_USER_EXTRA="${DOTFILES_DEST}/.config/niri/config.d/90-user-extra.kdl"
+NOCTALIA_CONFIG="${DOTFILES_DEST}/.config/noctalia/10-default.toml"
 # systemd's table of keyboard layouts, and the XKB rules listing every layout's
 # variants, from xkeyboard-config.
 KBD_MODEL_MAP="/usr/share/systemd/kbd-model-map"
@@ -121,6 +125,8 @@ Options:
                              Display position in logical pixels, e.g.
                              DP-4:2560,0; repeatable (default: niri's
                              automatic placement)
+  -a, --address ADDRESS      Location for Noctalia, e.g. "Stockholm, Sweden"
+                             (default: no location)
   -p, --packages PACKAGES    Additional packages to install (appended to defaults)
   -y, --yes                  Non-interactive mode, no confirmation prompts
 
@@ -172,6 +178,11 @@ parse_args() {
     -o | --position)
       require_value "$1" "${2:-}"
       POSITIONS+=("$2")
+      shift 2
+      ;;
+    -a | --address)
+      require_value "$1" "${2:-}"
+      LOCATION_ADDRESS="$2"
       shift 2
       ;;
     -p | --packages)
@@ -344,6 +355,16 @@ list_connected_displays() {
   echo "${names:-none}"
 }
 
+# The address ends up in a TOML string, which double quotes, backslashes and
+# control characters would break. Whether the address resolves is only known
+# once Noctalia geocodes it.
+validate_address() {
+  if [[ "$LOCATION_ADDRESS" == *[\"\\]* || "$LOCATION_ADDRESS" =~ [[:cntrl:]] ]]; then
+    print_error "The address must not contain double quotes, backslashes or control characters."
+    exit 1
+  fi
+}
+
 # Validates the environment and the repository files.
 validate_inputs() {
   # makepkg refuses to run as root, and the copies belong to the user.
@@ -400,6 +421,9 @@ confirm_operation() {
     while IFS= read -r output; do
       [ -n "$output" ] && echo "  - Display in niri: ${output}"
     done < <(describe_outputs)
+    if [ -n "$LOCATION_ADDRESS" ]; then
+      echo "  - Location in Noctalia: $LOCATION_ADDRESS"
+    fi
     echo
     echo "WARNING: Existing files with the same names in ~/.config and ~/.local/share"
     echo "         will be overwritten."
@@ -585,6 +609,17 @@ configure_displays() {
   done
 }
 
+# Runs after copy_dotfiles, and also without --address, which leaves the
+# address empty instead of the placeholder. The sed replacement escapes the
+# characters sed treats specially: the delimiter and the ampersand.
+configure_location() {
+  local address="${LOCATION_ADDRESS//|/\\|}"
+  address="${address//&/\\&}"
+
+  [ -z "$LOCATION_ADDRESS" ] || print_msg "Setting the Noctalia location to ${LOCATION_ADDRESS}"
+  sed -i "s|@LOCATION_ADDRESS@|${address}|" "$NOCTALIA_CONFIG"
+}
+
 # Re-runs the script under script(1), which records everything printed on the
 # terminal to the log. Typed passwords are never logged: input is not
 # recorded, and password prompts do not echo.
@@ -661,6 +696,9 @@ print_summary() {
   while IFS= read -r output; do
     [ -n "$output" ] && echo "${WHITE}Display:${NO_COLOR} ${output}"
   done < <(describe_outputs)
+  if [ -n "$LOCATION_ADDRESS" ]; then
+    echo "${WHITE}Location:${NO_COLOR} ${LOCATION_ADDRESS}"
+  fi
   if [ -n "$XKB_LAYOUT" ]; then
     echo "${WHITE}Keyboard layout:${NO_COLOR} ${XKB_LAYOUT}${XKB_VARIANT:+ ($XKB_VARIANT)}"
   fi
@@ -681,6 +719,7 @@ main() {
   validate_inputs
   validate_xkb_layout
   validate_displays
+  validate_address
   confirm_operation
 
   update_system
@@ -697,6 +736,7 @@ main() {
   copy_dotfiles
   configure_keyboard_layout
   configure_displays
+  configure_location
 
   print_summary
 }
