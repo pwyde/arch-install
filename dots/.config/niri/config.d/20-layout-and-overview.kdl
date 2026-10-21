@@ -63,29 +63,23 @@ layout {
 
     // ── Border ───────────────────────────────────────────────────────────────
     // Always-visible border, unlike the focus ring, which marks only the active
-    // window. noctalia.kdl replaces these colors; uncomment off to disable the
-    // border.
-    border {
-        // off
-        width 4
-        active-color   "#707070"
-        inactive-color "#d0d0d0"
-        urgent-color   "#cc4444"
-
-        // Pastel rainbow gradient, interpolated through OKLCH:
-        // active-gradient from="#e5989b" to="#ffb4a2" in="oklch longer hue"
-    }
+    // window. Off by default; on enables it, drawn inside the focus ring.
+    // noctalia.kdl replaces the colors.
+    // border {
+    //     on
+    //     width 4
+    //
+    //     // Pastel rainbow gradient, interpolated through OKLCH:
+    //     // active-gradient from="#e5989b" to="#ffb4a2" in="oklch longer hue"
+    // }
 
     // ── Shadow ───────────────────────────────────────────────────────────────
-    // Drop shadow beneath windows, in logical pixels. Windows with client-side
-    // corners may need draw-behind-window, or geometry-corner-radius in a
-    // window rule, to avoid artifacts.
+    // Drop shadow beneath windows, off by default. niri's defaults, in logical
+    // pixels: softness 30, spread 5, offset x=0 y=5, color "#0007". Windows
+    // with client-side corners may need draw-behind-window, or
+    // geometry-corner-radius in a window rule, to avoid artifacts.
     shadow {
         on
-        softness 30
-        spread 5
-        offset x=0 y=5
-        color "#0007"
         // draw-behind-window true
     }
 
@@ -106,8 +100,11 @@ layout {
 overview {
     zoom 0.75
 
-    // Solid color between workspaces. Default: transparent.
-    // backdrop-color "#777777"
+    // Solid color behind the workspaces. Default: "#262626". Black matches the
+    // screen between the greeter and the session, where this color otherwise
+    // shows as a grey flash until Noctalia draws the wallpaper. Noctalia's
+    // backdrop covers it in the overview.
+    backdrop-color "#000000"
 
     // Disables the shadow behind each workspace in the overview.
     // workspace-shadow {
