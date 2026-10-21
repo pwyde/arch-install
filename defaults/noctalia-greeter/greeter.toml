@@ -14,17 +14,10 @@ position = "above-panel"
 time_format = "{:%H:%M}"
 date_format = "%A, %x"
 
-[output]
-height = 2160
-name = "Virtual-1"
-refresh_rate = 60.0
-scale = 1.5
-width = 3840
-
 [cursor]
 size = 24
 theme = "XCursor-Pro-Dark"
 
 [keyboard]
-layout = "se"
+layout = "@XKB_LAYOUT@"
 numlock = true
