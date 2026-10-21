@@ -100,6 +100,8 @@ NIRI_USER_EXTRA="${DOTFILES_DEST}/.config/niri/config.d/90-user-extra.kdl"
 NIRI_BINDS="${DOTFILES_DEST}/.config/niri/config.d/70-binds.kdl"
 NOCTALIA_CONFIG="${DOTFILES_DEST}/.config/noctalia/10-default.toml"
 GTK3_SETTINGS="${DOTFILES_DEST}/.config/gtk-3.0/settings.ini"
+PYWALFOX_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/pywalfox/config.json"
+FIREFOX_PROFILES="${XDG_CONFIG_HOME:-$HOME/.config}/mozilla/firefox"
 # systemd's table of keyboard layouts, and the XKB rules listing every layout's
 # variants, from xkeyboard-config.
 KBD_MODEL_MAP="/usr/share/systemd/kbd-model-map"
@@ -680,6 +682,21 @@ configure_gtk_settings() {
   fi
 }
 
+# Pywalfox looks for the Firefox profiles in ~/.config/firefox and
+# ~/.mozilla/firefox, but Firefox creates them in ~/.config/mozilla/firefox.
+# The saved profile_path setting points it there, which lets it install its
+# userChrome.css and userContent.css. Other saved settings are kept.
+configure_pywalfox() {
+  print_msg "Pointing Pywalfox to the Firefox profiles in ${FIREFOX_PROFILES}"
+  local current='{}' rendered
+  if [ -s "$PYWALFOX_CONFIG" ]; then
+    current=$(cat "$PYWALFOX_CONFIG")
+  fi
+  mkdir -p "${PYWALFOX_CONFIG%/*}"
+  rendered=$(jq --arg path "$FIREFOX_PROFILES" '.profile_path = $path' <<<"$current")
+  printf '%s\n' "$rendered" >"$PYWALFOX_CONFIG"
+}
+
 # Runs after copy_dotfiles, which restores the repository's version of the file
 # and keeps a rerun from adding the block twice. niri reads 90-user-extra.kdl
 # last, and its xkb section replaces the one in 10-input-and-cursor.kdl.
@@ -849,6 +866,7 @@ main() {
   copy_wallpapers
   copy_dotfiles
   configure_gtk_settings
+  configure_pywalfox
   configure_keyboard_layout
   configure_swedish_binds
   configure_displays
