@@ -7,7 +7,7 @@ test -f $fzf_colors; and set -gx FZF_DEFAULT_OPTS_FILE $fzf_colors
 
 # Options added to the colors. fzf runs the preview command through $SHELL,
 # which is fish. Ctrl+Space selects, Tab and Shift+Tab move, ? toggles the
-# preview, Ctrl+A selects all, Ctrl+E opens the selection in vim and Ctrl+V
+# preview, Ctrl+A selects all, Ctrl+E opens the selection in Neovim and Ctrl+V
 # in VS Code.
 set -gx FZF_DEFAULT_OPTS (string join ' ' -- \
     --layout=reverse \
@@ -22,7 +22,7 @@ set -gx FZF_DEFAULT_OPTS (string join ' ' -- \
     "--bind='change:top'" \
     "--bind='?:toggle-preview'" \
     "--bind='ctrl-a:select-all'" \
-    "--bind='ctrl-e:execute(vim {+} >/dev/tty)'" \
+    "--bind='ctrl-e:execute(nvim {+} >/dev/tty)'" \
     "--bind='ctrl-v:execute(code {+})'")
 
 # Key bindings: Ctrl+R searches the history, Ctrl+T inserts files and Alt+C

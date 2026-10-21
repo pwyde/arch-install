@@ -1,0 +1,5 @@
+-- Autocommands are loaded on the VeryLazy event, after LazyVim's defaults:
+-- https://github.com/LazyVim/LazyVim/blob/main/lua/lazyvim/config/autocmds.lua
+--
+-- A default group is removed by name, prefixed with lazyvim_, for example:
+-- vim.api.nvim_del_augroup_by_name("lazyvim_wrap_spell")

@@ -23,6 +23,10 @@ DEFAULT_COMPOSITOR_PACKAGES="niri nirimod-git pipewire pipewire-jack pipewire-pu
 DEFAULT_SHELL_PACKAGES="noctalia noctalia-greeter kitty fish starship fastfetch jq btop superfile dolphin kate konsole ark gwenview libgsf kio-admin purpose kdeconnect kwallet-pam systemsettings plasma-integration breeze darkly adw-gtk-theme papirus-icon-theme-git nwg-look python-pywalfox ttf-jetbrains-mono-nerd inter-font noto-fonts noto-fonts-emoji ttf-liberation xcursor-pro-cursor-theme"
 # Command-line tools.
 DEFAULT_CLI_PACKAGES="bat bat-extras duf dust eza fd fzf procs ripgrep zoxide"
+# Neovim with LazyVim, and the tools its plugins rely on: lazygit, Lua and
+# luarocks for plugins with rocks, tree-sitter-cli for the syntax parsers and
+# unzip for language servers installed by Mason.
+DEFAULT_NEOVIM_PACKAGES="neovim lazygit lua51 luarocks tree-sitter-cli unzip"
 
 # Terminal colors.
 RED=$'\033[91m'
@@ -487,6 +491,11 @@ install_cli_tools() {
   paru_install "$DEFAULT_CLI_PACKAGES"
 }
 
+install_neovim() {
+  print_msg "Installing Neovim"
+  paru_install "$DEFAULT_NEOVIM_PACKAGES"
+}
+
 # Adds a sed expression to the caller's edits array: the placeholder takes the
 # value, or its line is deleted when the value is empty.
 set_or_delete() {
@@ -700,6 +709,16 @@ configure_gtk_settings() {
   fi
 }
 
+# Installs the LazyVim plugins from ~/.config/nvim ahead of the first start,
+# into ~/.local/share/nvim. Runs after copy_dotfiles. Not fatal: Neovim
+# installs whatever is missing when it starts.
+install_neovim_plugins() {
+  print_msg "Installing the Neovim plugins"
+  if ! nvim --headless "+Lazy! sync" +qa; then
+    print_warning "The Neovim plugins could not be installed; Neovim installs them on its first start."
+  fi
+}
+
 # Runs after copy_dotfiles, which restores the repository's version of the file
 # and keeps a rerun from adding the block twice. niri reads 90-user-extra.kdl
 # last, and its xkb section replaces the one in 10-input-and-cursor.kdl.
@@ -878,6 +897,7 @@ main() {
   install_compositor
   install_desktop_shell
   install_cli_tools
+  install_neovim
   install_extra_packages
 
   install_greeter_config
@@ -890,6 +910,7 @@ main() {
   copy_wallpapers
   copy_dotfiles
   configure_gtk_settings
+  install_neovim_plugins
   configure_keyboard_layout
   configure_swedish_binds
   configure_displays

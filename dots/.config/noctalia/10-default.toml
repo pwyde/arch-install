@@ -82,7 +82,7 @@ wallpaper_scheme = "m3-tonal-spot"
 
 [theme.templates]
 builtin_ids = [ "btop", "gtk3", "gtk4", "kcolorscheme", "kitty", "niri", "starship" ]
-community_ids = [ "fastfetch", "papirus-icons", "konsole", "superfile", "bat" ]
+community_ids = [ "fastfetch", "papirus-icons", "konsole", "superfile", "bat", "lazyvim" ]
 
 # Pywalfox colors for Firefox. The community pywalfox template is not used: its
 # firefox-theme action writes a native messaging manifest to ~/.mozilla, and an
