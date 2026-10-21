@@ -134,7 +134,7 @@ Options:
   -y, --yes                  Non-interactive mode, no confirmation prompts
 
 Example:
-  $(basename "$0") --xkb-layout se --display DP-1:3840x2160 --packages "firefox mpv"
+  $(basename "$0") --xkb-layout se --display DP-1:3840x2160 --packages "mpv"
 
 EOF
   exit 0
