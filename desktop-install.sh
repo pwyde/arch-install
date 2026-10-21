@@ -66,10 +66,13 @@ XKB_LAYOUT=""
 XKB_VARIANT=""
 # The layout without --xkb-layout, matching niri's 10-input-and-cursor.kdl.
 DEFAULT_XKB_LAYOUT="us"
-# Display modes from --display, as CONNECTOR:WIDTHxHEIGHT[@RATE] entries,
-# and the validated CONNECTOR:WIDTHxHEIGHT@RATE modes written to niri.
+# Raw --display, --scale and --position entries, and the validated settings
+# written to niri for each connector, in the order the connectors first appear.
 DISPLAYS=()
-DISPLAY_MODES=()
+SCALES=()
+POSITIONS=()
+declare -A OUTPUT_MODE=() OUTPUT_SCALE=() OUTPUT_POSITION=()
+OUTPUT_ORDER=()
 # Refresh rate for a --display entry without one.
 DEFAULT_REFRESH_RATE="60.000"
 # Set by the first step that changes the system. Earlier failures are argument
@@ -111,6 +114,13 @@ Options:
                              Display mode for niri, e.g. DP-1:2560x1440@143.912;
                              repeatable. The refresh rate defaults to 60 Hz and
                              must match a mode in 'niri msg outputs' exactly
+  -s, --scale CONNECTOR:SCALE
+                             Display scale for niri, e.g. DP-1:1.5; repeatable
+                             (default: niri's guess from the monitor size)
+  -o, --position CONNECTOR:X,Y
+                             Display position in logical pixels, e.g.
+                             DP-4:2560,0; repeatable (default: niri's
+                             automatic placement)
   -p, --packages PACKAGES    Additional packages to install (appended to defaults)
   -y, --yes                  Non-interactive mode, no confirmation prompts
 
@@ -152,6 +162,16 @@ parse_args() {
     -d | --display)
       require_value "$1" "${2:-}"
       DISPLAYS+=("$2")
+      shift 2
+      ;;
+    -s | --scale)
+      require_value "$1" "${2:-}"
+      SCALES+=("$2")
+      shift 2
+      ;;
+    -o | --position)
+      require_value "$1" "${2:-}"
+      POSITIONS+=("$2")
       shift 2
       ;;
     -p | --packages)
@@ -200,11 +220,13 @@ validate_xkb_layout() {
   fi
 }
 
-# Each connector must exist and have a monitor attached, and the resolution
+# Every connector must exist and have a monitor attached, and a resolution
 # must be one that monitor reports. The kernel lists no refresh rates, which
 # leaves the rate unchecked; niri picks a mode itself when it does not match.
+# niri rejects a scale outside 0 to 10, and stores positions as 32-bit
+# integers.
 validate_displays() {
-  local entry connector mode resolution rate status_file seen=" "
+  local entry connector resolution rate status_file
   for entry in "${DISPLAYS[@]}"; do
     if [[ ! "$entry" =~ ^([A-Za-z0-9-]+):([0-9]+x[0-9]+)(@([0-9]+(\.[0-9]{1,3})?))?$ ]]; then
       print_error "Invalid --display value '${entry}'; expected CONNECTOR:WIDTHxHEIGHT[@RATE]."
@@ -214,28 +236,86 @@ validate_displays() {
     resolution="${BASH_REMATCH[2]}"
     rate="${BASH_REMATCH[4]}"
 
-    if [[ "$seen" == *" ${connector} "* ]]; then
-      print_error "Connector ${connector} is given more than once."
+    if [ -n "${OUTPUT_MODE[$connector]:-}" ]; then
+      print_error "--display is given more than once for ${connector}."
       exit 1
     fi
-    seen+="${connector} "
-
-    status_file=$(find_connector_status "$connector")
-    if [ -z "$status_file" ]; then
-      print_error "Unknown connector '${connector}'. Connected: $(list_connected_displays)"
-      exit 1
-    fi
-    if [ "$(cat "$status_file")" != "connected" ]; then
-      print_error "No monitor is connected to ${connector}. Connected: $(list_connected_displays)"
-      exit 1
-    fi
+    status_file=$(require_connected "$connector") || exit 1
     if ! grep -qx "$resolution" "$(dirname "$status_file")/modes"; then
-      print_error "The monitor on ${connector} does not support ${resolution}. Supported: $(sort -u -V -r "$(dirname "$status_file")/modes" | tr '\n' ' ')"
+      print_error "The monitor on ${connector} does not support ${resolution}. Supported: $(sort -u -V -r "$(dirname "$status_file")/modes" | tr '
+' ' ')"
       exit 1
     fi
 
-    mode="${resolution}@${rate:-$DEFAULT_REFRESH_RATE}"
-    DISPLAY_MODES+=("${connector}:${mode}")
+    OUTPUT_MODE[$connector]="${resolution}@${rate:-$DEFAULT_REFRESH_RATE}"
+    add_output "$connector"
+  done
+
+  for entry in "${SCALES[@]}"; do
+    if [[ ! "$entry" =~ ^([A-Za-z0-9-]+):([0-9]+(\.[0-9]+)?)$ ]] ||
+      ! awk -v scale="${BASH_REMATCH[2]}" 'BEGIN { exit !(scale > 0 && scale <= 10) }'; then
+      print_error "Invalid --scale value '${entry}'; expected CONNECTOR:SCALE, with a scale above 0 and at most 10."
+      exit 1
+    fi
+    connector="${BASH_REMATCH[1]}"
+
+    if [ -n "${OUTPUT_SCALE[$connector]:-}" ]; then
+      print_error "--scale is given more than once for ${connector}."
+      exit 1
+    fi
+    require_connected "$connector" >/dev/null
+
+    OUTPUT_SCALE[$connector]="${BASH_REMATCH[2]}"
+    add_output "$connector"
+  done
+
+  for entry in "${POSITIONS[@]}"; do
+    if [[ ! "$entry" =~ ^([A-Za-z0-9-]+):(-?[0-9]{1,9}),(-?[0-9]{1,9})$ ]]; then
+      print_error "Invalid --position value '${entry}'; expected CONNECTOR:X,Y with integer coordinates."
+      exit 1
+    fi
+    connector="${BASH_REMATCH[1]}"
+
+    if [ -n "${OUTPUT_POSITION[$connector]:-}" ]; then
+      print_error "--position is given more than once for ${connector}."
+      exit 1
+    fi
+    require_connected "$connector" >/dev/null
+
+    OUTPUT_POSITION[$connector]="x=${BASH_REMATCH[2]} y=${BASH_REMATCH[3]}"
+    add_output "$connector"
+  done
+}
+
+# Prints the connector's status file, or exits when the connector does not
+# exist or has no monitor attached.
+require_connected() {
+  local status_file
+  status_file=$(find_connector_status "$1")
+  if [ -z "$status_file" ]; then
+    print_error "Unknown connector '${1}'. Connected: $(list_connected_displays)"
+    exit 1
+  fi
+  if [ "$(cat "$status_file")" != "connected" ]; then
+    print_error "No monitor is connected to ${1}. Connected: $(list_connected_displays)"
+    exit 1
+  fi
+  echo "$status_file"
+}
+
+add_output() {
+  local connector
+  for connector in "${OUTPUT_ORDER[@]}"; do
+    [ "$connector" != "$1" ] || return 0
+  done
+  OUTPUT_ORDER+=("$1")
+}
+
+# One line per connector, for the confirmation prompt and the summary.
+describe_outputs() {
+  local connector
+  for connector in "${OUTPUT_ORDER[@]}"; do
+    echo "${connector}${OUTPUT_MODE[$connector]:+ ${OUTPUT_MODE[$connector]}}${OUTPUT_SCALE[$connector]:+, scale ${OUTPUT_SCALE[$connector]}}${OUTPUT_POSITION[$connector]:+, position ${OUTPUT_POSITION[$connector]}}"
   done
 }
 
@@ -316,9 +396,10 @@ confirm_operation() {
     if [ -n "$XKB_LAYOUT" ]; then
       echo "  - Keyboard layout in niri: ${XKB_LAYOUT}${XKB_VARIANT:+ ($XKB_VARIANT)}"
     fi
-    if [ "${#DISPLAY_MODES[@]}" -gt 0 ]; then
-      echo "  - Display modes in niri: ${DISPLAY_MODES[*]}"
-    fi
+    local output
+    while IFS= read -r output; do
+      [ -n "$output" ] && echo "  - Display in niri: ${output}"
+    done < <(describe_outputs)
     echo
     echo "WARNING: Existing files with the same names in ~/.config and ~/.local/share"
     echo "         will be overwritten."
@@ -485,18 +566,20 @@ configure_keyboard_layout() {
   } >>"$NIRI_USER_EXTRA"
 }
 
-# Appended like the keyboard layout, after copy_dotfiles.
+# Appended like the keyboard layout, after copy_dotfiles. Each connector gets
+# one output section with the settings given for it; niri keeps its defaults
+# for the rest.
 configure_displays() {
-  [ "${#DISPLAY_MODES[@]}" -gt 0 ] || return 0
-
-  local entry
-  for entry in "${DISPLAY_MODES[@]}"; do
-    print_msg "Setting ${entry%%:*} to ${entry#*:}"
+  local connector
+  for connector in "${OUTPUT_ORDER[@]}"; do
+    print_msg "Configuring ${connector}"
     {
       echo
-      echo "// Display mode set by desktop-install.sh."
-      echo "output \"${entry%%:*}\" {"
-      echo "    mode \"${entry#*:}\""
+      echo "// Display settings set by desktop-install.sh."
+      echo "output \"${connector}\" {"
+      [ -z "${OUTPUT_MODE[$connector]:-}" ] || echo "    mode \"${OUTPUT_MODE[$connector]}\""
+      [ -z "${OUTPUT_SCALE[$connector]:-}" ] || echo "    scale ${OUTPUT_SCALE[$connector]}"
+      [ -z "${OUTPUT_POSITION[$connector]:-}" ] || echo "    position ${OUTPUT_POSITION[$connector]}"
       echo "}"
     } >>"$NIRI_USER_EXTRA"
   done
@@ -574,9 +657,10 @@ print_summary() {
   if [ -n "$EXTRA_PACKAGES" ]; then
     echo "${WHITE}Additional packages:${NO_COLOR} ${EXTRA_PACKAGES}"
   fi
-  if [ "${#DISPLAY_MODES[@]}" -gt 0 ]; then
-    echo "${WHITE}Display modes:${NO_COLOR} ${DISPLAY_MODES[*]}"
-  fi
+  local output
+  while IFS= read -r output; do
+    [ -n "$output" ] && echo "${WHITE}Display:${NO_COLOR} ${output}"
+  done < <(describe_outputs)
   if [ -n "$XKB_LAYOUT" ]; then
     echo "${WHITE}Keyboard layout:${NO_COLOR} ${XKB_LAYOUT}${XKB_VARIANT:+ ($XKB_VARIANT)}"
   fi
