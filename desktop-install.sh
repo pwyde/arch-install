@@ -101,6 +101,7 @@ FISH_SHELL="/usr/bin/fish"
 NIRI_USER_EXTRA="${DOTFILES_DEST}/.config/niri/config.d/90-user-extra.kdl"
 NIRI_BINDS="${DOTFILES_DEST}/.config/niri/config.d/70-binds.kdl"
 NOCTALIA_CONFIG="${DOTFILES_DEST}/.config/noctalia/10-default.toml"
+NOCTALIA_LOCKSCREEN="${DOTFILES_DEST}/.config/noctalia/20-lockscreen-widgets.toml"
 GTK3_SETTINGS="${DOTFILES_DEST}/.config/gtk-3.0/settings.ini"
 # systemd's table of keyboard layouts, and the XKB rules listing every layout's
 # variants, from xkeyboard-config.
@@ -734,6 +735,25 @@ configure_displays() {
   done
 }
 
+# Ties the lock screen widgets to the first display given with --display,
+# --scale or --position, or else to the first connected one. Without a display,
+# the file is removed and Noctalia uses its default lock screen.
+configure_lockscreen() {
+  local connector="${OUTPUT_ORDER[0]:-}"
+  if [ -z "$connector" ]; then
+    connector=$(list_connected_displays)
+    connector="${connector%% *}"
+  fi
+
+  if [ "$connector" = "none" ]; then
+    print_warning "No connected display found; the lock screen keeps Noctalia's default layout."
+    rm -f "$NOCTALIA_LOCKSCREEN"
+    return 0
+  fi
+  print_msg "Placing the lock screen widgets on ${connector}"
+  sed -i "s|@LOCKSCREEN_OUTPUT@|${connector}|g" "$NOCTALIA_LOCKSCREEN"
+}
+
 # Runs after copy_dotfiles, and also without --address, which leaves the
 # address empty instead of the placeholder. The sed replacement escapes the
 # characters sed treats specially: the delimiter and the ampersand.
@@ -866,6 +886,7 @@ main() {
   configure_swedish_binds
   configure_displays
   configure_location
+  configure_lockscreen
 
   print_summary
 }
