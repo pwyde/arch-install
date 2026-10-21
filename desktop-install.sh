@@ -1,9 +1,9 @@
 #!/bin/bash
 # desktop-install.sh
 #
-# Installs the niri Wayland compositor and the Noctalia desktop shell on a
-# system installed by arch-install.sh, and deploys the desktop configuration
-# from this repository.
+# Installs the niri Wayland compositor and the Noctalia desktop shell on an
+# Arch Linux system, and deploys the desktop configuration from this
+# repository.
 #
 # Features:
 # - niri with PipeWire audio, XDG desktop portals and Xwayland support
@@ -61,6 +61,9 @@ report_failure() {
 # Global variables
 EXTRA_PACKAGES=""
 NON_INTERACTIVE=0
+# XKB layout and variant from --xkb-layout and --xkb-variant.
+XKB_LAYOUT=""
+XKB_VARIANT=""
 # Set by the first step that changes the system. Earlier failures are argument
 # and validation errors, which report themselves.
 STARTED=0
@@ -78,6 +81,11 @@ GREETD_PAM_SRC="${SCRIPT_DIR}/etc/pam.d/greetd"
 WALLPAPERS_DEST="${HOME}/Pictures/Wallpapers"
 DOTFILES_DEST="${HOME}"
 GREETER_STATE_DIR="/var/lib/noctalia-greeter"
+NIRI_USER_EXTRA="${DOTFILES_DEST}/.config/niri/config.d/90-user-extra.kdl"
+# systemd's table of keyboard layouts, and the XKB rules listing every layout's
+# variants, from xkeyboard-config.
+KBD_MODEL_MAP="/usr/share/systemd/kbd-model-map"
+XKB_RULES="/usr/share/X11/xkb/rules/evdev.lst"
 
 # Help text.
 show_help() {
@@ -86,11 +94,14 @@ Usage: $(basename "$0") [options]
 
 Options:
   -h, --help                 Show this help message
+  -l, --xkb-layout LAYOUT    XKB keyboard layout for niri, e.g. se
+                             (default: the layout in the niri configuration)
+  -x, --xkb-variant VARIANT  Variant of that layout, e.g. nodeadkeys
   -p, --packages PACKAGES    Additional packages to install (appended to defaults)
   -y, --yes                  Non-interactive mode, no confirmation prompts
 
 Example:
-  $(basename "$0") --packages "firefox mpv"
+  $(basename "$0") --xkb-layout se --xkb-variant nodeadkeys --packages "firefox mpv"
 
 EOF
   exit 0
@@ -114,6 +125,16 @@ parse_args() {
     -h | --help)
       show_help
       ;;
+    -l | --xkb-layout)
+      require_value "$1" "${2:-}"
+      XKB_LAYOUT="$2"
+      shift 2
+      ;;
+    -x | --xkb-variant)
+      require_value "$1" "${2:-}"
+      XKB_VARIANT="$2"
+      shift 2
+      ;;
     -p | --packages)
       require_value "$1" "${2:-}"
       EXTRA_PACKAGES="$2"
@@ -130,6 +151,34 @@ parse_args() {
       ;;
     esac
   done
+}
+
+# The layout must be one in systemd's keyboard table, and the variant one that
+# xkeyboard-config defines for that layout.
+validate_xkb_layout() {
+  if [ -z "$XKB_LAYOUT" ]; then
+    if [ -n "$XKB_VARIANT" ]; then
+      print_error "Option --xkb-variant requires --xkb-layout."
+      exit 1
+    fi
+    return 0
+  fi
+
+  if ! awk -v layout="$XKB_LAYOUT" '!/^#/ && NF { n = split($2, l, ","); for (i = 1; i <= n; i++) if (l[i] == layout) found = 1 } END { exit !found }' "$KBD_MODEL_MAP" 2>/dev/null; then
+    print_error "Keyboard layout '${XKB_LAYOUT}' is not in ${KBD_MODEL_MAP}."
+    exit 1
+  fi
+
+  [ -n "$XKB_VARIANT" ] || return 0
+
+  if [ ! -f "$XKB_RULES" ]; then
+    print_error "${XKB_RULES} is missing; install xkeyboard-config to validate the variant."
+    exit 1
+  fi
+  if ! awk -v layout="$XKB_LAYOUT" -v variant="$XKB_VARIANT" '/^! /{ section = $2; next } section == "variant" && $1 == variant && $2 == layout ":" { found = 1 } END { exit !found }' "$XKB_RULES"; then
+    print_error "Keyboard layout '${XKB_LAYOUT}' has no variant '${XKB_VARIANT}'."
+    exit 1
+  fi
 }
 
 # Validates the environment and the repository files.
@@ -181,6 +230,9 @@ confirm_operation() {
     echo "  - The greetd login manager with the Noctalia greeter, from the next boot"
     echo "  - Appearance sync to the greeter without a password prompt"
     echo "  - Wallpapers and configuration files copied to the home directory"
+    if [ -n "$XKB_LAYOUT" ]; then
+      echo "  - Keyboard layout in niri: ${XKB_LAYOUT}${XKB_VARIANT:+ ($XKB_VARIANT)}"
+    fi
     echo
     echo "WARNING: Existing files with the same names in ~/.config and ~/.local/share"
     echo "         will be overwritten."
@@ -319,6 +371,29 @@ copy_dotfiles() {
   cp -rT "$DOTFILES_SRC" "$DOTFILES_DEST"
 }
 
+# Runs after copy_dotfiles, which restores the repository's version of the file
+# and keeps a rerun from adding the block twice. niri reads 90-user-extra.kdl
+# last, and its xkb section replaces the one in 10-input-and-cursor.kdl.
+configure_keyboard_layout() {
+  [ -n "$XKB_LAYOUT" ] || return 0
+
+  print_msg "Setting the niri keyboard layout to ${XKB_LAYOUT}${XKB_VARIANT:+ ($XKB_VARIANT)}"
+  {
+    echo
+    echo "// Keyboard layout set by desktop-install.sh."
+    echo "input {"
+    echo "    keyboard {"
+    echo "        xkb {"
+    echo "            layout \"${XKB_LAYOUT}\""
+    if [ -n "$XKB_VARIANT" ]; then
+      echo "            variant \"${XKB_VARIANT}\""
+    fi
+    echo "        }"
+    echo "    }"
+    echo "}"
+  } >>"$NIRI_USER_EXTRA"
+}
+
 # Re-runs the script under script(1), which records everything printed on the
 # terminal to the log. Typed passwords are never logged: input is not
 # recorded, and password prompts do not echo.
@@ -391,6 +466,9 @@ print_summary() {
   if [ -n "$EXTRA_PACKAGES" ]; then
     echo "${WHITE}Additional packages:${NO_COLOR} ${EXTRA_PACKAGES}"
   fi
+  if [ -n "$XKB_LAYOUT" ]; then
+    echo "${WHITE}Keyboard layout:${NO_COLOR} ${XKB_LAYOUT}${XKB_VARIANT:+ ($XKB_VARIANT)}"
+  fi
   echo
   echo "${BLUE}==>${WHITE} Done. Reboot to start the greeter.${NO_COLOR}"
 }
@@ -406,6 +484,7 @@ main() {
   parse_args "$@"
 
   validate_inputs
+  validate_xkb_layout
   confirm_operation
 
   update_system
@@ -420,6 +499,7 @@ main() {
   create_user_dirs
   copy_wallpapers
   copy_dotfiles
+  configure_keyboard_layout
 
   print_summary
 }
