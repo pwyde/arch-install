@@ -1,0 +1,4 @@
+# bat options, one per line. Noctalia's bat template keeps the --theme line
+# set to its generated noctalia theme. Run `bat --help` for all options.
+--theme=noctalia
+--color=always

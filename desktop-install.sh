@@ -21,6 +21,8 @@ set -euo pipefail
 DEFAULT_COMPOSITOR_PACKAGES="niri nirimod-git pipewire pipewire-jack pipewire-pulse pipewire-alsa wireplumber wl-clipboard xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-gtk xdg-desktop-portal-kde xdg-user-dirs xdg-utils xwayland-satellite ddcutil playerctl brightnessctl"
 # The desktop shell and the applications and themes it is configured for.
 DEFAULT_SHELL_PACKAGES="noctalia noctalia-greeter kitty fish starship fastfetch jq btop superfile dolphin kate konsole ark gwenview libgsf kio-admin purpose kdeconnect kwallet-pam systemsettings plasma-integration breeze darkly adw-gtk-theme papirus-icon-theme-git nwg-look python-pywalfox ttf-jetbrains-mono-nerd inter-font noto-fonts noto-fonts-emoji ttf-liberation xcursor-pro-cursor-theme"
+# Command-line tools.
+DEFAULT_CLI_PACKAGES="bat bat-extras duf dust eza fd fzf procs ripgrep zoxide"
 
 # Terminal colors.
 RED=$'\033[91m'
@@ -480,6 +482,11 @@ install_desktop_shell() {
   paru_install "$DEFAULT_SHELL_PACKAGES"
 }
 
+install_cli_tools() {
+  print_msg "Installing the command-line tools"
+  paru_install "$DEFAULT_CLI_PACKAGES"
+}
+
 # Adds a sed expression to the caller's edits array: the placeholder takes the
 # value, or its line is deleted when the value is empty.
 set_or_delete() {
@@ -870,6 +877,7 @@ main() {
   update_system
   install_compositor
   install_desktop_shell
+  install_cli_tools
   install_extra_packages
 
   install_greeter_config
