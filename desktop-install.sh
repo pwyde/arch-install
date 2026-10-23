@@ -712,13 +712,18 @@ configure_gtk_settings() {
 }
 
 # Installs the LazyVim plugins from ~/.config/nvim ahead of the first start,
-# into ~/.local/share/nvim. Runs after copy_dotfiles. Not fatal: Neovim
-# installs whatever is missing when it starts.
+# into ~/.local/share/nvim, along with the syntax parsers LazyVim lists.
+# nvim-treesitter compiles the parsers in the background, and wait() keeps
+# Neovim from quitting before they are done, for up to ten minutes. Runs after
+# copy_dotfiles. Not fatal: Neovim installs whatever is missing when it starts.
 install_neovim_plugins() {
   print_msg "Installing the Neovim plugins"
-  if ! nvim --headless "+Lazy! sync" +qa; then
+  local parsers="require('nvim-treesitter').install(LazyVim.opts('nvim-treesitter').ensure_installed or {}):wait(600000)"
+  if ! nvim --headless "+Lazy! sync" "+lua ${parsers}" +qa; then
     print_warning "The Neovim plugins could not be installed; Neovim installs them on its first start."
   fi
+  # Neovim's progress messages leave the last line open.
+  echo
 }
 
 # Installs the Noctalia theme extension in VSCodium, whose colors Noctalia
@@ -731,7 +736,11 @@ configure_vscodium() {
   # VSCodium only uses VSCODE_PORTABLE when the directory exists, and falls
   # back to ~/.vscode-oss and ~/.config/VSCodium otherwise.
   mkdir -p "$VSCODIUM_DATA"
-  if ! VSCODE_PORTABLE="$VSCODIUM_DATA" VSCODE_CLI_DATA_DIR="${VSCODIUM_DATA}/cli" codium --install-extension "$VSCODIUM_THEME_EXTENSION" >/dev/null; then
+  # The extension install prints Node.js deprecation warnings about VSCodium's
+  # own code, which are filtered out of the error output.
+  if ! VSCODE_PORTABLE="$VSCODIUM_DATA" VSCODE_CLI_DATA_DIR="${VSCODIUM_DATA}/cli" \
+    codium --install-extension "$VSCODIUM_THEME_EXTENSION" >/dev/null \
+    2> >(grep -v -e 'DeprecationWarning' -e '--trace-deprecation' >&2); then
     print_warning "The Noctalia theme extension could not be installed in VSCodium."
   fi
 }
