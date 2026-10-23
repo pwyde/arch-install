@@ -20,7 +20,7 @@ set -euo pipefail
 # The Wayland compositor and the session services it relies on.
 DEFAULT_COMPOSITOR_PACKAGES="niri nirimod-git pipewire pipewire-jack pipewire-pulse pipewire-alsa wireplumber wl-clipboard xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-gtk xdg-desktop-portal-kde xdg-user-dirs xdg-utils xwayland-satellite ddcutil playerctl brightnessctl"
 # The desktop shell and the applications and themes it is configured for.
-DEFAULT_SHELL_PACKAGES="noctalia noctalia-greeter kitty fish starship fastfetch jq btop superfile perl-image-exiftool dolphin kate konsole ark gwenview gimp inkscape libreoffice-fresh hunspell-en_us hunspell-en_gb libgsf kio-admin purpose kdeconnect kwallet-pam systemsettings plasma-integration breeze darkly adw-gtk-theme papirus-icon-theme-git nwg-look python-pywalfox ttf-jetbrains-mono-nerd inter-font noto-fonts noto-fonts-emoji ttf-liberation xcursor-pro-cursor-theme"
+DEFAULT_SHELL_PACKAGES="noctalia noctalia-greeter kitty fish starship fastfetch jq btop superfile perl-image-exiftool dolphin kate konsole ark gwenview gimp inkscape libreoffice-fresh hunspell-en_us hunspell-en_gb libgsf kio-admin purpose kdeconnect kwallet-pam systemsettings plasma-integration breeze darkly adw-gtk-theme papirus-icon-theme-git nwg-look python-pywalfox spotify-launcher spicetify-cli ttf-jetbrains-mono-nerd inter-font noto-fonts noto-fonts-emoji ttf-liberation xcursor-pro-cursor-theme"
 # Command-line tools.
 DEFAULT_CLI_PACKAGES="bat bat-extras duf dust eza fd fzf glow procs ripgrep zoxide"
 # Neovim with LazyVim, and the tools its plugins rely on: lazygit, Lua and
@@ -109,6 +109,9 @@ NIRI_BINDS="${DOTFILES_DEST}/.config/niri/config.d/70-binds.kdl"
 NOCTALIA_CONFIG="${DOTFILES_DEST}/.config/noctalia/10-default.toml"
 NOCTALIA_LOCKSCREEN="${DOTFILES_DEST}/.config/noctalia/20-lockscreen-widgets.toml"
 GTK3_SETTINGS="${DOTFILES_DEST}/.config/gtk-3.0/settings.ini"
+SPICETIFY_THEMES="${DOTFILES_DEST}/.config/spicetify/Themes"
+SPOTIFY_DESKTOP="${DOTFILES_DEST}/.local/share/applications/spotify-launcher.desktop"
+COMFY_REPO="https://github.com/Comfy-Themes/Spicetify.git"
 # systemd's table of keyboard layouts, and the XKB rules listing every layout's
 # variants, from xkeyboard-config.
 KBD_MODEL_MAP="/usr/share/systemd/kbd-model-map"
@@ -718,6 +721,35 @@ install_neovim_plugins() {
   fi
 }
 
+# Installs Spicetify's Comfy theme, whose colors Noctalia renders, and selects
+# it with the options its README lists. Spicetify can only back up and patch
+# Spotify after Spotify's first start, which ~/.local/bin/spotify-spicetify
+# handles. Runs after copy_dotfiles, which installs its desktop entry. Not
+# fatal: Spotify then starts without the theme.
+configure_spicetify() {
+  print_msg "Installing the Comfy theme for Spicetify"
+  local repo
+  if [ ! -f "${SPICETIFY_THEMES}/Comfy/theme.js" ]; then
+    repo=$(mktemp -d)
+    if git clone -q --depth 1 "$COMFY_REPO" "$repo"; then
+      mkdir -p "${SPICETIFY_THEMES}/Comfy"
+      cp -rT "${repo}/Comfy" "${SPICETIFY_THEMES}/Comfy"
+    else
+      print_warning "The Comfy theme could not be downloaded; Spotify starts without it."
+    fi
+    rm -rf -- "$repo"
+  fi
+
+  if ! spicetify config current_theme Comfy color_scheme Comfy \
+    inject_css 1 replace_colors 1 overwrite_assets 1 inject_theme_js 1 >/dev/null; then
+    print_warning "Spicetify could not be configured; Spotify starts without the theme."
+  fi
+
+  # Desktop entries expand neither ~ nor variables.
+  local home="${HOME//|/\\|}"
+  sed -i "s|@HOME@|${home//&/\\&}|" "$SPOTIFY_DESKTOP"
+}
+
 # Runs after copy_dotfiles, which restores the repository's version of the file
 # and keeps a rerun from adding the block twice. niri reads 90-user-extra.kdl
 # last, and its xkb section replaces the one in 10-input-and-cursor.kdl.
@@ -910,6 +942,7 @@ main() {
   copy_dotfiles
   configure_gtk_settings
   install_neovim_plugins
+  configure_spicetify
   configure_keyboard_layout
   configure_swedish_binds
   configure_displays

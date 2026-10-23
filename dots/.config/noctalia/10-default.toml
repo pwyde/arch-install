@@ -107,6 +107,17 @@ output_path = "$XDG_CONFIG_HOME/fzf/colors"
 input_path = "$XDG_CONFIG_HOME/noctalia/templates/eza-theme.yml"
 output_path = "$XDG_CONFIG_HOME/eza/theme.yml"
 
+# Spotify colors through Spicetify's Comfy theme, from the community spicetify
+# template's color file. The community template itself is not used: it also
+# renders the Colorful theme and runs spicetify apply twice per change. The
+# lock keeps the hook from running at the same time as spotify-spicetify.
+# Spotify shows new colors after Ctrl+Shift+R or a restart.
+[theme.templates.user.spicetify]
+input_path = "$XDG_CONFIG_HOME/noctalia/templates/spicetify-comfy.ini"
+output_path = "$XDG_CONFIG_HOME/spicetify/Themes/Comfy/color.ini"
+post_hook = 'flock "$XDG_RUNTIME_DIR/spicetify.lock" spicetify -q apply --no-restart'
+hook_async = false
+
 [wallpaper]
 directory = "~/Pictures/Wallpapers"
 transition = [ "fade" ]

@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Starts Spotify through spotify-launcher and keeps the Spicetify theme
+# applied. spotify-launcher installs Spotify on the first start and replaces it
+# on every update, which brings back Spotify's original .spa files without the
+# theme. Spicetify then needs a new backup, which it records with the version
+# that Spotify writes to its prefs file on start. Spotify therefore starts
+# first; once prefs shows the new version, Spicetify backs up, applies the
+# theme and restarts Spotify with it.
+
+data="${XDG_DATA_HOME:-$HOME/.local/share}/spotify-launcher"
+apps="$data/install/usr/share/spotify/Apps"
+prefs="${XDG_CONFIG_HOME:-$HOME/.config}/spotify/prefs"
+# Shared with the Noctalia hook: concurrent spicetify runs corrupt the files.
+lock="${XDG_RUNTIME_DIR:-/tmp}/spicetify.lock"
+
+prefs_version() {
+  sed -n 's/^app\.last-launched-version=//p' "$prefs" 2>/dev/null | tr -d '"'
+}
+
+# Installs or updates Spotify without starting it.
+spotify-launcher --no-exec || exit
+
+if ! compgen -G "$apps/*.spa" >/dev/null; then
+  exec spotify-launcher --skip-update "$@"
+fi
+
+before=$(prefs_version)
+spotify-launcher --skip-update "$@" &
+for _ in $(seq 60); do
+  sleep 1
+  now=$(prefs_version)
+  if [ -n "$now" ] && [ "$now" != "$before" ]; then
+    break
+  fi
+done
+flock "$lock" spicetify -q backup apply
