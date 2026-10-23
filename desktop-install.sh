@@ -22,7 +22,7 @@ DEFAULT_COMPOSITOR_PACKAGES="niri nirimod-git pipewire pipewire-jack pipewire-pu
 # The desktop shell and the applications and themes it is configured for.
 DEFAULT_SHELL_PACKAGES="noctalia noctalia-greeter kitty fish starship fastfetch jq btop superfile perl-image-exiftool dolphin kate konsole ark gwenview libgsf kio-admin purpose kdeconnect kwallet-pam systemsettings plasma-integration breeze darkly adw-gtk-theme papirus-icon-theme-git nwg-look python-pywalfox ttf-jetbrains-mono-nerd inter-font noto-fonts noto-fonts-emoji ttf-liberation xcursor-pro-cursor-theme"
 # Command-line tools.
-DEFAULT_CLI_PACKAGES="bat bat-extras duf dust eza fd fzf procs ripgrep zoxide"
+DEFAULT_CLI_PACKAGES="bat bat-extras duf dust eza fd fzf glow procs ripgrep zoxide"
 # Neovim with LazyVim, and the tools its plugins rely on: lazygit, Lua and
 # luarocks for plugins with rocks, tree-sitter-cli for the syntax parsers and
 # unzip for language servers installed by Mason.
