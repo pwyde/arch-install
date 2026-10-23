@@ -48,12 +48,12 @@ window-rule {
     open-floating true
 }
 
-// Blurs the background of all applications, with xray disabled for a more
-// realistic result.
+// Blurs the background of all applications. niri's default xray mode blurs the
+// wallpaper behind a window, not the windows below it, and keeps the blur
+// during open and close animations, which the regular mode does not.
 window-rule {
     background-effect {
         blur true
-        xray false
     }
 }
 
