@@ -82,10 +82,7 @@ wallpaper_scheme = "m3-tonal-spot"
 
 [theme.templates]
 builtin_ids = [ "btop", "gtk3", "gtk4", "kcolorscheme", "kitty", "niri" ]
-# gimp only applies once GIMP has created ~/.config/GIMP on its first start:
-# writing its gimp.css earlier would create the 3.2 directory and make GIMP
-# skip its own first-start setup.
-community_ids = [ "fastfetch", "papirus-icons", "konsole", "superfile", "bat", "lazyvim", "glow", "starship", "gimp" ]
+community_ids = [ "fastfetch", "papirus-icons", "konsole", "superfile", "bat", "lazyvim", "glow", "starship" ]
 
 # Pywalfox colors for Firefox. The community pywalfox template is not used: its
 # firefox-theme action writes a native messaging manifest to ~/.mozilla, and an
