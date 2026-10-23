@@ -108,7 +108,6 @@ NIRI_USER_EXTRA="${DOTFILES_DEST}/.config/niri/config.d/90-user-extra.kdl"
 NIRI_BINDS="${DOTFILES_DEST}/.config/niri/config.d/70-binds.kdl"
 NOCTALIA_CONFIG="${DOTFILES_DEST}/.config/noctalia/10-default.toml"
 NOCTALIA_LOCKSCREEN="${DOTFILES_DEST}/.config/noctalia/20-lockscreen-widgets.toml"
-INKSCAPE_PROFILE="${DOTFILES_DEST}/.config/inkscape"
 GTK3_SETTINGS="${DOTFILES_DEST}/.config/gtk-3.0/settings.ini"
 # systemd's table of keyboard layouts, and the XKB rules listing every layout's
 # variants, from xkeyboard-config.
@@ -630,14 +629,6 @@ create_user_dirs() {
   xdg-user-dirs-update
 }
 
-# Noctalia's inkscape template only writes its theme once this directory
-# exists. Inkscape creates whatever else its profile lacks on every start,
-# which makes an early, empty directory safe, and the theme applies from the
-# first start on.
-create_inkscape_profile() {
-  mkdir -p "$INKSCAPE_PROFILE"
-}
-
 copy_wallpapers() {
   print_msg "Copying the wallpapers to $WALLPAPERS_DEST"
   mkdir -p "$WALLPAPERS_DEST"
@@ -916,7 +907,6 @@ main() {
   set_login_shell
 
   create_user_dirs
-  create_inkscape_profile
   copy_wallpapers
   copy_dotfiles
   configure_gtk_settings
