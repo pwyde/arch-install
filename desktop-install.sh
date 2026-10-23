@@ -265,8 +265,7 @@ validate_displays() {
     fi
     status_file=$(require_connected "$connector") || exit 1
     if ! grep -qx "$resolution" "$(dirname "$status_file")/modes"; then
-      print_error "The monitor on ${connector} does not support ${resolution}. Supported: $(sort -u -V -r "$(dirname "$status_file")/modes" | tr '
-' ' ')"
+      print_error "The monitor on ${connector} does not support ${resolution}. Supported: $(sort -u -V -r "$(dirname "$status_file")/modes" | paste -sd ' ')"
       exit 1
     fi
 
