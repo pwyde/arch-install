@@ -20,7 +20,7 @@ set -euo pipefail
 # The Wayland compositor and the session services it relies on.
 DEFAULT_COMPOSITOR_PACKAGES="niri nirimod-git pipewire pipewire-jack pipewire-pulse pipewire-alsa wireplumber wl-clipboard xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-gtk xdg-desktop-portal-kde xdg-user-dirs xdg-utils xwayland-satellite ddcutil playerctl brightnessctl"
 # The desktop shell and the applications and themes it is configured for.
-DEFAULT_SHELL_PACKAGES="noctalia noctalia-greeter kitty fish starship fastfetch jq btop superfile perl-image-exiftool dolphin kate konsole ark gwenview gimp libgsf kio-admin purpose kdeconnect kwallet-pam systemsettings plasma-integration breeze darkly adw-gtk-theme papirus-icon-theme-git nwg-look python-pywalfox ttf-jetbrains-mono-nerd inter-font noto-fonts noto-fonts-emoji ttf-liberation xcursor-pro-cursor-theme"
+DEFAULT_SHELL_PACKAGES="noctalia noctalia-greeter kitty fish starship fastfetch jq btop superfile perl-image-exiftool dolphin kate konsole ark gwenview gimp inkscape libgsf kio-admin purpose kdeconnect kwallet-pam systemsettings plasma-integration breeze darkly adw-gtk-theme papirus-icon-theme-git nwg-look python-pywalfox ttf-jetbrains-mono-nerd inter-font noto-fonts noto-fonts-emoji ttf-liberation xcursor-pro-cursor-theme"
 # Command-line tools.
 DEFAULT_CLI_PACKAGES="bat bat-extras duf dust eza fd fzf glow procs ripgrep zoxide"
 # Neovim with LazyVim, and the tools its plugins rely on: lazygit, Lua and
@@ -108,6 +108,7 @@ NIRI_USER_EXTRA="${DOTFILES_DEST}/.config/niri/config.d/90-user-extra.kdl"
 NIRI_BINDS="${DOTFILES_DEST}/.config/niri/config.d/70-binds.kdl"
 NOCTALIA_CONFIG="${DOTFILES_DEST}/.config/noctalia/10-default.toml"
 NOCTALIA_LOCKSCREEN="${DOTFILES_DEST}/.config/noctalia/20-lockscreen-widgets.toml"
+INKSCAPE_PROFILE="${DOTFILES_DEST}/.config/inkscape"
 GTK3_SETTINGS="${DOTFILES_DEST}/.config/gtk-3.0/settings.ini"
 # systemd's table of keyboard layouts, and the XKB rules listing every layout's
 # variants, from xkeyboard-config.
@@ -629,6 +630,14 @@ create_user_dirs() {
   xdg-user-dirs-update
 }
 
+# Noctalia's inkscape template only writes its theme once this directory
+# exists. Inkscape creates whatever else its profile lacks on every start,
+# which makes an early, empty directory safe, and the theme applies from the
+# first start on.
+create_inkscape_profile() {
+  mkdir -p "$INKSCAPE_PROFILE"
+}
+
 copy_wallpapers() {
   print_msg "Copying the wallpapers to $WALLPAPERS_DEST"
   mkdir -p "$WALLPAPERS_DEST"
@@ -907,6 +916,7 @@ main() {
   set_login_shell
 
   create_user_dirs
+  create_inkscape_profile
   copy_wallpapers
   copy_dotfiles
   configure_gtk_settings
