@@ -111,7 +111,10 @@ NOCTALIA_LOCKSCREEN="${DOTFILES_DEST}/.config/noctalia/20-lockscreen-widgets.tom
 GTK3_SETTINGS="${DOTFILES_DEST}/.config/gtk-3.0/settings.ini"
 # VSCodium's portable data, as ~/.config/environment.d/60-vscodium.conf sets it.
 VSCODIUM_DATA="${XDG_DATA_HOME:-$HOME/.local/share}/vscodium"
-VSCODIUM_THEME_EXTENSION="Noctalia.noctaliatheme"
+# The extensions to install, under "recommendations", from copy_dotfiles. Not
+# extensions/extensions.json, which is VSCodium's own record of what it has
+# installed.
+VSCODIUM_EXTENSIONS="${VSCODIUM_DATA}/extensions.json"
 # systemd's table of keyboard layouts, and the XKB rules listing every layout's
 # variants, from xkeyboard-config.
 KBD_MODEL_MAP="/usr/share/systemd/kbd-model-map"
@@ -726,22 +729,29 @@ install_neovim_plugins() {
   echo
 }
 
-# Installs the Noctalia theme extension in VSCodium, whose colors Noctalia
-# renders. The settings.json from copy_dotfiles selects its theme. The install
-# runs outside the niri session, which leaves VSCODE_PORTABLE and
-# VSCODE_CLI_DATA_DIR to be set here. Not fatal: VSCodium then starts with its
-# default theme.
+# Installs the VSCodium extensions that extensions.json lists: the Noctalia
+# theme extension, whose colors Noctalia renders, and Material Icon Theme. The
+# settings.json from copy_dotfiles selects both. The install runs outside the
+# niri session, which leaves VSCODE_PORTABLE and VSCODE_CLI_DATA_DIR to be set
+# here. Not fatal: VSCodium then starts with its default themes.
 configure_vscodium() {
-  print_msg "Installing the Noctalia theme in VSCodium"
+  print_msg "Installing the VSCodium extensions"
+  local extension
+  local -a args=()
+  while IFS= read -r extension; do
+    args+=(--install-extension "$extension")
+  done < <(jq -r '.recommendations[]' "$VSCODIUM_EXTENSIONS")
+  [ "${#args[@]}" -gt 0 ] || return 0
+
   # VSCodium only uses VSCODE_PORTABLE when the directory exists, and falls
   # back to ~/.vscode-oss and ~/.config/VSCodium otherwise.
   mkdir -p "$VSCODIUM_DATA"
   # The extension install prints Node.js deprecation warnings about VSCodium's
   # own code, which are filtered out of the error output.
   if ! VSCODE_PORTABLE="$VSCODIUM_DATA" VSCODE_CLI_DATA_DIR="${VSCODIUM_DATA}/cli" \
-    codium --install-extension "$VSCODIUM_THEME_EXTENSION" >/dev/null \
+    codium "${args[@]}" >/dev/null \
     2> >(grep -v -e 'DeprecationWarning' -e '--trace-deprecation' >&2); then
-    print_warning "The Noctalia theme extension could not be installed in VSCodium."
+    print_warning "Not every VSCodium extension could be installed."
   fi
 }
 

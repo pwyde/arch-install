@@ -3,8 +3,11 @@
 // portable mode, see ~/.config/environment.d/60-vscodium.conf.
 {
     // The theme from the Noctalia theme extension, whose colors Noctalia
-    // renders. desktop-install.sh installs the extension.
+    // renders. desktop-install.sh installs the extensions that
+    // ~/.local/share/vscodium/extensions.json lists.
     "workbench.colorTheme": "NoctaliaTheme",
+    // File and folder icons from Material Icon Theme.
+    "workbench.iconTheme": "material-icon-theme",
 
     // JetBrainsMono Nerd Font in the editor and the integrated terminal.
     "editor.fontFamily": "'JetBrainsMono Nerd Font', monospace",
