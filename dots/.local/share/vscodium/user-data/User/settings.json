@@ -1,0 +1,12 @@
+// VSCodium user settings, installed as
+// ~/.local/share/vscodium/user-data/User/settings.json: VSCodium runs in
+// portable mode, see ~/.config/environment.d/60-vscodium.conf.
+{
+    // The theme from the Noctalia theme extension, whose colors Noctalia
+    // renders. desktop-install.sh installs the extension.
+    "workbench.colorTheme": "NoctaliaTheme",
+
+    // JetBrainsMono Nerd Font in the editor and the integrated terminal.
+    "editor.fontFamily": "'JetBrainsMono Nerd Font', monospace",
+    "terminal.integrated.fontFamily": "'JetBrainsMono Nerd Font'"
+}

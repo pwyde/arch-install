@@ -721,10 +721,11 @@ install_neovim_plugins() {
   fi
 }
 
-# Installs the Noctalia theme extension in VSCodium and selects its theme, whose
-# colors Noctalia renders. The install runs outside the niri session, which
-# leaves VSCODE_PORTABLE and VSCODE_CLI_DATA_DIR to be set here. Not fatal:
-# VSCodium then starts with its default theme.
+# Installs the Noctalia theme extension in VSCodium, whose colors Noctalia
+# renders. The settings.json from copy_dotfiles selects its theme. The install
+# runs outside the niri session, which leaves VSCODE_PORTABLE and
+# VSCODE_CLI_DATA_DIR to be set here. Not fatal: VSCodium then starts with its
+# default theme.
 configure_vscodium() {
   print_msg "Installing the Noctalia theme in VSCodium"
   # VSCodium only uses VSCODE_PORTABLE when the directory exists, and falls
@@ -732,17 +733,6 @@ configure_vscodium() {
   mkdir -p "$VSCODIUM_DATA"
   if ! VSCODE_PORTABLE="$VSCODIUM_DATA" VSCODE_CLI_DATA_DIR="${VSCODIUM_DATA}/cli" codium --install-extension "$VSCODIUM_THEME_EXTENSION" >/dev/null; then
     print_warning "The Noctalia theme extension could not be installed in VSCodium."
-    return 0
-  fi
-
-  local settings="${VSCODIUM_DATA}/user-data/User/settings.json" rendered
-  mkdir -p "${settings%/*}"
-  if [ ! -s "$settings" ]; then
-    printf '{\n  "workbench.colorTheme": "NoctaliaTheme"\n}\n' >"$settings"
-  elif rendered=$(jq '."workbench.colorTheme" = "NoctaliaTheme"' "$settings" 2>/dev/null); then
-    printf '%s\n' "$rendered" >"$settings"
-  else
-    print_warning "${settings} is not plain JSON; select NoctaliaTheme in VSCodium instead."
   fi
 }
 
