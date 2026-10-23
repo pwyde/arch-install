@@ -43,7 +43,7 @@ $character\
 
 [os]
 disabled = false
-style = "fg:red"
+style = "fg:blue"
 format = '[$symbol ]($style)'
 
 [os.symbols]
@@ -71,7 +71,7 @@ Pop = ""
 
 [username]
 show_always = true
-style_user = "fg:red"
+style_user = "fg:magenta"
 style_root = "bold fg:bright-red"
 format = '[$user ]($style)'
 
@@ -89,7 +89,7 @@ fish_style_pwd_dir_length = 0
 use_logical_path = true
 
 [hostname]
-format = '[$ssh_symbol](red) [$hostname](red) '
+format = '[$ssh_symbol](white) [$hostname](red) '
 ssh_symbol = "󰖟"
 
 [git_branch]
@@ -337,10 +337,10 @@ command = """
 #     macOS
 
 if [ "$(uname -s)" = "Darwin" ]; then
-        input_source=$(defaults read ~/Library/Preferences/com.apple.HIToolbox.plist AppleCurrentKeyboardLayoutInputSourceID)
-        layout_id=$(echo "$input_source" | cut -d '.' -f4)
-        layout=$(printenv "STARSHIP_COCKPIT_KEYBOARD_LAYOUT_$(echo "$layout_id" | tr '[:lower:]' '[:upper:]')")
-        echo "$layout" || echo "$layout_id"
+input_source=$(defaults read ~/Library/Preferences/com.apple.HIToolbox.plist AppleCurrentKeyboardLayoutInputSourceID)
+    layout_id=$(echo "$input_source" | cut -d '.' -f4)
+    layout=$(printenv "STARSHIP_COCKPIT_KEYBOARD_LAYOUT_$(echo "$layout_id" | tr '[:lower:]' '[:upper:]')")
+    echo "$layout" || echo "$layout_id"
 fi
 
 """
