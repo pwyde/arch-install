@@ -185,6 +185,7 @@ SUDOERS_SRC="${SCRIPT_DIR}/etc/sudoers.d"
 XDG_PROFILE_SRC="${SCRIPT_DIR}/etc/profile.d/00-xdg.sh"
 DEFAULTS_PROFILE_SRC="${SCRIPT_DIR}/etc/profile.d/10-defaults.sh"
 XDG_BASH_PROFILE_SRC="${SCRIPT_DIR}/etc/profile.d/zz-xdg-bash.sh"
+VIM_XDG_SRC="${SCRIPT_DIR}/etc/vim/xdg.vim"
 USER_BASHRC_SRC="${SCRIPT_DIR}/defaults/bash/bashrc"
 SUDOERS_FILES="00-wheel 01-timeout 02-passwd-tries"
 SLEEP_HOOK_SRC="${SCRIPT_DIR}/defaults/systemd/system-sleep/keyboard-backlight"
@@ -399,6 +400,7 @@ validate_inputs() {
     "$XDG_PROFILE_SRC"
     "$DEFAULTS_PROFILE_SRC"
     "$XDG_BASH_PROFILE_SRC"
+    "$VIM_XDG_SRC"
     "$USER_BASHRC_SRC"
   )
   for repo_file in $CMDLINE_FILES; do
@@ -821,6 +823,9 @@ configure_basic_system() {
   print_msg "Setting the XDG Base Directories"
   install -D -m 0644 "$XDG_PROFILE_SRC" /mnt/etc/profile.d/00-xdg.sh
   install -D -m 0644 "$XDG_BASH_PROFILE_SRC" /mnt/etc/profile.d/zz-xdg-bash.sh
+  # /etc/vimrc is where Arch expects system-wide additions; pacman keeps the
+  # edited file on upgrades.
+  cat "$VIM_XDG_SRC" >>/mnt/etc/vimrc
 
   # Editor, pager and colored man pages for every login.
   print_msg "Setting the default programs"
