@@ -8,5 +8,36 @@
 
     // JetBrainsMono Nerd Font in the editor and the integrated terminal.
     "editor.fontFamily": "'JetBrainsMono Nerd Font', monospace",
-    "terminal.integrated.fontFamily": "'JetBrainsMono Nerd Font'"
+    "editor.fontLigatures": true,
+    "terminal.integrated.fontFamily": "'JetBrainsMono Nerd Font'",
+
+    // Bracket pair guides: vertical and horizontal for the pair around the
+    // cursor only.
+    "editor.guides.bracketPairs": "active",
+    "editor.guides.bracketPairsHorizontal": "active",
+
+    "editor.hover.delay": 1500,
+    "editor.rulers": [100],
+    "editor.stickyScroll.enabled": false,
+    "explorer.autoReveal": false,
+
+    // JSON5 has no built-in language; JSON with comments comes closest.
+    "files.associations": {
+        "*.json5": "jsonc",
+        "**/*.yaml.j2": "yaml"
+    },
+
+    // Saves a second after typing stops, without trailing whitespace and with
+    // a final line break.
+    "files.autoSave": "afterDelay",
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true,
+    // Two trailing spaces are a line break in Markdown.
+    "[markdown]": {
+        "files.trimTrailingWhitespace": false
+    },
+
+    // Terminal colors exactly as Noctalia sets them, without contrast
+    // adjustments.
+    "terminal.integrated.minimumContrastRatio": 1
 }
