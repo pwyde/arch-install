@@ -727,6 +727,9 @@ install_neovim_plugins() {
 # its default theme.
 configure_vscodium() {
   print_msg "Installing the Noctalia theme in VSCodium"
+  # VSCodium only uses VSCODE_PORTABLE when the directory exists, and falls
+  # back to ~/.vscode-oss and ~/.config/VSCodium otherwise.
+  mkdir -p "$VSCODIUM_DATA"
   if ! VSCODE_PORTABLE="$VSCODIUM_DATA" codium --install-extension "$VSCODIUM_THEME_EXTENSION" >/dev/null; then
     print_warning "The Noctalia theme extension could not be installed in VSCodium."
     return 0
