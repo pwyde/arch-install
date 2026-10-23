@@ -20,7 +20,7 @@ set -euo pipefail
 # The Wayland compositor and the session services it relies on.
 DEFAULT_COMPOSITOR_PACKAGES="niri nirimod-git pipewire pipewire-jack pipewire-pulse pipewire-alsa wireplumber wl-clipboard xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-gtk xdg-desktop-portal-kde xdg-user-dirs xdg-utils xwayland-satellite ddcutil playerctl brightnessctl"
 # The desktop shell and the applications and themes it is configured for.
-DEFAULT_SHELL_PACKAGES="noctalia noctalia-greeter kitty fish starship fastfetch jq btop superfile perl-image-exiftool dolphin kate konsole ark gwenview gimp inkscape libreoffice-fresh hunspell-en_us hunspell-en_gb libgsf kio-admin purpose kdeconnect kwallet-pam systemsettings plasma-integration breeze darkly adw-gtk-theme papirus-icon-theme-git nwg-look python-pywalfox ttf-jetbrains-mono-nerd inter-font noto-fonts noto-fonts-emoji ttf-liberation xcursor-pro-cursor-theme"
+DEFAULT_SHELL_PACKAGES="noctalia noctalia-greeter kitty fish starship fastfetch jq btop superfile perl-image-exiftool dolphin kate konsole ark gwenview gimp inkscape libreoffice-fresh hunspell-en_us hunspell-en_gb vscodium-bin vscodium-bin-marketplace libgsf kio-admin purpose kdeconnect kwallet-pam systemsettings plasma-integration breeze darkly adw-gtk-theme papirus-icon-theme-git nwg-look python-pywalfox ttf-jetbrains-mono-nerd inter-font noto-fonts noto-fonts-emoji ttf-liberation xcursor-pro-cursor-theme"
 # Command-line tools.
 DEFAULT_CLI_PACKAGES="bat bat-extras duf dust eza fd fzf glow procs ripgrep zoxide"
 # Neovim with LazyVim, and the tools its plugins rely on: lazygit, Lua and
@@ -109,6 +109,9 @@ NIRI_BINDS="${DOTFILES_DEST}/.config/niri/config.d/70-binds.kdl"
 NOCTALIA_CONFIG="${DOTFILES_DEST}/.config/noctalia/10-default.toml"
 NOCTALIA_LOCKSCREEN="${DOTFILES_DEST}/.config/noctalia/20-lockscreen-widgets.toml"
 GTK3_SETTINGS="${DOTFILES_DEST}/.config/gtk-3.0/settings.ini"
+# VSCodium's portable data, as ~/.config/environment.d/60-vscodium.conf sets it.
+VSCODIUM_DATA="${XDG_DATA_HOME:-$HOME/.local/share}/vscodium"
+VSCODIUM_THEME_EXTENSION="Noctalia.noctaliatheme"
 # systemd's table of keyboard layouts, and the XKB rules listing every layout's
 # variants, from xkeyboard-config.
 KBD_MODEL_MAP="/usr/share/systemd/kbd-model-map"
@@ -718,6 +721,28 @@ install_neovim_plugins() {
   fi
 }
 
+# Installs the Noctalia theme extension in VSCodium and selects its theme, whose
+# colors Noctalia renders. The install runs outside the niri session, which
+# leaves VSCODE_PORTABLE to be set here. Not fatal: VSCodium then starts with
+# its default theme.
+configure_vscodium() {
+  print_msg "Installing the Noctalia theme in VSCodium"
+  if ! VSCODE_PORTABLE="$VSCODIUM_DATA" codium --install-extension "$VSCODIUM_THEME_EXTENSION" >/dev/null; then
+    print_warning "The Noctalia theme extension could not be installed in VSCodium."
+    return 0
+  fi
+
+  local settings="${VSCODIUM_DATA}/user-data/User/settings.json" rendered
+  mkdir -p "${settings%/*}"
+  if [ ! -s "$settings" ]; then
+    printf '{\n  "workbench.colorTheme": "NoctaliaTheme"\n}\n' >"$settings"
+  elif rendered=$(jq '."workbench.colorTheme" = "NoctaliaTheme"' "$settings" 2>/dev/null); then
+    printf '%s\n' "$rendered" >"$settings"
+  else
+    print_warning "${settings} is not plain JSON; select NoctaliaTheme in VSCodium instead."
+  fi
+}
+
 # Runs after copy_dotfiles, which restores the repository's version of the file
 # and keeps a rerun from adding the block twice. niri reads 90-user-extra.kdl
 # last, and its xkb section replaces the one in 10-input-and-cursor.kdl.
@@ -910,6 +935,7 @@ main() {
   copy_dotfiles
   configure_gtk_settings
   install_neovim_plugins
+  configure_vscodium
   configure_keyboard_layout
   configure_swedish_binds
   configure_displays
