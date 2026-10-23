@@ -730,7 +730,7 @@ install_neovim_plugins() {
 }
 
 # Installs the VSCodium extensions that extensions.json lists: the Noctalia
-# theme extension, whose colors Noctalia renders, and Material Icon Theme. The
+# theme extension, whose colors Noctalia renders, and Catppuccin Icons. The
 # settings.json from copy_dotfiles selects both. The install runs outside the
 # niri session, which leaves VSCODE_PORTABLE and VSCODE_CLI_DATA_DIR to be set
 # here. Not fatal: VSCodium then starts with its default themes.
