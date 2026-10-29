@@ -515,8 +515,9 @@ validate_options() {
       "or '-'."
     exit 1
   fi
-  # An existing account would be reused rather than created, and would gain
-  # a password and SSH access.
+  # An existing account would gain a password and SSH access. The live system
+  # has the target's base accounts; configure_users catches those that
+  # packages add.
   if getent passwd "${USERNAME}" >/dev/null; then
     print_error "Username '${USERNAME}' is reserved for a system account."
     exit 1
@@ -1230,14 +1231,16 @@ configure_users() {
   # Mounts the chroot's virtual filesystems, unless already mounted.
   prepare_chroot
 
-  # The account is created before the passwords are set: a rerun that finds the
-  # account already present still refreshes both.
+  # The target is freshly installed, so an account of that name comes from a
+  # package, such as a service user from --packages, and would gain a password
+  # and SSH access.
   if arch-chroot /mnt id "${USERNAME}" &>/dev/null; then
-    print_msg "User ${USERNAME} already exists, skipping creation"
-  else
-    print_msg "Creating user ${USERNAME}"
-    arch-chroot /mnt useradd -m -G wheel -s /bin/bash "${USERNAME}"
+    print_error "Username '${USERNAME}' is taken by a system account that a" \
+      "package created. Rerun with another --username."
+    exit 1
   fi
+  print_msg "Creating user ${USERNAME}"
+  arch-chroot /mnt useradd -m -G wheel -s /bin/bash "${USERNAME}"
 
   # less and Python write their history into the XDG state directory, which
   # neither creates. Created as the user, which gives it the right owner.

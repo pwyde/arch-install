@@ -51,11 +51,13 @@ the volume.
 A running system lies outside the threat model. The installers nevertheless
 apply a baseline that limits what is exposed while the volume is unlocked:
 
-- **SSH.** sshd is enabled, accepts public-key authentication only, refuses
-  root logins and admits only the user created by the installer. No key is
-  installed, so no remote login is possible until one is added.
-  `base-install.sh` refuses a username that names an existing system account,
-  such as root, which would otherwise receive a password and SSH access.
+- **SSH.** sshd is enabled, accepts public-key authentication only, refuses root
+  logins and admits only the user created by the installer. No key is installed,
+  so no remote login is possible until one is added. `base-install.sh` refuses a
+  username that names an existing system account, such as root, which would
+  otherwise receive a password and SSH access. It checks the live system before
+  the disk is erased, and the installed system again when it creates the user,
+  which catches accounts added by packages from `--packages`.
 - **No core dumps.** systemd-coredump stores nothing, and setuid programs
   never dump core, so process memory is not written to disk.
 - **Kernel restrictions.** The kernel log and kernel pointers are restricted
