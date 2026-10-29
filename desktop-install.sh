@@ -138,6 +138,11 @@ readonly DEFAULT_NEOVIM_PACKAGES=(
   unzip
 )
 
+# The layout without --xkb-layout, matching niri's 10-input-and-cursor.kdl.
+readonly DEFAULT_XKB_LAYOUT="us"
+# Refresh rate for a --display entry without one.
+readonly DEFAULT_REFRESH_RATE="60.000"
+
 # Terminal colors.
 readonly RED=$'\033[91m'
 readonly GREEN=$'\033[92m'
@@ -146,63 +151,6 @@ readonly BLUE=$'\033[38;2;23;147;209m'
 readonly YELLOW=$'\033[93m'
 readonly WHITE=$'\033[1;97m'
 readonly NO_COLOR=$'\033[0m'
-
-trap cleanup EXIT
-trap 'exit 130' INT
-trap 'exit 143' TERM
-
-print_msg() {
-  echo "${GREEN}==>${NO_COLOR}${WHITE}" "$*${NO_COLOR}"
-}
-
-print_warning() {
-  echo "${YELLOW}==> WARNING:${NO_COLOR}${WHITE}" "$*${NO_COLOR}" >&2
-}
-
-print_error() {
-  echo "${RED}==> ERROR:${NO_COLOR}${WHITE}" "$*${NO_COLOR}" >&2
-}
-
-# Removes the temporary file and reports a failed run. Nothing needs undoing:
-# each package installation is a single pacman transaction, and the copies can
-# be repeated.
-cleanup() {
-  local exit_code=$?
-
-  # Left only if a step failed while it was in use.
-  [[ -z "${TEMP_FILE:-}" ]] || rm -f "${TEMP_FILE}"
-
-  if [[ "${exit_code}" -ne 0 ]] && [[ "${STARTED:-0}" -eq 1 ]]; then
-    print_error "Script exited with error code ${exit_code}."
-    print_msg "The script can be run again once the error is resolved."
-  fi
-}
-
-# Global variables
-EXTRA_PACKAGES=""
-NON_INTERACTIVE=0
-# XKB layout and variant from --xkb-layout and --xkb-variant.
-XKB_LAYOUT=""
-XKB_VARIANT=""
-# The layout without --xkb-layout, matching niri's 10-input-and-cursor.kdl.
-readonly DEFAULT_XKB_LAYOUT="us"
-# Address from --address, which Noctalia geocodes for weather, night light and
-# automatic dark mode. Empty leaves Noctalia without a location, its default.
-LOCATION_ADDRESS=""
-# Raw --display, --scale and --position entries, and the validated settings
-# written to niri for each connector, in the order the connectors first appear.
-DISPLAYS=()
-SCALES=()
-POSITIONS=()
-declare -A OUTPUT_MODE=() OUTPUT_RATE=() OUTPUT_SCALE=() OUTPUT_POSITION=()
-OUTPUT_ORDER=()
-# Refresh rate for a --display entry without one.
-readonly DEFAULT_REFRESH_RATE="60.000"
-# Set by the first step that changes the system. Earlier failures are argument
-# and validation errors, which report themselves.
-STARTED=0
-# Temporary file of configure_swedish_binds, removed by cleanup on failure.
-TEMP_FILE=""
 
 # Repository files
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -238,6 +186,55 @@ readonly KBD_MODEL_MAP="/usr/share/systemd/kbd-model-map"
 readonly XKB_RULES="/usr/share/X11/xkb/rules/evdev.lst"
 # The kernel's connectors, named as niri names them, with their modes.
 readonly DRM_SYSFS="/sys/class/drm"
+
+# Global variables
+EXTRA_PACKAGES=""
+NON_INTERACTIVE=0
+# XKB layout and variant from --xkb-layout and --xkb-variant.
+XKB_LAYOUT=""
+XKB_VARIANT=""
+# Address from --address, which Noctalia geocodes for weather, night light and
+# automatic dark mode. Empty leaves Noctalia without a location, its default.
+LOCATION_ADDRESS=""
+# Raw --display, --scale and --position entries, and the validated settings
+# written to niri for each connector, in the order the connectors first appear.
+DISPLAYS=()
+SCALES=()
+POSITIONS=()
+declare -A OUTPUT_MODE=() OUTPUT_RATE=() OUTPUT_SCALE=() OUTPUT_POSITION=()
+OUTPUT_ORDER=()
+# Set by the first step that changes the system. Earlier failures are argument
+# and validation errors, which report themselves.
+STARTED=0
+# Temporary file of configure_swedish_binds, removed by cleanup on failure.
+TEMP_FILE=""
+
+print_msg() {
+  echo "${GREEN}==>${NO_COLOR}${WHITE}" "$*${NO_COLOR}"
+}
+
+print_warning() {
+  echo "${YELLOW}==> WARNING:${NO_COLOR}${WHITE}" "$*${NO_COLOR}" >&2
+}
+
+print_error() {
+  echo "${RED}==> ERROR:${NO_COLOR}${WHITE}" "$*${NO_COLOR}" >&2
+}
+
+# Removes the temporary file and reports a failed run. Nothing needs undoing:
+# each package installation is a single pacman transaction, and the copies can
+# be repeated.
+cleanup() {
+  local exit_code=$?
+
+  # Left only if a step failed while it was in use.
+  [[ -z "${TEMP_FILE:-}" ]] || rm -f "${TEMP_FILE}"
+
+  if [[ "${exit_code}" -ne 0 ]] && [[ "${STARTED:-0}" -eq 1 ]]; then
+    print_error "Script exited with error code ${exit_code}."
+    print_msg "The script can be run again once the error is resolved."
+  fi
+}
 
 # Help text.
 show_help() {
@@ -1192,6 +1189,13 @@ print_summary() {
 
 # Runs every installation step in order.
 main() {
+  # Only EXIT runs cleanup: a signal handler would see the status of whatever
+  # command the signal interrupted, which is 0 more often than not. Converting
+  # the signals to an exit gives cleanup the real code, and only one trap fires.
+  trap cleanup EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+
   if [[ -z "${DESKTOP_INSTALL_LOG:-}" ]]; then
     start_logging "$@"
   fi
