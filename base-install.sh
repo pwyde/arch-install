@@ -80,12 +80,8 @@ readonly YELLOW=$'\033[93m'
 readonly WHITE=$'\033[1;97m'
 readonly NO_COLOR=$'\033[0m'
 
-# Set once this script opens the LUKS container. Cleanup closes a container
-# only when this script opened it, never an unrelated cryptroot that was already
-# mapped.
-CRYPTROOT_OPENED=0
-# Set by the first step that writes to the disk. Until then a failure has
-# nothing to undo, and reporting a cleanup would only obscure the real error.
+# Set by the first step that writes to the disk. A failure before it leaves
+# nothing behind and reports itself; after it, cleanup asks for a reboot.
 DISK_MODIFIED=0
 # Set by verify_installation when the installed system may not boot. The run
 # then fails, but the target stays mounted for the repairs the errors suggest.
@@ -110,63 +106,36 @@ print_error() {
   echo -e "${RED}==> ERROR:${NO_COLOR}${WHITE}" "${@}" "${NO_COLOR}" >&2
 }
 
-# Cleans up after a failed run.
+# Reports a failed run. Once the disk has been written to, the target is left
+# as it is: the live system's sandboxed services hold copies of the mounts
+# under /mnt, which keep the LUKS container open until the next boot. A new run
+# after a reboot starts over on a clean disk.
 cleanup() {
-  local exit_code=$?
+  local exit_code=$? failed_command="${BASH_COMMAND}"
 
   # Left only if package validation failed.
   [[ -z "${PKG_DB_DIR:-}" ]] || rm -rf "${PKG_DB_DIR}"
 
-  # Argument, validation and confirmation failures all end here before anything
-  # on the disk has changed, and stay quiet. A failed verification leaves the
-  # target mounted for repairs.
-  if [[ "${exit_code}" -ne 0 ]] && [[ "${DISK_MODIFIED:-0}" -eq 1 ]] \
-    && [[ "${VERIFY_FAILED:-0}" -eq 0 ]]; then
-    print_error "Script exited with error code ${exit_code}. Performing" \
-      "cleanup..."
-
-    # The chroot's virtual filesystems first.
-    if mountpoint -q /mnt/proc 2>/dev/null \
-      || mountpoint -q /mnt/sys 2>/dev/null \
-      || mountpoint -q /mnt/dev 2>/dev/null \
-      || mountpoint -q /mnt/run 2>/dev/null; then
-      cleanup_chroot
-    fi
-
-    # pacman-key leaves a gpg-agent running on the target keyring. It keeps a
-    # reference to the filesystem after the unmount, which blocks the close
-    # below. Addressing it by homedir stops that agent and no other.
-    if [[ -d /mnt/etc/pacman.d/gnupg ]]; then
-      gpgconf --homedir /mnt/etc/pacman.d/gnupg --kill all &>/dev/null || true
-    fi
-
-    # The target filesystems, if mounted.
-    if mountpoint -q /mnt 2>/dev/null; then
-      print_msg "Unmounting filesystems"
-      umount -Rf /mnt 2>/dev/null || true
-    fi
-
-    # Only the container this script opened; an already-mapped cryptroot
-    # belongs to the running system.
-    if [[ "${CRYPTROOT_OPENED:-0}" -eq 1 ]] \
-      && [[ -e "/dev/mapper/cryptroot" ]]; then
-      print_msg "Closing LUKS container"
-      local tries=0
-      until cryptsetup close cryptroot 2>/dev/null; do
-        tries=$((tries + 1))
-        if [[ "${tries}" -ge 10 ]]; then
-          print_warning "Could not close the LUKS container; something still" \
-            "holds it."
-          print_warning "Close it before running the installer again:"
-          print_warning "  cryptsetup close cryptroot"
-          break
-        fi
-        sleep 1
-      done
-    fi
-
-    print_msg "Cleanup complete. Please check the logs for errors."
+  # Failures before the first write report themselves, and the summary explains
+  # a failed verification.
+  if [[ "${exit_code}" -eq 0 ]] || [[ "${DISK_MODIFIED:-0}" -eq 0 ]] \
+    || [[ "${VERIFY_FAILED:-0}" -eq 1 ]]; then
+    return
   fi
+
+  case "${exit_code}" in
+    130 | 143) print_error "The installation was interrupted." ;;
+    *)
+      print_error "The installation failed with exit code ${exit_code}."
+      # An explicit exit follows an error message of its own. Of a command
+      # with a heredoc, only the first line is shown.
+      if [[ "${failed_command}" != exit* ]]; then
+        print_error "Failed command: ${failed_command%%$'\n'*}"
+      fi
+      ;;
+  esac
+  print_error "Reboot the installation medium and run the installer again;" \
+    "the disk stays in use until then."
 }
 
 # Global variables
@@ -465,18 +434,18 @@ validate_disk_unused() {
     while IFS= read -r line; do
       print_error "  ${line}"
     done <<<"${busy}"
-    exit 1
-  fi
-
-  if mountpoint -q /mnt; then
+  elif mountpoint -q /mnt; then
     print_error "/mnt is already in use. Unmount it first: umount -R /mnt"
-    exit 1
-  fi
-  if [[ -e /dev/mapper/cryptroot ]]; then
+  elif [[ -e /dev/mapper/cryptroot ]]; then
     print_error "/dev/mapper/cryptroot is already open. Close it first:" \
       "cryptsetup close cryptroot"
-    exit 1
+  else
+    return 0
   fi
+  # Those commands cannot release what a failed run leaves; see cleanup.
+  print_error "After a failed installation, reboot the installation medium" \
+    "instead."
+  exit 1
 }
 
 # systemd-firstboot --root only checks that the keymap name is well-formed,
@@ -823,7 +792,6 @@ format_partitions() {
       "detected."
     exit 1
   fi
-  CRYPTROOT_OPENED=1
 }
 
 # Creates the Btrfs filesystem and its subvolumes.

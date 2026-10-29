@@ -68,11 +68,13 @@ it may be mounted, used as swap or held by a LUKS container, LVM or RAID, and
 network connection is already required at this step.
 
 Until the first write to the disk, a failure exits quietly; the `EXIT` trap only
-removes the temporary sync databases. After it, the trap also unmounts the
-target filesystems, stops the `gpg-agent` left running on the target keyring and
-closes the LUKS container if the installer opened it. A failed check of the boot
-files in step 14 is the exception: the installer exits with status 1 but leaves
-the target mounted for the repairs that the errors suggest.
+removes the temporary sync databases. After it, the trap reports the failure and
+asks for a reboot instead of undoing the run: the sandboxed services of the live
+system receive copies of the mounts under `/mnt`, and some of those copies
+survive any unmount, which keeps the LUKS container open until the next boot. A
+new run then starts over on a clean disk. After a failed check of the boot files
+in step 14, the summary reports the errors, and the installer exits with status
+1 but leaves the target mounted for the repairs that they suggest.
 
 `configure_system` runs its steps in a fixed order. Hibernation and Plymouth
 are configured before the boot setup, since both contribute kernel parameters
