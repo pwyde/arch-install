@@ -1077,15 +1077,39 @@ pacman -Sy
 EOF
 }
 
+# Prompts for the password of an account into the variable named by $2. An
+# empty or mismatched entry falls back to 'changeme' and adds the account to
+# PASSWORD_FALLBACK; $3 is the command that changes the password later.
+prompt_password() {
+  local account=$1 change_command=$3 confirm
+  local -n password=$2
+
+  # IFS= keeps leading and trailing spaces, which are part of the password.
+  print_msg "Setting password for ${account}"
+  echo "Please enter password for ${account}:"
+  IFS= read -rs password
+  echo
+  echo "Please confirm password for ${account}:"
+  IFS= read -rs confirm
+  echo
+
+  if [[ -n "${password}" && "${password}" == "${confirm}" ]]; then
+    print_msg "Password for ${account} set successfully"
+    return
+  fi
+  if [[ -z "${password}" ]]; then
+    print_msg "Password is empty. Setting temporary password 'changeme'"
+  else
+    print_msg "Passwords do not match. Setting temporary password 'changeme'"
+  fi
+  password="changeme"
+  PASSWORD_FALLBACK+="${account} "
+  print_warning "Change the password for ${account} after the first login" \
+    "with: ${change_command}"
+}
+
 # Prompts for both passwords, outside the chroot.
 prompt_for_passwords() {
-  # Cleared before each prompt.
-  USER_PASSWORD=""
-  USER_PASSWORD_CONFIRM=""
-  ROOT_PASSWORD=""
-  ROOT_PASSWORD_CONFIRM=""
-  PASSWORD_FALLBACK=""
-
   # Non-interactive mode sets temporary passwords instead of prompting.
   if [[ "${NON_INTERACTIVE}" -eq 1 ]]; then
     print_msg "Non-interactive mode: Setting default temporary passwords"
@@ -1095,51 +1119,8 @@ prompt_for_passwords() {
     return
   fi
 
-  print_msg "Setting password for ${USERNAME}"
-  echo "Please enter password for ${USERNAME}:"
-  read -rs USER_PASSWORD
-  echo
-  echo "Please confirm password for ${USERNAME}:"
-  read -rs USER_PASSWORD_CONFIRM
-  echo
-
-  if [[ -z "${USER_PASSWORD}" ]]; then
-    print_msg "Password is empty. Setting temporary password 'changeme'"
-    PASSWORD_FALLBACK="${PASSWORD_FALLBACK}${USERNAME} "
-    USER_PASSWORD="changeme"
-    print_warning "You must change the password after first login with: passwd"
-  elif [[ "${USER_PASSWORD}" != "${USER_PASSWORD_CONFIRM}" ]]; then
-    print_msg "Passwords do not match. Setting temporary password 'changeme'"
-    PASSWORD_FALLBACK="${PASSWORD_FALLBACK}${USERNAME} "
-    USER_PASSWORD="changeme"
-    print_warning "You must change the password after first login with: passwd"
-  else
-    print_msg "Password for ${USERNAME} set successfully"
-  fi
-
-  print_msg "Setting root password"
-  echo "Please enter password for root:"
-  read -rs ROOT_PASSWORD
-  echo
-  echo "Please confirm password for root:"
-  read -rs ROOT_PASSWORD_CONFIRM
-  echo
-
-  if [[ -z "${ROOT_PASSWORD}" ]]; then
-    print_msg "Password is empty. Setting temporary password 'changeme'"
-    PASSWORD_FALLBACK="${PASSWORD_FALLBACK}root "
-    ROOT_PASSWORD="changeme"
-    print_warning "You must change the root password after installation with:" \
-      "sudo passwd root"
-  elif [[ "${ROOT_PASSWORD}" != "${ROOT_PASSWORD_CONFIRM}" ]]; then
-    print_msg "Passwords do not match. Setting temporary password 'changeme'"
-    PASSWORD_FALLBACK="${PASSWORD_FALLBACK}root "
-    ROOT_PASSWORD="changeme"
-    print_warning "You must change the root password after installation with:" \
-      "sudo passwd root"
-  else
-    print_msg "Root password set successfully"
-  fi
+  prompt_password "${USERNAME}" USER_PASSWORD "passwd"
+  prompt_password root ROOT_PASSWORD "sudo passwd root"
 }
 
 # Creates the user and sets both passwords, prompted for outside the chroot.
