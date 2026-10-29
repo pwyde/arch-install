@@ -358,9 +358,9 @@ versions have to match the AUR for an AUR helper to offer later updates.
   [`keyboard-backlight`](./defaults/systemd/system-sleep/keyboard-backlight)
   system-sleep hook**, installed to `/usr/lib/systemd/system-sleep/`. It turns
   the keyboard backlight off before hibernation, as the keyboard controller on
-  some ASUS laptops otherwise blocks the S4 power-off. The hook requires
-  `brightnessctl`, which `desktop-install.sh` installs. On a base system
-  without the desktop, it can be added with `--packages brightnessctl`.
+  some ASUS laptops otherwise blocks the S4 power-off. It writes to sysfs
+  directly, so it needs no other package and also works on a base system without
+  the desktop.
 
 Three deliberate departures from common practice:
 

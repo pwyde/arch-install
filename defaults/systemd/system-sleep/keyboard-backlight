@@ -2,20 +2,15 @@
 
 # Turns the keyboard backlight off before hibernation. On some ASUS laptops the
 # keyboard controller blocks the S4 power-off while the LEDs are lit, and the
-# machine hangs instead of powering off.
+# machine hangs instead of powering off. The hook writes to sysfs itself, so it
+# also works without brightnessctl, which only the desktop installs.
 
 sleep_action="${SYSTEMD_SLEEP_ACTION:-$2}"
 
 if [[ "$1" == "pre" && "${sleep_action}" == "hibernate" ]]; then
-  device=""
-  for candidate in /sys/class/leds/*kbd_backlight*; do
-    if [[ -e "${candidate}" ]]; then
-      device="${candidate##*/}"
-      break
+  for led in /sys/class/leds/*kbd_backlight*; do
+    if [[ -w "${led}/brightness" ]]; then
+      echo 0 >"${led}/brightness"
     fi
   done
-
-  if [[ -n "${device}" ]]; then
-    brightnessctl -d "${device}" set 0 >/dev/null 2>&1
-  fi
 fi
