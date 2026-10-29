@@ -191,6 +191,15 @@ In approximate order of importance:
   `changeme` for the user and for root. The installation summary names the
   affected accounts, and their passwords must be changed with `passwd` before
   the machine is used. The LUKS passphrase is always entered interactively.
+- **AUR packages are trusted as published.** The AUR holds user-submitted build
+  files, which can run any code when a package is built or installed.
+  `base-install.sh` builds the AUR helper paru from its current AUR build files
+  without showing them for review, and installs the result as root. The two
+  Limine packages in `packages/` are built by the maintainer from their AUR
+  build files in a clean chroot and installed unsigned from this repository.
+  `desktop-install.sh` installs some of its default packages, and any AUR
+  package given with `--packages`, through paru, which shows their build files
+  for review before it builds them; `--yes` skips that review.
 - **A running system is not protected.** Once the volume is unlocked, only
   the regular access controls remain.
 - **Snapshots are not backups.** They share the disk and its encryption. A
