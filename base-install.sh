@@ -1831,7 +1831,14 @@ print_summary() {
     echo
     echo "${YELLOW}The temporary password 'changeme' was set for:" \
       "${PASSWORD_FALLBACK% }"
-    echo "Log in with it and change it immediately with: passwd${NO_COLOR}"
+    echo "Log in with it and change it immediately:"
+    if [[ " ${PASSWORD_FALLBACK}" == *" ${USERNAME} "* ]]; then
+      echo "  ${USERNAME}: passwd"
+    fi
+    if [[ " ${PASSWORD_FALLBACK}" == *" root "* ]]; then
+      echo "  root: sudo passwd root"
+    fi
+    printf '%s' "${NO_COLOR}"
   fi
 
   echo
