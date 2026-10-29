@@ -916,12 +916,10 @@ install_base_system() {
   cat /mnt/etc/fstab
 }
 
-# Configures the installed system, one function per area.
+# Configures the installed system, one function per area. Each arch-chroot call
+# mounts /proc, /sys, /dev and /run itself, so no step mounts them here.
 configure_system() {
   print_msg "Starting system configuration"
-
-  # Mounts the chroot's virtual filesystems once for all chroot steps.
-  prepare_chroot
 
   # Time zone, locale, hostname and system tuning.
   configure_basic_system
@@ -956,9 +954,6 @@ configure_system() {
   # Last, and not fatal: an unreachable AUR should not fail an install that is
   # otherwise complete.
   install_aur_helper
-
-  # Unmounts the chroot's virtual filesystems.
-  cleanup_chroot
 }
 
 # Configures the time zone, locale, hostname and system tuning.
@@ -1141,63 +1136,9 @@ prompt_for_passwords() {
   fi
 }
 
-# Mounts the virtual filesystems the chroot steps need.
-prepare_chroot() {
-  print_msg "Preparing chroot environment"
-
-  # The target must be mounted.
-  if ! mountpoint -q /mnt; then
-    print_error "/mnt is not mounted. Please mount the root filesystem first."
-    exit 1
-  fi
-
-  # Creates any missing mount points.
-  mkdir -p /mnt/{proc,sys,dev,run}
-
-  # Mounts each virtual filesystem not already mounted.
-  if ! mountpoint -q /mnt/proc; then
-    mount -t proc proc /mnt/proc
-  fi
-  if ! mountpoint -q /mnt/sys; then
-    mount -t sysfs sys /mnt/sys
-  fi
-  if ! mountpoint -q /mnt/dev; then
-    mount --rbind /dev /mnt/dev
-    mount --make-rslave /mnt/dev
-  fi
-  if ! mountpoint -q /mnt/run; then
-    mount --rbind /run /mnt/run
-    mount --make-rslave /mnt/run
-  fi
-
-  print_msg "Chroot environment prepared"
-}
-
-# Unmounts the chroot's virtual filesystems.
-cleanup_chroot() {
-  print_msg "Cleaning up chroot mounts"
-
-  # Only those currently mounted.
-  if mountpoint -q /mnt/run 2>/dev/null; then
-    umount -l /mnt/run
-  fi
-  if mountpoint -q /mnt/dev 2>/dev/null; then
-    umount -l /mnt/dev
-  fi
-  if mountpoint -q /mnt/sys 2>/dev/null; then
-    umount /mnt/sys
-  fi
-  if mountpoint -q /mnt/proc 2>/dev/null; then
-    umount /mnt/proc
-  fi
-}
-
 # Creates the user and sets both passwords, prompted for outside the chroot.
 configure_users() {
   print_msg "Configuring users"
-
-  # Mounts the chroot's virtual filesystems, unless already mounted.
-  prepare_chroot
 
   # The target is freshly installed, so an account of that name comes from a
   # package, such as a service user from --packages, and would gain a password
@@ -1241,9 +1182,6 @@ configure_users() {
     install -D -m 0440 "${SUDOERS_SRC}/${sudoers_file}" \
       "/mnt/etc/sudoers.d/${sudoers_file}"
   done
-
-  # Unmounts the chroot's virtual filesystems.
-  cleanup_chroot
 }
 
 # Configures hibernation.
