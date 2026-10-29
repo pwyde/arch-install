@@ -468,7 +468,7 @@ require_connected() {
       "$(list_connected_displays)"
     exit 1
   fi
-  if [[ "$(cat "${status_file}")" != "connected" ]]; then
+  if [[ "$(<"${status_file}")" != "connected" ]]; then
     print_error "No monitor is connected to ${1}. Connected:" \
       "$(list_connected_displays)"
     exit 1
@@ -514,7 +514,7 @@ list_connected_displays() {
   local entry name names=""
   for entry in "${DRM_SYSFS}"/card*-*; do
     [[ -f "${entry}/status" ]] || continue
-    [[ "$(cat "${entry}/status")" == "connected" ]] || continue
+    [[ "$(<"${entry}/status")" == "connected" ]] || continue
     name="${entry##*/}"
     names+="${name#card*-} "
   done

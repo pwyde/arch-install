@@ -1682,7 +1682,7 @@ check_shell_nesting() {
     case "${arg}" in -h | --help) return 0 ;; esac
   done
 
-  PARENT_CMD="$(ps -o comm= -p "$(ps -o ppid= -p "$$" | xargs)")"
+  PARENT_CMD="$(ps -o comm= -p "${PPID}")"
 
   case "${PARENT_CMD}" in
     login | agetty | systemd | zsh)
