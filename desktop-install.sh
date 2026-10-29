@@ -660,9 +660,11 @@ update_system() {
   STARTED=1
   print_msg "Upgrading the system"
 
+  # -Syu also upgrades AUR packages, whose review would otherwise stop an
+  # unattended run.
   local -a flags=()
   if [[ "${NON_INTERACTIVE}" -eq 1 ]]; then
-    flags+=(--noconfirm)
+    flags+=(--noconfirm --skipreview)
   fi
 
   paru -Syu "${flags[@]}"
