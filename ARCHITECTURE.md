@@ -130,9 +130,11 @@ Snapper.
   from their parent without any change in content.
 - **`nodiscard` with `fstrim.timer`**: the LUKS container is opened with
   `--allow-discards`, which makes the device support TRIM, and Btrfs would
-  otherwise enable continuous `discard=async` by default (kernel 6.2 and
-  later). Arch, Debian and Red Hat all recommend periodic TRIM instead; freed
-  blocks are discarded once a week in a single batch.
+  otherwise enable continuous `discard=async` by default (kernel 6.2 and later).
+  Arch, Debian and Red Hat all recommend periodic TRIM instead; freed blocks are
+  discarded once a week in a single batch. `genfstab` drops `nodiscard`, since
+  the kernel never reports it, so the installer adds it to every Btrfs line in
+  `/etc/fstab`.
 - **No snapshots subvolume is created by the installer.** `snapper
   create-config` creates its own `/.snapshots` and refuses to run when the
   path already exists.

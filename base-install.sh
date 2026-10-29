@@ -913,6 +913,12 @@ install_base_system() {
     exit 1
   fi
 
+  # genfstab copies the options the kernel reports, which never include
+  # nodiscard. Without it, btrfs turns on discard=async at every boot; see
+  # BTRFS_MOUNT_OPTS.
+  sed -i -E 's/^([^#[:space:]]\S*\s+\S+\s+btrfs\s+)(\S+)/\1\2,nodiscard/' \
+    /mnt/etc/fstab
+
   print_msg "Installed fstab:"
   cat /mnt/etc/fstab
 }
