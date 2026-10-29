@@ -652,9 +652,9 @@ confirm_operation() {
       echo "  - Location in Noctalia: ${LOCATION_ADDRESS}"
     fi
     echo
-    echo "WARNING: Existing files with the same names in ~/.config" \
-      "and ~/.local/share"
-    echo "         will be overwritten."
+    echo "WARNING: Existing files with the same names" \
+      "in ~/.config, ~/.local/bin"
+    echo "         and ~/.local/share will be overwritten."
     read -r -p "Are you sure you want to continue? (y/N) " REPLY
     echo
     if [[ ! ${REPLY} =~ ^[Yy]$ ]]; then
@@ -872,9 +872,9 @@ copy_wallpapers() {
   cp -rT "${WALLPAPERS_SRC}" "${WALLPAPERS_DEST}"
 }
 
-# Merges dots/ into the home directory, which covers ~/.config and
-# ~/.local/share. Files from the repository replace files of the same name, and
-# every other file is left in place. A symbolic link of the same name is
+# Merges dots/ into the home directory, which covers ~/.config, ~/.local/bin
+# and ~/.local/share. Files from the repository replace files of the same name,
+# and every other file is left in place. A symbolic link of the same name is
 # replaced as well, which leaves its target, such as a file in a dotfile
 # repository, unchanged; a linked directory is followed. The AGENTS.md files
 # describe the repository to coding agents and are not configuration, so they
