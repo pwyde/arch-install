@@ -42,11 +42,18 @@ window_class() {
   echo "chrome-${host}_${path//\//_}-Default"
 }
 
-# Downloads an image to the given file. Fails for anything that is not one.
+# Downloads an image to the given file. Fails for anything that is not one, and
+# then leaves no download behind and an existing file in place.
 download_image() {
-  local url="$1" file="$2"
-  curl -fsSL --max-time 15 -o "${file}" "${url}" || return 1
-  [[ "$(file -b --mime-type "${file}")" == image/* ]] || return 1
+  local url="$1" file="$2" tmp
+  tmp=$(mktemp "${file}.XXXXXX")
+  if curl -fsSL --max-time 15 -o "${tmp}" "${url}" \
+    && [[ "$(file -b --mime-type "${tmp}")" == image/* ]]; then
+    mv -f "${tmp}" "${file}"
+    return 0
+  fi
+  rm -f "${tmp}"
+  return 1
 }
 
 # Saves the site's own icon, or Google's favicon for the domain, as the file.
@@ -116,6 +123,8 @@ main() {
     || die "the URL must be http or https, without spaces."
   [[ "${url}" != *[\"\`\$\\]* ]] \
     || die "the URL cannot contain \", \`, \$ or \\."
+  [[ "${icon}" != *[[:cntrl:]]* ]] \
+    || die "the icon cannot contain control characters."
 
   local id
   id=$(app_id "${name}")
