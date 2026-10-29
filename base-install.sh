@@ -581,13 +581,11 @@ validate_inputs() {
   validate_disk
   validate_disk_unused
 
-  # Root privileges are required.
   if [[ "$(id -u)" -ne 0 ]]; then
     print_error "This script must be run as root."
     exit 1
   fi
 
-  # The live system must be booted in UEFI mode.
   if [[ ! -d /sys/firmware/efi/efivars ]]; then
     print_error "System not booted in UEFI mode. This script requires UEFI" \
       "boot."
@@ -726,18 +724,15 @@ create_partitions() {
   DISK_MODIFIED=1
   print_msg "Creating partitions on ${DISK}"
 
-  # New GPT partition table.
   print_msg "Creating new GPT partition table on ${DISK}"
   sgdisk --zap-all "${DISK}" # Removes the existing GPT and MBR
   sgdisk --clear "${DISK}"   # Writes a new, empty GPT
   udevadm settle             # Lets udev finish with the removed partitions
 
-  # EFI System Partition, 2 GiB.
   print_msg "Creating EFI System Partition"
   sgdisk --new=1:0:+2048M --typecode=1:ef00 --change-name=1:"EFI System" \
     "${DISK}"
 
-  # Root partition, the rest of the disk.
   print_msg "Creating root partition"
   sgdisk --new=2:0:0 --typecode=2:8309 --change-name=2:"Linux LUKS" "${DISK}"
 
@@ -766,7 +761,6 @@ format_partitions() {
   print_msg "Format EFI partition with FAT32"
   mkfs.fat -F32 -n "EFI" "${EFI_PART}"
 
-  # An existing LUKS header is wiped first.
   if cryptsetup isLuks "${ROOT_PART}" 2>/dev/null; then
     print_msg "Partition ${ROOT_PART} already has a LUKS header, removing it..."
     # Overwrites the first 10 MiB, where the LUKS header is stored.
@@ -774,11 +768,9 @@ format_partitions() {
     sync
   fi
 
-  # Creates the LUKS container.
   print_msg "Creating new LUKS container on ${ROOT_PART}..."
   cryptsetup luksFormat --type luks2 -v "${ROOT_PART}"
 
-  # Opens the container.
   print_msg "Opening LUKS container..."
   if ! cryptsetup --allow-discards --persistent open "${ROOT_PART}" \
     cryptroot; then
@@ -883,7 +875,6 @@ install_base_system() {
     exit 1
   fi
 
-  # Base packages.
   print_msg "Running pacstrap to install packages (this may take a while)"
 
   # pacstrap passes --noconfirm unless -i is given and runs unattended without
@@ -921,7 +912,6 @@ install_base_system() {
 configure_system() {
   print_msg "Starting system configuration"
 
-  # Time zone, locale, hostname and system tuning.
   configure_basic_system
 
   # Users: root and the regular user in the wheel group. Passwords are prompted
@@ -948,7 +938,6 @@ configure_system() {
 
   configure_snapshots
 
-  # System services.
   enable_services
 
   # Last, and not fatal: an unreachable AUR should not fail an install that is
@@ -1573,7 +1562,6 @@ EOF
 verify_installation() {
   print_msg "Verifying critical components"
 
-  # The ESP must contain an EFI directory.
   if [[ ! -d "/mnt/boot/EFI" ]]; then
     print_error "EFI directory not found at /boot/EFI. The system will not" \
       "boot."
@@ -1581,7 +1569,6 @@ verify_installation() {
     VERIFY_FAILED=1
   fi
 
-  # Boot files.
   print_msg "Checking boot files"
   if [[ ! -f "/mnt/boot/EFI/Linux/arch_linux.efi" ]]; then
     print_error "UKI not found at /boot/EFI/Linux/arch_linux.efi. The system" \
@@ -1590,7 +1577,6 @@ verify_installation() {
     VERIFY_FAILED=1
   fi
 
-  # Bootloader.
   if [[ ! -f "/mnt/boot/EFI/limine/limine_x64.efi" ]] \
     && [[ ! -f "/mnt/boot/EFI/BOOT/BOOTX64.EFI" ]]; then
     print_error "Limine not found. The system will not boot."
@@ -1598,7 +1584,6 @@ verify_installation() {
     VERIFY_FAILED=1
   fi
 
-  # Bootloader configuration.
   if [[ ! -f "/mnt/boot/limine.conf" ]]; then
     print_error "Limine configuration not found at /boot/limine.conf."
     print_error "Rebuild it with: arch-chroot /mnt limine-mkinitcpio"
@@ -1639,7 +1624,6 @@ verify_installation() {
       "/etc/mkinitcpio.conf.d/hooks.conf; there will be no boot splash."
   fi
 
-  # User setup.
   print_msg "Checking user setup"
   if ! arch-chroot /mnt id "${USERNAME}" &>/dev/null; then
     print_warning "User ${USERNAME} not properly created."
