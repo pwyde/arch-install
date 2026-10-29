@@ -39,11 +39,13 @@ main() {
       echo "$((i + 1))) ${names[i]}"
     done
     read -r -p "Web app to remove: " choice
-    if [[ ! "${choice}" =~ ^[0-9]+$ ]] \
-      || ((choice < 1 || choice > ${#names[@]})); then
+    # Read in base 10, since bash takes a leading zero for octal, and limited
+    # to nine digits, which keeps the number from overflowing.
+    if [[ ! "${choice}" =~ ^[0-9]{1,9}$ ]] \
+      || ((10#${choice} < 1 || 10#${choice} > ${#names[@]})); then
       die "no web app number ${choice}."
     fi
-    name="${names[choice - 1]}"
+    name="${names[10#${choice} - 1]}"
   fi
 
   for i in "${!names[@]}"; do
