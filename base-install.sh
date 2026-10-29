@@ -904,7 +904,13 @@ install_base_system() {
 configure_system() {
   print_msg "Starting system configuration"
 
-  configure_basic_system
+  configure_localization
+  configure_hostname
+  configure_system_tuning
+  configure_shell_environment
+  harden_sshd
+  configure_networkmanager
+  configure_pacman
 
   # Users: root and the regular user in the wheel group. Passwords are prompted
   # for outside the chroot.
@@ -937,10 +943,8 @@ configure_system() {
   install_aur_helper
 }
 
-# Configures the time zone, locale, hostname and system tuning.
-configure_basic_system() {
-  print_msg "Configuring basic system settings"
-
+# Keymap, locale and time zone; the locales are generated in the chroot.
+configure_localization() {
   # Outside the chroot: with --root, systemd-firstboot skips reloading the
   # console over D-Bus.
   print_msg "Setting keymap to ${KEYMAP}"
@@ -950,10 +954,33 @@ configure_basic_system() {
   sed "s|@LOCALE@|${LOCALE}|g" "${LOCALE_CONF_SRC}" \
     | install -D -m 0644 /dev/stdin /mnt/etc/locale.conf
 
+  arch-chroot /mnt env TIMEZONE="${TIMEZONE}" LOCALE="${LOCALE}" \
+    /bin/bash -e <<'EOF'
+echo "==> Setting timezone to ${TIMEZONE}"
+ln -sf "/usr/share/zoneinfo/${TIMEZONE}" /etc/localtime
+hwclock --systohc
+
+# Anchored with the trailing space, so that en_GB does not also enable
+# en_GB.UTF-8.
+echo "==> Generating locales"
+sed -i 's/^#\(en_US.UTF-8 \)/\1/' /etc/locale.gen
+sed -i 's/^#\(en_GB.UTF-8 \)/\1/' /etc/locale.gen
+sed -i "s/^#\(${LOCALE} \)/\1/" /etc/locale.gen
+locale-gen
+EOF
+}
+
+configure_hostname() {
   print_msg "Setting hostname to ${HOSTNAME}"
   echo "${HOSTNAME}" >/mnt/etc/hostname
   sed "s|@HOSTNAME@|${HOSTNAME}|g" "${HOSTS_SRC}" \
     | install -D -m 0644 /dev/stdin /mnt/etc/hosts
+}
+
+# Swap on zram, kernel and network tuning, and the system's timers and
+# shutdown.
+configure_system_tuning() {
+  local sysctl_file shutdown_file
 
   print_msg "Configuring ZRAM"
   install -D -m 0644 "${ZRAM_CONF_SRC}" \
@@ -962,7 +989,6 @@ configure_basic_system() {
   # Reclaim tuning for swap on zram, network buffers, BBR, and the kernel and
   # TCP/IP hardening. tcp_bbr has to be registered before sysctl can select it.
   print_msg "Applying sysctl tuning"
-  local sysctl_file
   for sysctl_file in "${SYSCTL_FILES[@]}"; do
     install -D -m 0644 "${SYSCTL_SRC}/${sysctl_file}" \
       "/mnt/etc/sysctl.d/${sysctl_file}"
@@ -989,7 +1015,6 @@ configure_basic_system() {
   # Three files: system services, the session's services and user@.service
   # itself, which carries its own 120s timeout the default cannot reach.
   print_msg "Shortening the shutdown timeouts"
-  local shutdown_file
   for shutdown_file in "${SHUTDOWN_CONF_FILES[@]}"; do
     install -D -m 0644 "${SHUTDOWN_CONF_SRC}/${shutdown_file}" \
       "/mnt/etc/systemd/${shutdown_file}"
@@ -1000,7 +1025,9 @@ configure_basic_system() {
   print_msg "Scoping the locate index"
   install -D -m 0644 "${UPDATEDB_SERVICE_SRC}" \
     /mnt/etc/systemd/system/plocate-updatedb.service.d/override.conf
+}
 
+configure_shell_environment() {
   # XDG Base Directory variables for every login, including the niri session.
   print_msg "Setting the XDG Base Directories"
   install -D -m 0644 "${XDG_PROFILE_SRC}" /mnt/etc/profile.d/00-xdg.sh
@@ -1012,35 +1039,29 @@ configure_basic_system() {
   # Editor, pager and colored man pages for every login.
   print_msg "Setting the default programs"
   install -D -m 0644 "${DEFAULTS_PROFILE_SRC}" /mnt/etc/profile.d/10-defaults.sh
+}
 
-  # A drop-in, leaving /etc/ssh/sshd_config as the package ships it. Keys only,
-  # and only this account: remote login needs a key placed from the console.
+# A drop-in, leaving /etc/ssh/sshd_config as the package ships it. Keys only,
+# and only this account: remote login needs a key placed from the console.
+harden_sshd() {
   print_msg "Hardening sshd"
   sed "s|@USERNAME@|${USERNAME}|g" "${SSHD_CONF_SRC}" \
     | install -D -m 0644 /dev/stdin /mnt/etc/ssh/sshd_config.d/10-hardening.conf
+}
 
-  # Rotating IPv6 addresses, and no Wi-Fi power save.
-  print_msg "Configuring NetworkManager"
+# Rotating IPv6 addresses, and no Wi-Fi power save.
+configure_networkmanager() {
   local nm_file
+
+  print_msg "Configuring NetworkManager"
   for nm_file in "${NM_CONF_FILES[@]}"; do
     install -D -m 0644 "${NM_CONF_SRC}/${nm_file}" \
       "/mnt/etc/NetworkManager/conf.d/${nm_file}"
   done
+}
 
-  arch-chroot /mnt env TIMEZONE="${TIMEZONE}" LOCALE="${LOCALE}" \
-    /bin/bash -e <<'EOF'
-echo "==> Setting timezone to ${TIMEZONE}"
-ln -sf "/usr/share/zoneinfo/${TIMEZONE}" /etc/localtime
-hwclock --systohc
-
-# Anchored with the trailing space, so that en_GB does not also enable
-# en_GB.UTF-8.
-echo "==> Generating locales"
-sed -i 's/^#\(en_US.UTF-8 \)/\1/' /etc/locale.gen
-sed -i 's/^#\(en_GB.UTF-8 \)/\1/' /etc/locale.gen
-sed -i "s/^#\(${LOCALE} \)/\1/" /etc/locale.gen
-locale-gen
-
+configure_pacman() {
+  arch-chroot /mnt /bin/bash -e <<'EOF'
 echo "==> Configuring pacman"
 sed -i "/Color/s/^#//" /etc/pacman.conf
 sed -i '/^Color/a ILoveCandy' /etc/pacman.conf
