@@ -1064,7 +1064,8 @@ echo "==> Configuring pacman"
 sed -i "/Color/s/^#//" /etc/pacman.conf
 sed -i '/^Color/a ILoveCandy' /etc/pacman.conf
 sed -i "/VerbosePkgLists/s/^#//" /etc/pacman.conf
-sed -i 's/#ParallelDownloads = 5/ParallelDownloads = 16/' /etc/pacman.conf
+# Whether the package ships the line commented out or set, as pacman 7 does.
+sed -i 's/^#\?ParallelDownloads = .*/ParallelDownloads = 16/' /etc/pacman.conf
 sed -i '/\[multilib\]/,/Include/s/^#//' /etc/pacman.conf
 pacman -Sy
 EOF
