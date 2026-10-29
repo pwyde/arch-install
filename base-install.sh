@@ -569,10 +569,21 @@ validate_packages() {
   PKG_DB_DIR=""
 }
 
-# Validates the options and the live environment.
+# Validates the options, the live environment and the repository files.
 validate_inputs() {
   validate_disk
   validate_disk_unused
+  validate_environment
+  validate_keymap
+  validate_options
+  validate_packages
+  validate_repository
+}
+
+# Root on a live system booted in UEFI mode, with the tools the installer runs.
+# validate_packages needs root as well, which is why this runs before it.
+validate_environment() {
+  local tool
 
   if ((EUID != 0)); then
     print_error "This script must be run as root."
@@ -585,13 +596,19 @@ validate_inputs() {
     exit 1
   fi
 
-  validate_keymap
-  validate_options
-  validate_packages
+  for tool in sgdisk cryptsetup mkfs.fat mkfs.btrfs; do
+    if ! command -v "${tool}" &>/dev/null; then
+      print_error "Required tool '${tool}' not found. Please install it first."
+      exit 1
+    fi
+  done
+}
 
-  # Everything the installer copies out of this repository. Checked now, before
-  # the disk is wiped, rather than failing halfway through the install.
-  local repo_file
+# Everything the installer copies out of this repository. Checked now, before
+# the disk is wiped, rather than failing halfway through the install.
+validate_repository() {
+  local repo_file pkg_name
+  local -a pkg_files
   local -a repo_files=(
     # Stands in for the whole theme directory, which is copied with cp -rT.
     "${PLYMOUTH_THEME_SRC}/arch-linux.plymouth"
@@ -618,22 +635,13 @@ validate_inputs() {
     "${XDG_BASH_PROFILE_SRC}"
     "${VIM_XDG_SRC}"
     "${USER_BASHRC_SRC}"
+    # The files of each list, with their directory put in front of each one.
+    "${CMDLINE_FILES[@]/#/${CMDLINE_SRC}/}"
+    "${SUDOERS_FILES[@]/#/${SUDOERS_SRC}/}"
+    "${SYSCTL_FILES[@]/#/${SYSCTL_SRC}/}"
+    "${SHUTDOWN_CONF_FILES[@]/#/${SHUTDOWN_CONF_SRC}/}"
+    "${NM_CONF_FILES[@]/#/${NM_CONF_SRC}/}"
   )
-  for repo_file in "${CMDLINE_FILES[@]}"; do
-    repo_files+=("${CMDLINE_SRC}/${repo_file}")
-  done
-  for repo_file in "${SUDOERS_FILES[@]}"; do
-    repo_files+=("${SUDOERS_SRC}/${repo_file}")
-  done
-  for repo_file in "${SYSCTL_FILES[@]}"; do
-    repo_files+=("${SYSCTL_SRC}/${repo_file}")
-  done
-  for repo_file in "${SHUTDOWN_CONF_FILES[@]}"; do
-    repo_files+=("${SHUTDOWN_CONF_SRC}/${repo_file}")
-  done
-  for repo_file in "${NM_CONF_FILES[@]}"; do
-    repo_files+=("${NM_CONF_SRC}/${repo_file}")
-  done
 
   for repo_file in "${repo_files[@]}"; do
     [[ -f "${repo_file}" ]] && continue
@@ -645,8 +653,6 @@ validate_inputs() {
   # Exactly one file per package: pacman -U installs every file that matches,
   # and two versions of a package in one transaction fail after the disk is
   # wiped.
-  local pkg_name
-  local -a pkg_files
   for pkg_name in "${LIMINE_PKGS[@]}"; do
     pkg_files=("${LIMINE_PKG_SRC}/${pkg_name}"-*.pkg.tar.zst)
     if [[ ! -f "${pkg_files[0]}" ]]; then
@@ -659,15 +665,6 @@ validate_inputs() {
       print_error "More than one prebuilt package for ${pkg_name}:"
       print_error "  ${pkg_files[*]##*/}"
       print_error "Keep only the current version in ${LIMINE_PKG_SRC}."
-      exit 1
-    fi
-  done
-
-  # Tools required on the live system.
-  local tool
-  for tool in sgdisk cryptsetup mkfs.fat mkfs.btrfs; do
-    if ! command -v "${tool}" &>/dev/null; then
-      print_error "Required tool '${tool}' not found. Please install it first."
       exit 1
     fi
   done

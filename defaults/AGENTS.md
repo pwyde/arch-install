@@ -3,9 +3,9 @@
 Files installed to a path other than their own, unlike `etc/`. The root
 [AGENTS.md](../AGENTS.md) applies as well.
 
-- `plymouth/arch-linux/` is copied as a whole, so a new file there is
-  installed without being named; `validate_inputs` checks
-  `arch-linux.plymouth` for the directory.
+- `plymouth/arch-linux/` is copied as a whole, so a new file there is installed
+  without being named; `validate_repository` checks `arch-linux.plymouth` for
+  the directory.
 - `noctalia-greeter/greeter.toml` is invalid TOML until rendered; never run
   a TOML formatter on it. `install_greeter_config` fills `@XKB_LAYOUT@` and
   the `@OUTPUT_*@` placeholders, and deletes the line of a placeholder

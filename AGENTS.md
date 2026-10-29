@@ -152,7 +152,7 @@ run under "VM test needed" in the completion report.
 
 - **Option or default:** keep `show_help` sorted by short option, with
   `-h, --help` last, and the README.md usage block matching its output.
-- **New installed file:** check it in `validate_inputs` like the existing
+- **New installed file:** check it in `validate_repository` like the existing
   files, and add it to ARCHITECTURE.md.
 - **Step added, removed or reordered:** update the sequence table in
   ARCHITECTURE.md.

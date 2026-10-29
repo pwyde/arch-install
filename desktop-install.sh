@@ -557,8 +557,17 @@ validate_packages() {
   done
 }
 
-# Validates the environment and the repository files.
+# Validates the environment, the display manager and the repository files.
 validate_inputs() {
+  validate_environment
+  validate_display_manager
+  validate_repository
+}
+
+# The regular user, with the commands the installer runs.
+validate_environment() {
+  local cmd
+
   # makepkg refuses to run as root, and the copies belong to the user.
   if ((EUID == 0)); then
     print_error "This script must be run as the regular user, not as root."
@@ -566,17 +575,19 @@ validate_inputs() {
   fi
 
   # Tools required on the installed system.
-  local cmd
   for cmd in paru sudo cp; do
     if ! command -v "${cmd}" &>/dev/null; then
       print_error "Required command not found: ${cmd}"
       exit 1
     fi
   done
+}
 
-  # greetd is enabled as display-manager.service, an alias that systemctl
-  # enable does not take over from another display manager.
+# greetd is enabled as display-manager.service, an alias that systemctl enable
+# does not take over from another display manager.
+validate_display_manager() {
   local dm_link="/etc/systemd/system/display-manager.service" display_manager
+
   if [[ -L "${dm_link}" ]]; then
     display_manager=$(readlink "${dm_link}")
     display_manager="${display_manager##*/}"
@@ -594,16 +605,11 @@ validate_inputs() {
       exit 1
     fi
   fi
+}
 
-  # Everything the script copies out of this repository.
+# Everything the script copies out of this repository.
+validate_repository() {
   local src
-  for src in "${WALLPAPERS_SRC}" "${DOTFILES_SRC}"; do
-    if [[ ! -d "${src}" ]]; then
-      print_error "Missing repository directory: ${src}"
-      print_error "Run the script from a full checkout of the repository."
-      exit 1
-    fi
-  done
   local -a repo_files=(
     "${GREETER_CONF_SRC}"
     "${GREETD_CONF_SRC}"
@@ -611,6 +617,15 @@ validate_inputs() {
     "${FONTCONFIG_SRC}"
     "${NIRI_SESSION_SRC}"
   )
+
+  for src in "${WALLPAPERS_SRC}" "${DOTFILES_SRC}"; do
+    if [[ ! -d "${src}" ]]; then
+      print_error "Missing repository directory: ${src}"
+      print_error "Run the script from a full checkout of the repository."
+      exit 1
+    fi
+  done
+
   for src in "${repo_files[@]}"; do
     if [[ ! -f "${src}" ]]; then
       print_error "Missing repository file: ${src}"
