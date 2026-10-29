@@ -664,7 +664,9 @@ does not support.
 [`dots/`](./dots/) is merged into the home directory file by file with
 `cp --parents`, except the `AGENTS.md` files, which describe the repository to
 coding agents. Files from the repository replace files of the same name, and
-every other file is left in place. The wallpapers in
+every other file is left in place. A symbolic link of the same name is replaced
+by the file, which leaves its target unchanged, while a linked directory is
+followed and receives the files. The wallpapers in
 [`assets/wallpapers/`](./assets/wallpapers/) are copied to
 `~/Pictures/Wallpapers`, after `xdg-user-dirs-update` has created the XDG user
 directories.

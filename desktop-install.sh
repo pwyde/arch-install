@@ -874,15 +874,18 @@ copy_wallpapers() {
 
 # Merges dots/ into the home directory, which covers ~/.config and
 # ~/.local/share. Files from the repository replace files of the same name, and
-# every other file is left in place. The AGENTS.md files describe the
-# repository to coding agents and are not configuration, so they stay behind.
+# every other file is left in place. A symbolic link of the same name is
+# replaced as well, which leaves its target, such as a file in a dotfile
+# repository, unchanged; a linked directory is followed. The AGENTS.md files
+# describe the repository to coding agents and are not configuration, so they
+# stay behind.
 copy_dotfiles() {
   print_msg "Copying the configuration files to the home directory"
   mkdir -p "${DOTFILES_DEST}"
   (
     cd "${DOTFILES_SRC}"
     find . ! -type d ! -name AGENTS.md \
-      -exec cp -P --parents -t "${DOTFILES_DEST}" -- {} +
+      -exec cp -P --remove-destination --parents -t "${DOTFILES_DEST}" -- {} +
   )
 }
 

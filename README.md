@@ -187,8 +187,10 @@ installation to start the greeter.
 > the few system-wide changes.
 
 > [!WARNING]
-> Files in the home directory with the same names as those in
-> [`dots/`](./dots/) will be overwritten. Other files are left in place.
+> Files in the home directory with the same names as those in [`dots/`](./dots/)
+> will be overwritten. A linked file is replaced by a regular file, while a
+> linked directory is followed, which overwrites the files in its target. Other
+> files are left in place.
 
 ### Usage
 
