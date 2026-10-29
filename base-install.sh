@@ -146,6 +146,8 @@ ROOT_PART=""
 HOSTNAME=""
 USERNAME=""
 TIMEZONE=""
+KEYMAP=""
+LOCALE=""
 SUBVOLUMES=""
 EXTRA_PACKAGES=""
 # Temporary sync databases of validate_packages, removed by cleanup on failure.
