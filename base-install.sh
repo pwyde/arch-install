@@ -1753,6 +1753,36 @@ copy_installer_to_home() {
   fi
 }
 
+# Prints one line of the boot setup status. The path is the file's path on the
+# installed system, which is how the line names it.
+print_boot_file() {
+  local label=$1 path=$2
+
+  if [[ -f "/mnt${path}" ]]; then
+    echo " ${WHITE}- ${label}:${NO_COLOR} Yes (${path})"
+  else
+    echo " ${WHITE}- ${label}:${NO_COLOR} No (missing)"
+  fi
+}
+
+# Prints the steps that rebuild the boot setup from the installation medium.
+print_troubleshooting() {
+  echo
+  print_heading "BOOT TROUBLESHOOTiNG"
+  echo "If the system does not boot, try these steps:"
+  echo "1. From the UEFI/BIOS setup, make sure Secure Boot is disabled"
+  echo "2. Make sure the EFI partition is set as the primary boot device"
+  echo "3. If it still does not boot, try rebuilding the boot setup:"
+  echo "  - Boot from the Arch Linux installation media"
+  echo "  - Open the encrypted root: cryptsetup open ${ROOT_PART} cryptroot"
+  echo "  - Mount the filesystems: mount -o subvol=@ /dev/mapper/cryptroot" \
+    "/mnt"
+  echo "  - Mount the ESP: mount ${EFI_PART} /mnt/boot"
+  echo "  - Chroot: arch-chroot /mnt"
+  echo "  - Rerun: limine-install && limine-mkinitcpio"
+  echo "  - Exit chroot and reboot"
+}
+
 # Prints the installation summary.
 print_summary() {
   echo
@@ -1768,38 +1798,11 @@ print_summary() {
   echo
 
   echo "${WHITE}Boot Setup Status:${NO_COLOR}"
-  if [[ -f "/mnt/boot/EFI/Linux/arch_linux.efi" ]]; then
-    echo " ${WHITE}- UKI present:${NO_COLOR} Yes" \
-      "(/boot/EFI/Linux/arch_linux.efi)"
-  else
-    echo " ${WHITE}- UKI present:${NO_COLOR} No (missing)"
-  fi
-
-  if [[ -f "/mnt/boot/EFI/Linux/arch_linux-fallback.efi" ]]; then
-    echo " ${WHITE}- Fallback UKI:${NO_COLOR} Yes" \
-      "(/boot/EFI/Linux/arch_linux-fallback.efi)"
-  else
-    echo " ${WHITE}- Fallback UKI:${NO_COLOR} No (missing)"
-  fi
-
-  if [[ -f "/mnt/boot/EFI/limine/limine_x64.efi" ]]; then
-    echo " ${WHITE}- Limine:${NO_COLOR} Yes (/boot/EFI/limine/limine_x64.efi)"
-  else
-    echo " ${WHITE}- Limine:${NO_COLOR} No (missing)"
-  fi
-
-  if [[ -f "/mnt/boot/EFI/BOOT/BOOTX64.EFI" ]]; then
-    echo " ${WHITE}- Removable fallback:${NO_COLOR} Yes" \
-      "(/boot/EFI/BOOT/BOOTX64.EFI)"
-  else
-    echo " ${WHITE}- Removable fallback:${NO_COLOR} No (missing)"
-  fi
-
-  if [[ -f "/mnt/boot/limine.conf" ]]; then
-    echo " ${WHITE}- Limine config:${NO_COLOR} Yes (/boot/limine.conf)"
-  else
-    echo " ${WHITE}- Limine config:${NO_COLOR} No (missing)"
-  fi
+  print_boot_file "UKI present" /boot/EFI/Linux/arch_linux.efi
+  print_boot_file "Fallback UKI" /boot/EFI/Linux/arch_linux-fallback.efi
+  print_boot_file "Limine" /boot/EFI/limine/limine_x64.efi
+  print_boot_file "Removable fallback" /boot/EFI/BOOT/BOOTX64.EFI
+  print_boot_file "Limine config" /boot/limine.conf
 
   echo
   echo "${WHITE}The disk is unlocked with the LUKS passphrase. There is no" \
@@ -1838,20 +1841,7 @@ print_summary() {
   if ((VERIFY_FAILED)) \
     || [[ ! -f "/mnt/boot/EFI/Linux/arch_linux.efi" ]] \
     || [[ ! -f "/mnt/boot/EFI/BOOT/BOOTX64.EFI" ]]; then
-    echo
-    print_heading "BOOT TROUBLESHOOTiNG"
-    echo "If the system does not boot, try these steps:"
-    echo "1. From the UEFI/BIOS setup, make sure Secure Boot is disabled"
-    echo "2. Make sure the EFI partition is set as the primary boot device"
-    echo "3. If it still does not boot, try rebuilding the boot setup:"
-    echo "  - Boot from the Arch Linux installation media"
-    echo "  - Open the encrypted root: cryptsetup open ${ROOT_PART} cryptroot"
-    echo "  - Mount the filesystems: mount -o subvol=@ /dev/mapper/cryptroot" \
-      "/mnt"
-    echo "  - Mount the ESP: mount ${EFI_PART} /mnt/boot"
-    echo "  - Chroot: arch-chroot /mnt"
-    echo "  - Rerun: limine-install && limine-mkinitcpio"
-    echo "  - Exit chroot and reboot"
+    print_troubleshooting
   fi
 }
 
