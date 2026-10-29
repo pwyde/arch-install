@@ -161,6 +161,8 @@ can be run again to restore the configuration from the repository.
 - An Arch Linux system installed by `base-install.sh`, or one that provides:
   - A regular user account with `sudo` privileges.
   - The [paru](https://github.com/Morganamilo/paru) AUR helper.
+- No other enabled display manager, such as SDDM or GDM. The installer checks
+  this before it installs anything.
 - A network connection.
 - A full checkout of the repository.
 

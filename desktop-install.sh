@@ -577,6 +577,27 @@ validate_inputs() {
     fi
   done
 
+  # greetd is enabled as display-manager.service, an alias that systemctl
+  # enable does not take over from another display manager.
+  local dm_link="/etc/systemd/system/display-manager.service" display_manager
+  if [[ -L "${dm_link}" ]]; then
+    display_manager=$(readlink "${dm_link}")
+    display_manager="${display_manager##*/}"
+    if [[ "${display_manager}" != "greetd.service" ]]; then
+      print_error "${display_manager} is enabled as the display manager," \
+        "which greetd would replace."
+      if [[ -e "${dm_link}" ]]; then
+        print_error "Disable it first: sudo systemctl disable" \
+          "${display_manager}"
+      else
+        # pacman removes a package without disabling its services.
+        print_error "Its unit no longer exists. Remove the leftover link" \
+          "first: sudo rm ${dm_link}"
+      fi
+      exit 1
+    fi
+  fi
+
   # Everything the script copies out of this repository.
   local src
   for src in "${WALLPAPERS_SRC}" "${DOTFILES_SRC}"; do

@@ -549,7 +549,7 @@ have no per-user configuration; see [System-Wide Files](#system-wide-files).
 | --- | --- | --- |
 | Logging | `start_logging` | Re-runs the installer under `script(1)` |
 | Input | `parse_args` | Parses the command-line options |
-| Validation | `validate_inputs`, `validate_xkb_layout`, `validate_displays`, `validate_address`, `validate_packages` | Checks the account, the required commands, the repository files and every option |
+| Validation | `validate_inputs`, `validate_xkb_layout`, `validate_displays`, `validate_address`, `validate_packages` | Checks the account, the required commands, the display manager, the repository files and every option |
 | Confirmation | `confirm_operation` | Lists what will be installed and asks for confirmation |
 | Packages | `update_system`, `install_compositor`, `install_desktop_shell`, `install_cli_tools`, `install_neovim`, `install_extra_packages` | Upgrades the system and installs the packages |
 | System | `install_greeter_config`, `configure_greetd`, `configure_fonts`, `enable_passwordless_sync`, `set_login_shell` | Configures the login screen, the session, the fonts and the login shell |
