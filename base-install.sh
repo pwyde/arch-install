@@ -671,6 +671,7 @@ validate_inputs() {
   done
 
   # Tools required on the live system.
+  local tool
   for tool in sgdisk cryptsetup mkfs.fat mkfs.btrfs; do
     if ! command -v "${tool}" &>/dev/null; then
       print_error "Required tool '${tool}' not found. Please install it first."
@@ -788,6 +789,9 @@ format_partitions() {
 
 # Creates the Btrfs filesystem and its subvolumes.
 setup_btrfs() {
+  local subvol
+  local -a subvols
+
   print_msg "Format and layout Btrfs"
   mkfs.btrfs -L "ArchRoot" /dev/mapper/cryptroot
 
@@ -795,7 +799,8 @@ setup_btrfs() {
   mount /dev/mapper/cryptroot /mnt
 
   print_msg "Creating Btrfs subvolumes"
-  for subvol in ${SUBVOLUMES}; do
+  read -ra subvols <<<"${SUBVOLUMES}"
+  for subvol in "${subvols[@]}"; do
     print_msg "Creating subvolume ${subvol}"
     btrfs subvolume create "/mnt/${subvol}"
   done
@@ -806,6 +811,9 @@ setup_btrfs() {
 
 # Mounts the subvolumes and the ESP under /mnt.
 mount_filesystems() {
+  local subvol mountpoint
+  local -a subvols
+
   print_msg "Mount subvolumes"
 
   # The root subvolume first.
@@ -826,11 +834,9 @@ mount_filesystems() {
 
   # The remaining subvolumes, each on its own mount point.
   print_msg "Mounting other subvolumes"
-  for subvol in ${SUBVOLUMES}; do
+  read -ra subvols <<<"${SUBVOLUMES}"
+  for subvol in "${subvols[@]}"; do
     if [[ "${subvol}" != "@" ]]; then
-      # Mount point for the subvolume: '@home' becomes '/home'.
-      local mountpoint
-
       # @cache and @log mount below /var; the others at /<name>.
       case "${subvol}" in
         @home) mountpoint="/home" ;;
@@ -1648,15 +1654,6 @@ verify_installation() {
       "/etc/mkinitcpio.conf.d/hooks.conf; there will be no boot splash."
   fi
 
-  # Essential files.
-  print_msg "Checking for essential files"
-  # shellcheck disable=SC2043
-  for file in /mnt/etc/fstab; do
-    if [[ ! -f "${file}" ]]; then
-      print_warning "${file} not found. This may cause problems."
-    fi
-  done
-
   # User setup.
   print_msg "Checking user setup"
   if ! arch-chroot /mnt id "${USERNAME}" &>/dev/null; then
@@ -1677,21 +1674,21 @@ verify_installation() {
 # The Arch Linux installation image uses zsh as its default shell. Any parent
 # other than zsh or a program that starts a login session marks a nested shell.
 check_shell_nesting() {
-  local arg
+  local arg parent_cmd
   for arg in "$@"; do
     case "${arg}" in -h | --help) return 0 ;; esac
   done
 
-  PARENT_CMD="$(ps -o comm= -p "${PPID}")"
+  parent_cmd="$(ps -o comm= -p "${PPID}")"
 
-  case "${PARENT_CMD}" in
+  case "${parent_cmd}" in
     login | agetty | systemd | zsh)
-      print_msg "Top-level shell detected (parent: ${PARENT_CMD})"
+      print_msg "Top-level shell detected (parent: ${parent_cmd})"
       echo
       ;;
     *)
       print_error "This script must be started from a top-level shell, not" \
-        "from ${PARENT_CMD}."
+        "from ${parent_cmd}."
       exit 1
       ;;
   esac
