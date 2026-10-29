@@ -34,6 +34,8 @@ readonly DEFAULT_LOCALE="en_GB.UTF-8"
 # No snapshots subvolume is listed: 'snapper create-config' creates its own
 # /.snapshots and refuses to run when the path already exists.
 readonly DEFAULT_SUBVOLUMES="@ @home @cache @log @root"
+# base-devel and git clone and build paru in install_aur_helper, and paru needs
+# base-devel for every AUR package it builds afterwards.
 # mkinitcpio and iptables are named explicitly. They provide the virtual
 # packages 'initramfs' and 'libxtables.so', which have several providers each.
 # pacstrap runs with --noconfirm, which would otherwise leave the choice to
