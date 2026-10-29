@@ -70,7 +70,9 @@ network connection is already required at this step.
 Until the first write to the disk, a failure exits quietly; the `EXIT` trap only
 removes the temporary sync databases. After it, the trap also unmounts the
 target filesystems, stops the `gpg-agent` left running on the target keyring and
-closes the LUKS container if the installer opened it.
+closes the LUKS container if the installer opened it. A failed check of the boot
+files in step 14 is the exception: the installer exits with status 1 but leaves
+the target mounted for the repairs that the errors suggest.
 
 `configure_system` runs its steps in a fixed order. Hibernation and Plymouth
 are configured before the boot setup, since both contribute kernel parameters

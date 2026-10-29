@@ -87,6 +87,9 @@ CRYPTROOT_OPENED=0
 # Set by the first step that writes to the disk. Until then a failure has
 # nothing to undo, and reporting a cleanup would only obscure the real error.
 DISK_MODIFIED=0
+# Set by verify_installation when the installed system may not boot. The run
+# then fails, but the target stays mounted for the repairs the errors suggest.
+VERIFY_FAILED=0
 
 # Only EXIT runs cleanup: a signal handler would see the status of whatever
 # command the signal interrupted, which is 0 more often than not. Converting the
@@ -115,8 +118,10 @@ cleanup() {
   [[ -z "${PKG_DB_DIR:-}" ]] || rm -rf "${PKG_DB_DIR}"
 
   # Argument, validation and confirmation failures all end here before anything
-  # on the disk has changed, and stay quiet.
-  if [[ "${exit_code}" -ne 0 ]] && [[ "${DISK_MODIFIED:-0}" -eq 1 ]]; then
+  # on the disk has changed, and stay quiet. A failed verification leaves the
+  # target mounted for repairs.
+  if [[ "${exit_code}" -ne 0 ]] && [[ "${DISK_MODIFIED:-0}" -eq 1 ]] \
+    && [[ "${VERIFY_FAILED:-0}" -eq 0 ]]; then
     print_error "Script exited with error code ${exit_code}. Performing" \
       "cleanup..."
 
@@ -897,10 +902,7 @@ mount_filesystems() {
       print_msg "Mounting subvolume ${subvol} to /mnt${mountpoint}"
       mkdir -p "/mnt${mountpoint}"
       mount -o "subvol=${subvol},${BTRFS_MOUNT_OPTS}" /dev/mapper/cryptroot \
-        "/mnt${mountpoint}" || {
-        print_warning "Failed to mount subvolume ${subvol} to /mnt${mountpoint}"
-        continue
-      }
+        "/mnt${mountpoint}"
     fi
   done
 
@@ -1748,6 +1750,7 @@ verify_installation() {
     print_error "EFI directory not found at /boot/EFI. The system will not" \
       "boot."
     print_error "Check that the EFI partition is mounted at /mnt/boot."
+    VERIFY_FAILED=1
   fi
 
   # Boot files.
@@ -1756,6 +1759,7 @@ verify_installation() {
     print_error "UKI not found at /boot/EFI/Linux/arch_linux.efi. The system" \
       "will not boot."
     print_error "Rebuild it with: arch-chroot /mnt limine-mkinitcpio"
+    VERIFY_FAILED=1
   fi
 
   # Bootloader.
@@ -1763,12 +1767,14 @@ verify_installation() {
     && [[ ! -f "/mnt/boot/EFI/BOOT/BOOTX64.EFI" ]]; then
     print_error "Limine not found. The system will not boot."
     print_error "Reinstall it with: arch-chroot /mnt limine-install"
+    VERIFY_FAILED=1
   fi
 
   # Bootloader configuration.
   if [[ ! -f "/mnt/boot/limine.conf" ]]; then
     print_error "Limine configuration not found at /boot/limine.conf."
     print_error "Rebuild it with: arch-chroot /mnt limine-mkinitcpio"
+    VERIFY_FAILED=1
   fi
 
   # The UKI embeds the command line assembled from /etc/cmdline.d/. This checks
@@ -2010,14 +2016,22 @@ print_summary() {
   fi
 
   echo
-  echo "${BLUE}==>${WHITE} Done. Ready to reboot!${NO_COLOR}"
+  if [[ "${VERIFY_FAILED}" -eq 1 ]]; then
+    echo "${RED}==>${WHITE} Finished with errors, and the system may not" \
+      "boot.${NO_COLOR}"
+    echo "    ${WHITE}Fix the errors above before rebooting; /mnt stays" \
+      "mounted for arch-chroot.${NO_COLOR}"
+  else
+    echo "${BLUE}==>${WHITE} Done. Ready to reboot!${NO_COLOR}"
+  fi
   echo "${BLUE}==>${WHITE} Secure Boot is not configured by this script:" \
     "leave it disabled${NO_COLOR}"
   echo "    ${WHITE}in the BIOS for now.${NO_COLOR}"
   echo "${BLUE}==>${WHITE} After reboot, log in as ${USERNAME}${NO_COLOR}"
 
-  # Troubleshooting tips when a boot file is missing.
-  if [[ ! -f "/mnt/boot/EFI/Linux/arch_linux.efi" ]] \
+  # Troubleshooting tips when verification failed or a boot file is missing.
+  if [[ "${VERIFY_FAILED}" -eq 1 ]] \
+    || [[ ! -f "/mnt/boot/EFI/Linux/arch_linux.efi" ]] \
     || [[ ! -f "/mnt/boot/EFI/BOOT/BOOTX64.EFI" ]]; then
     echo
     print_heading "BOOT TROUBLESHOOTiNG"
@@ -2065,6 +2079,10 @@ main() {
   verify_installation
   print_summary
   copy_installer_to_home
+
+  if [[ "${VERIFY_FAILED}" -eq 1 ]]; then
+    exit 1
+  fi
 }
 
 # Entry point.
