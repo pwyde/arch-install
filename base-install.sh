@@ -905,9 +905,11 @@ install_base_system() {
   print_msg "Generate fstab"
   genfstab -U /mnt >>/mnt/etc/fstab
 
-  # genfstab must have produced a non-empty fstab.
-  if [[ ! -s /mnt/etc/fstab ]]; then
-    print_error "fstab generation failed or produced empty file"
+  # The filesystem package ships an fstab of comments only, so an entry for /
+  # is what shows that genfstab wrote anything.
+  if ! findmnt --tab-file /mnt/etc/fstab --mountpoint / >/dev/null; then
+    print_error "genfstab wrote no entry for the root filesystem to" \
+      "/mnt/etc/fstab."
     exit 1
   fi
 
