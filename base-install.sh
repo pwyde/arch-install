@@ -1328,8 +1328,17 @@ configure_boot() {
   install -D -m 0644 "${MKINITCPIO_HOOKS_CONF_SRC}" \
     /mnt/etc/mkinitcpio.conf.d/hooks.conf
 
-  local root_uuid
+  # blkid prints nothing and still succeeds when it cannot read a UUID. An
+  # empty one would pass the later checks for rd.luks.name and leave a system
+  # that cannot unlock its root.
+  local root_uuid pattern
+  pattern='^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$'
   root_uuid=$(blkid -s UUID -o value "${ROOT_PART}")
+  if [[ ! "${root_uuid}" =~ ${pattern} ]]; then
+    print_error "Could not read the UUID of the LUKS container on" \
+      "${ROOT_PART}."
+    exit 1
+  fi
   print_msg "Installing kernel command line for root UUID ${root_uuid}"
   sed "s|@ROOT_UUID@|${root_uuid}|g" "${CMDLINE_SRC}/10-root.conf" \
     | install -D -m 0644 /dev/stdin /mnt/etc/cmdline.d/10-root.conf
