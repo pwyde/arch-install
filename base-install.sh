@@ -1849,6 +1849,7 @@ print_summary() {
     echo "2. Make sure the EFI partition is set as the primary boot device"
     echo "3. If it still does not boot, try rebuilding the boot setup:"
     echo "  - Boot from the Arch Linux installation media"
+    echo "  - Open the encrypted root: cryptsetup open ${ROOT_PART} cryptroot"
     echo "  - Mount the filesystems: mount -o subvol=@ /dev/mapper/cryptroot" \
       "/mnt"
     echo "  - Mount the ESP: mount ${EFI_PART} /mnt/boot"
