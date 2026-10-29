@@ -95,15 +95,15 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 print_msg() {
-  echo -e "${GREEN}==>${NO_COLOR}${WHITE}" "${@}" "${NO_COLOR}" >&1
+  echo "${GREEN}==>${NO_COLOR}${WHITE}" "$*${NO_COLOR}"
 }
 
 print_warning() {
-  echo -e "${YELLOW}==> WARNING:${NO_COLOR}${WHITE}" "${@}" "${NO_COLOR}" >&2
+  echo "${YELLOW}==> WARNING:${NO_COLOR}${WHITE}" "$*${NO_COLOR}" >&2
 }
 
 print_error() {
-  echo -e "${RED}==> ERROR:${NO_COLOR}${WHITE}" "${@}" "${NO_COLOR}" >&2
+  echo "${RED}==> ERROR:${NO_COLOR}${WHITE}" "$*${NO_COLOR}" >&2
 }
 
 # Reports a failed run. Once the disk has been written to, nothing is undone:
