@@ -710,24 +710,6 @@ validate_inputs() {
   done
 }
 
-setup_luks() {
-  # Prompts for the LUKS passphrase unless it is already set.
-  if [[ -z "${LUKS_PASSPHRASE:-}" ]]; then
-    read -rs -p "Enter LUKS passphrase: " LUKS_PASSPHRASE
-    echo # Ends the line after the hidden input
-  fi
-
-  # Opens the container with the passphrase on stdin.
-  if ! echo "${LUKS_PASSPHRASE}" \
-    | cryptsetup open "${ROOT_PART}" cryptroot --key-file=-; then
-    print_error "Failed to open LUKS container."
-    print_msg "This might be due to a previous LUKS header still being" \
-      "detected."
-    exit 1
-  fi
-  CRYPTROOT_OPENED=1
-}
-
 # Derives the partition names and the microcode package.
 setup_partitions() {
   # The kernel puts a 'p' between the disk name and the partition number when
@@ -1430,65 +1412,11 @@ EOF
 configure_boot() {
   print_msg "Configuring boot"
 
-  # The ESP must be mounted at /mnt/boot.
-  if ! mountpoint -q "/mnt/boot"; then
-    print_warning "EFI partition not mounted at /mnt/boot. Attempting to mount."
-    mkdir -p "/mnt/boot"
-    if [[ -b "${EFI_PART}" ]]; then
-      if mount -o "${ESP_MOUNT_OPTS}" "${EFI_PART}" "/mnt/boot"; then
-        print_msg "EFI partition mounted."
-      else
-        print_error "Failed to mount EFI partition. Boot setup will likely" \
-          "fail."
-        if [[ "${NON_INTERACTIVE}" -eq 0 ]]; then
-          read -r -p "Continue anyway? (y/N) " REPLY
-          echo
-          if [[ ! ${REPLY} =~ ^[Yy]$ ]]; then
-            print_msg "Boot setup aborted."
-            return 1
-          fi
-        else
-          print_msg "Continuing anyway in non-interactive mode."
-        fi
-      fi
-    else
-      print_error "EFI partition ${EFI_PART} not found. Boot setup will" \
-        "likely fail."
-      if [[ "${NON_INTERACTIVE}" -eq 0 ]]; then
-        read -r -p "Continue anyway? (y/N) " REPLY
-        echo
-        if [[ ! ${REPLY} =~ ^[Yy]$ ]]; then
-          print_msg "Boot setup aborted."
-          return 1
-        fi
-      else
-        print_msg "Continuing anyway in non-interactive mode."
-      fi
-    fi
-  fi
-
-  # The ESP must be formatted as FAT.
-  if ! file -sL "$(findmnt -n -o SOURCE --first-only "/mnt/boot")" \
-    | grep -q "FAT"; then
-    print_warning "WARNING: EFI System Partition is not formatted as FAT" \
-      "filesystem."
-    print_msg "Current filesystem type:" \
-      "$(file -sL "$(findmnt -n -o SOURCE --first-only "/mnt/boot")")"
-    if [[ "${NON_INTERACTIVE}" -eq 0 ]]; then
-      local prompt="Format the EFI partition with FAT32? This will erase all"
-      read -r -p "${prompt} data on it. (y/N) " REPLY
-      echo
-      if [[ ${REPLY} =~ ^[Yy]$ ]]; then
-        umount "/mnt/boot"
-        mkfs.fat -F32 -n "EFI" "${EFI_PART}"
-        mount -o "${ESP_MOUNT_OPTS}" "${EFI_PART}" "/mnt/boot"
-        print_msg "EFI partition reformatted and remounted."
-      else
-        print_msg "Continuing without reformatting. Boot might fail."
-      fi
-    else
-      print_msg "Continuing without reformatting in non-interactive mode."
-    fi
+  # The boot files belong on the ESP, which mount_filesystems mounted as FAT.
+  # Empty output means nothing is mounted there.
+  if [[ "$(findmnt -n -o FSTYPE --mountpoint /mnt/boot)" != "vfat" ]]; then
+    print_error "/mnt/boot is not the FAT-formatted EFI partition."
+    exit 1
   fi
 
   # Limine reads it from the root of the boot volume. It carries only global
