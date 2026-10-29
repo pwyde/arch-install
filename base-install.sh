@@ -820,15 +820,7 @@ mount_filesystems() {
 
   # The root subvolume first.
   print_msg "Mounting root subvolume"
-  mount -o "subvol=@,${BTRFS_MOUNT_OPTS}" /dev/mapper/cryptroot /mnt || {
-    print_error "Failed to mount root subvolume"
-    print_msg "Debug info:"
-    mount /dev/mapper/cryptroot /mnt
-    ls -la /mnt/
-    btrfs subvolume list /mnt
-    umount /mnt
-    exit 1
-  }
+  mount -o "subvol=@,${BTRFS_MOUNT_OPTS}" /dev/mapper/cryptroot /mnt
 
   mkdir -p "/mnt/boot"
   print_msg "Mounting EFI partition to /mnt/boot"
@@ -971,7 +963,6 @@ configure_basic_system() {
   # Outside the chroot: with --root, systemd-firstboot skips reloading the
   # console over D-Bus.
   print_msg "Setting keymap to ${KEYMAP}"
-  validate_keymap
   systemd-firstboot --root=/mnt --keymap="${KEYMAP}"
 
   print_msg "Setting locale to ${LOCALE}"
@@ -1555,7 +1546,7 @@ EOF
 # Enables the system services.
 enable_services() {
   print_msg "Enabling services"
-  arch-chroot /mnt /bin/bash -e <<EOF
+  arch-chroot /mnt /bin/bash -e <<'EOF'
 systemctl enable systemd-resolved systemd-timesyncd \
   systemd-zram-setup@zram0.service sshd NetworkManager
 systemctl mask systemd-networkd
