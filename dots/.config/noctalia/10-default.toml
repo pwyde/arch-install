@@ -1,0 +1,173 @@
+[backdrop]
+enabled = true
+
+[bar.default]
+capsule = true
+center = ["workspaces"]
+end = [
+  "tray",
+  "media",
+  "volume",
+  "notifications",
+  "clipboard",
+  "network",
+  "clock",
+]
+margin_edge = 15
+margin_ends = 15
+start = ["launcher", "group:g1", "group:g2"]
+
+[[bar.default.capsule_group]]
+accordion = false
+accordion_direction = "end"
+border_width = 1.0
+enabled = true
+fill = "surface_container"
+id = "g1"
+members = ["cpu", "ram", "sysmon", "temp"]
+opacity = 1.0
+padding = 6.0
+
+[[bar.default.capsule_group]]
+accordion = false
+accordion_direction = "end"
+border_width = 1.0
+enabled = true
+fill = "surface_container"
+id = "g2"
+members = ["network_rx", "network_tx"]
+opacity = 1.0
+padding = 6.0
+
+[brightness]
+enable_ddcutil = true
+
+[calendar]
+enabled = true
+
+[control_center.calendar]
+show_week_numbers = true
+
+[idle]
+behavior_order = ["lock", "screen-off", "lock-and-suspend"]
+pre_action_fade_seconds = 5
+
+[idle.behavior.lock]
+action = "lock"
+enabled = true
+timeout = 900.0
+
+[idle.behavior.lock-and-suspend]
+action = "lock_and_suspend"
+enabled = true
+timeout = 3600.0
+
+[idle.behavior.screen-off]
+action = "screen_off"
+enabled = true
+timeout = 1800.0
+
+[location]
+address = "@LOCATION_ADDRESS@"
+
+[lockscreen]
+transition = ["fade"]
+
+[shell]
+font_family = "Inter"
+polkit_agent = true
+screen_time_enabled = true
+
+[shell.greeter_sync]
+auto_sync = true
+
+[shell.panel]
+session_position = "center"
+
+[theme]
+source = "wallpaper"
+wallpaper_scheme = "m3-tonal-spot"
+
+[theme.templates]
+builtin_ids = ["btop", "gtk3", "gtk4", "kcolorscheme", "kitty", "niri"]
+community_ids = [
+  "fastfetch",
+  "papirus-icons",
+  "konsole",
+  "superfile",
+  "bat",
+  "lazyvim",
+  "glow",
+  "starship",
+]
+
+# Pywalfox colors for Firefox. The community pywalfox template is not used: its
+# firefox-theme action writes a native messaging manifest to ~/.mozilla, and an
+# existing ~/.mozilla makes Firefox keep its profiles there instead of under
+# ~/.config/mozilla. The python-pywalfox package registers its host in
+# /usr/lib/mozilla/native-messaging-hosts instead.
+[theme.templates.user.pywalfox]
+input_path = "$XDG_CONFIG_HOME/noctalia/templates/pywalfox.json"
+output_path = "$XDG_CACHE_HOME/wal/colors.json"
+post_hook = "pywalfox {{ mode }} && pywalfox update"
+
+# fzf colors, read through FZF_DEFAULT_OPTS_FILE, which
+# ~/.config/fish/conf.d/10-fzf.fish sets. The community fzf template is not
+# used: its fish snippet appends the colors to a universal FZF_DEFAULT_OPTS,
+# which grows with every new shell.
+[theme.templates.user.fzf]
+input_path = "$XDG_CONFIG_HOME/noctalia/templates/fzf-colors"
+output_path = "$XDG_CONFIG_HOME/fzf/colors"
+
+# eza colors.
+[theme.templates.user.eza]
+input_path = "$XDG_CONFIG_HOME/noctalia/templates/eza-theme.yml"
+output_path = "$XDG_CONFIG_HOME/eza/theme.yml"
+
+# VSCodium colors, written into the installed Noctalia theme extension, from
+# the community vscode template's color file. The community template itself is
+# not used: it expects ~/.vscode-oss and extension version 0.0.5, while
+# VSCodium keeps its extensions in ~/.local/share/vscodium in portable mode. The
+# command finds the extension at any version. VSCodium reloads the theme when
+# the file changes.
+[theme.templates.user.vscodium]
+input_path = "$XDG_CONFIG_HOME/noctalia/templates/vscode.json"
+output_path_dynamic = 'ls -d "${VSCODE_PORTABLE:-${XDG_DATA_HOME:-$HOME/.local/share}/vscodium}"/extensions/noctalia.noctaliatheme-*/themes/NoctaliaTheme-color-theme.json 2>/dev/null'
+
+[wallpaper]
+directory = "~/Pictures/Wallpapers"
+transition = ["fade"]
+
+[widget.clock]
+format = "{:%a %d %b} {:%H:%M}"
+
+[widget.cpu]
+show_value = false
+
+[widget.launcher]
+glyph = "navigation-search"
+
+[widget.media]
+hide_when_no_media = true
+
+[widget.network]
+show_label = false
+
+[widget.network_rx]
+show_value = false
+
+[widget.network_tx]
+show_value = false
+
+[widget.ram]
+show_value = false
+
+[widget.sysmon]
+show_value = false
+stat = "disk_used"
+
+[widget.temp]
+show_value = false
+
+[widget.volume]
+show_label = false

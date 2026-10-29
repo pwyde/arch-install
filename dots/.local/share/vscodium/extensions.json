@@ -1,0 +1,13 @@
+{
+  "recommendations": [
+    "bmalehorn.vscode-fish",
+    "Catppuccin.catppuccin-vsc-icons",
+    "coolbear.systemd-unit-file",
+    "DavidAnson.vscode-markdownlint",
+    "kdl-org.kdl",
+    "Noctalia.noctaliatheme",
+    "sumneko.lua",
+    "tamasfe.even-better-toml",
+    "timonwong.shellcheck"
+  ]
+}

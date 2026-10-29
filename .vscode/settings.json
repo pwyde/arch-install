@@ -1,0 +1,24 @@
+{
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "[fish][kdl]": {
+    "editor.tabSize": 4
+  },
+
+  "editor.guides.bracketPairs": "active",
+  "editor.guides.bracketPairsHorizontal": "active",
+
+  "editor.hover.delay": 1500,
+  "editor.rulers": [80],
+  "editor.stickyScroll.enabled": false,
+  "explorer.autoReveal": false,
+
+  "files.autoSave": "afterDelay",
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "[markdown]": {
+    "files.trimTrailingWhitespace": false
+  },
+
+  "terminal.integrated.minimumContrastRatio": 1
+}

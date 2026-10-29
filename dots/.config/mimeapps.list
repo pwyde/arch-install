@@ -1,0 +1,99 @@
+# Default applications, installed as ~/.config/mimeapps.list and followed by
+# Dolphin and every other program that implements the XDG MIME applications
+# specification. The types are the names shared-mime-info gives the files;
+# Matroska is also listed under the older alias in Haruna's desktop file.
+[Default Applications]
+# Web pages and links: Firefox.
+application/xhtml+xml=firefox.desktop;
+text/html=firefox.desktop;
+x-scheme-handler/http=firefox.desktop;
+x-scheme-handler/https=firefox.desktop;
+
+# Images: Gwenview.
+image/avif=org.kde.gwenview.desktop;
+image/bmp=org.kde.gwenview.desktop;
+image/gif=org.kde.gwenview.desktop;
+image/heif=org.kde.gwenview.desktop;
+image/jpeg=org.kde.gwenview.desktop;
+image/jxl=org.kde.gwenview.desktop;
+image/png=org.kde.gwenview.desktop;
+image/svg+xml=org.kde.gwenview.desktop;
+image/svg+xml-compressed=org.kde.gwenview.desktop;
+image/tiff=org.kde.gwenview.desktop;
+image/vnd.microsoft.icon=org.kde.gwenview.desktop;
+image/webp=org.kde.gwenview.desktop;
+
+# Videos: Haruna.
+video/matroska=org.kde.haruna.desktop;
+video/mp2t=org.kde.haruna.desktop;
+video/mp4=org.kde.haruna.desktop;
+video/mpeg=org.kde.haruna.desktop;
+video/ogg=org.kde.haruna.desktop;
+video/quicktime=org.kde.haruna.desktop;
+video/vnd.avi=org.kde.haruna.desktop;
+video/webm=org.kde.haruna.desktop;
+video/x-matroska=org.kde.haruna.desktop;
+video/x-ms-wmv=org.kde.haruna.desktop;
+
+# PDF: Okular.
+application/pdf=okularApplication_pdf.desktop;
+
+# Text documents: LibreOffice Writer.
+application/msword=libreoffice-writer.desktop;
+application/rtf=libreoffice-writer.desktop;
+application/vnd.oasis.opendocument.text=libreoffice-writer.desktop;
+application/vnd.oasis.opendocument.text-template=libreoffice-writer.desktop;
+application/vnd.openxmlformats-officedocument.wordprocessingml.document=libreoffice-writer.desktop;
+application/vnd.openxmlformats-officedocument.wordprocessingml.template=libreoffice-writer.desktop;
+
+# Spreadsheets: LibreOffice Calc.
+application/vnd.ms-excel=libreoffice-calc.desktop;
+application/vnd.oasis.opendocument.spreadsheet=libreoffice-calc.desktop;
+application/vnd.oasis.opendocument.spreadsheet-template=libreoffice-calc.desktop;
+application/vnd.openxmlformats-officedocument.spreadsheetml.sheet=libreoffice-calc.desktop;
+application/vnd.openxmlformats-officedocument.spreadsheetml.template=libreoffice-calc.desktop;
+
+# Presentations: LibreOffice Impress.
+application/vnd.ms-powerpoint=libreoffice-impress.desktop;
+application/vnd.oasis.opendocument.presentation=libreoffice-impress.desktop;
+application/vnd.oasis.opendocument.presentation-template=libreoffice-impress.desktop;
+application/vnd.openxmlformats-officedocument.presentationml.presentation=libreoffice-impress.desktop;
+application/vnd.openxmlformats-officedocument.presentationml.template=libreoffice-impress.desktop;
+
+# Drawings: LibreOffice Draw.
+application/vnd.oasis.opendocument.graphics=libreoffice-draw.desktop;
+application/vnd.oasis.opendocument.graphics-template=libreoffice-draw.desktop;
+
+# Text and source code: Kate.
+application/json=org.kde.kate.desktop;
+application/toml=org.kde.kate.desktop;
+application/x-fishscript=org.kde.kate.desktop;
+application/xml=org.kde.kate.desktop;
+application/yaml=org.kde.kate.desktop;
+text/css=org.kde.kate.desktop;
+text/javascript=org.kde.kate.desktop;
+text/markdown=org.kde.kate.desktop;
+text/plain=org.kde.kate.desktop;
+text/x-chdr=org.kde.kate.desktop;
+text/x-csrc=org.kde.kate.desktop;
+text/x-log=org.kde.kate.desktop;
+text/x-lua=org.kde.kate.desktop;
+text/x-makefile=org.kde.kate.desktop;
+text/x-patch=org.kde.kate.desktop;
+text/x-python=org.kde.kate.desktop;
+text/x-shellscript=org.kde.kate.desktop;
+text/x-systemd-unit=org.kde.kate.desktop;
+
+# Archives: Ark.
+application/gzip=org.kde.ark.desktop;
+application/vnd.rar=org.kde.ark.desktop;
+application/x-7z-compressed=org.kde.ark.desktop;
+application/x-bzip2=org.kde.ark.desktop;
+application/x-bzip2-compressed-tar=org.kde.ark.desktop;
+application/x-compressed-tar=org.kde.ark.desktop;
+application/x-tar=org.kde.ark.desktop;
+application/x-xz=org.kde.ark.desktop;
+application/x-xz-compressed-tar=org.kde.ark.desktop;
+application/x-zstd-compressed-tar=org.kde.ark.desktop;
+application/zip=org.kde.ark.desktop;
+application/zstd=org.kde.ark.desktop;

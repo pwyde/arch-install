@@ -1,0 +1,8 @@
+# Static table lookup for hostnames. See hosts(5).
+#
+# The hostname is also mapped to 127.0.1.1, which is what Debian-derived
+# systems do and what some software expects when resolving its own name on a
+# machine with no permanent IP address.
+127.0.0.1   localhost
+::1         localhost
+127.0.1.1   @HOSTNAME@.localdomain @HOSTNAME@

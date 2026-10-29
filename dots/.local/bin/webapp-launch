@@ -1,0 +1,19 @@
+#!/bin/bash
+#
+# Opens a URL as a web app: a Chromium window without tabs or address bar.
+# The launchers that webapp-install creates run this command.
+#
+# Usage: webapp-launch URL [CHROMIUM OPTION...]
+
+set -euo pipefail
+
+if [[ $# -lt 1 ]]; then
+  echo "Usage: webapp-launch URL [CHROMIUM OPTION...]" >&2
+  exit 1
+fi
+if ! command -v chromium >/dev/null; then
+  echo "webapp-launch: web apps need Chromium, which is not installed." >&2
+  exit 1
+fi
+
+exec chromium --app="$1" "${@:2}"

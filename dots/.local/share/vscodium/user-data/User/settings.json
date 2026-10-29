@@ -1,0 +1,55 @@
+// VSCodium user settings, installed as
+// ~/.local/share/vscodium/user-data/User/settings.json: VSCodium runs in
+// portable mode, see ~/.config/environment.d/60-vscodium.conf.
+{
+  // The theme from the Noctalia theme extension, whose colors Noctalia
+  // renders. desktop-install.sh installs the extensions that
+  // ~/.local/share/vscodium/extensions.json lists.
+  "workbench.colorTheme": "NoctaliaTheme",
+  // File and folder icons from Catppuccin Icons, in the Mocha variant.
+  "workbench.iconTheme": "catppuccin-mocha",
+
+  // JetBrainsMono Nerd Font in the editor and the integrated terminal.
+  "editor.fontFamily": "'JetBrainsMono Nerd Font', monospace",
+  "editor.fontLigatures": true,
+  "terminal.integrated.fontFamily": "'JetBrainsMono Nerd Font'",
+
+  // Indentation with two spaces, where a file's own indentation does not
+  // show otherwise. Fish and KDL use four, as fish_indent and niri's default
+  // configuration do.
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "[fish][kdl]": {
+    "editor.tabSize": 4
+  },
+
+  // Bracket pair guides: vertical and horizontal for the pair around the
+  // cursor only.
+  "editor.guides.bracketPairs": "active",
+  "editor.guides.bracketPairsHorizontal": "active",
+
+  "editor.hover.delay": 1500,
+  "editor.rulers": [80],
+  "editor.stickyScroll.enabled": false,
+  "explorer.autoReveal": false,
+
+  // JSON5 has no built-in language; JSON with comments comes closest.
+  "files.associations": {
+    "*.json5": "jsonc",
+    "**/*.yaml.j2": "yaml"
+  },
+
+  // Saves a second after typing stops, without trailing whitespace and with
+  // a final line break.
+  "files.autoSave": "afterDelay",
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  // Two trailing spaces are a line break in Markdown.
+  "[markdown]": {
+    "files.trimTrailingWhitespace": false
+  },
+
+  // Terminal colors exactly as Noctalia sets them, without contrast
+  // adjustments.
+  "terminal.integrated.minimumContrastRatio": 1
+}

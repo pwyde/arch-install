@@ -1,0 +1,10 @@
+# Runs the Noctalia greeter on the first virtual terminal. greetd.service
+# conflicts with getty@tty1, which it replaces.
+[terminal]
+vt = 1
+
+# The greeter runs as the 'greeter' account created by the greetd package,
+# which also owns /var/lib/noctalia-greeter.
+[default_session]
+command = "/usr/bin/noctalia-greeter-session"
+user = "greeter"

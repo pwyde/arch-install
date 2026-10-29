@@ -1,0 +1,11 @@
+{
+  "recommendations": [
+    "bmalehorn.vscode-fish",
+    "coolbear.systemd-unit-file",
+    "DavidAnson.vscode-markdownlint",
+    "kdl-org.kdl",
+    "sumneko.lua",
+    "tamasfe.even-better-toml",
+    "timonwong.shellcheck"
+  ]
+}

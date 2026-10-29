@@ -1,0 +1,90 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// 60 — Animations
+// ─────────────────────────────────────────────────────────────────────────────
+// Docs: https://niri-wm.github.io/niri/Configuration:-Animations
+//
+// Each animation is either a spring or an easing curve. This file uses springs
+// throughout, all slightly underdamped apart from the overview and the window
+// switcher. Niri's defaults use critically damped springs for most animations,
+// and easing curves for window open, window close and the screenshot UI.
+//
+// Spring parameters, all three required:
+//
+//   damping-ratio  How the spring comes to rest, from 0.1 to 10.0.
+//                  < 1.0  underdamped: oscillates at the end
+//                  = 1.0  critically damped: comes to rest in the minimum
+//                         time, without oscillating
+//                  > 1.0  overdamped: does not oscillate, but is not
+//                         recommended, as it can cause graphical glitches
+//                  A fast touchpad swipe can make any spring oscillate,
+//                  including a critically damped one.
+//
+//   stiffness      Lower values give a slower animation that is more prone to
+//                  oscillation. The spring mass is fixed at 1.0, and the
+//                  duration cannot be set directly.
+//
+//   epsilon        Lower this value if the animation jumps at the end.
+//
+// An easing curve sets the duration directly, as two separate lines:
+//   duration-ms 250
+//   curve "ease-out-expo"
+// Curves: ease-out-quad, ease-out-cubic, ease-out-expo, linear and
+// cubic-bezier, which takes four control-point values.
+// ─────────────────────────────────────────────────────────────────────────────
+animations {
+    // Uncomment to disable all animations.
+    // off
+
+    // Workspace switch: a damping ratio below 1.0 gives a slight overshoot.
+    workspace-switch {
+        spring damping-ratio=0.78 stiffness=600 epsilon=0.0001
+    }
+
+    // Window open: the lowest stiffness in this file, giving the slowest
+    // animation, with a slight overshoot.
+    window-open {
+        spring damping-ratio=0.82 stiffness=500 epsilon=0.0001
+    }
+
+    // Window close: higher stiffness for a quick exit.
+    window-close {
+        spring damping-ratio=0.88 stiffness=900 epsilon=0.0001
+    }
+
+    // Horizontal view movement: smooth panning with a slight overshoot.
+    horizontal-view-movement {
+        spring damping-ratio=0.80 stiffness=550 epsilon=0.0001
+    }
+
+    // Window movement: a slight overshoot.
+    window-movement {
+        spring damping-ratio=0.85 stiffness=650 epsilon=0.0001
+    }
+
+    // Column and window resize: fast, with minimal overshoot.
+    window-resize {
+        spring damping-ratio=0.88 stiffness=700 epsilon=0.0001
+    }
+
+    // Configuration notification: less bounce than niri's default damping
+    // ratio of 0.6.
+    config-notification-open-close {
+        spring damping-ratio=0.90 stiffness=800 epsilon=0.0001
+    }
+
+    // Screenshot UI: fast opening.
+    screenshot-ui-open {
+        spring damping-ratio=0.85 stiffness=750 epsilon=0.0001
+    }
+
+    // Overview: critically damped, without overshoot.
+    overview-open-close {
+        spring damping-ratio=1.0 stiffness=900 epsilon=0.0001
+    }
+
+    // Niri's built-in window switcher. Alt+Tab opens Noctalia's switcher
+    // instead; see 70-binds.kdl.
+    recent-windows-close {
+        spring damping-ratio=1.0 stiffness=1000 epsilon=0.001
+    }
+}

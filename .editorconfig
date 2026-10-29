@@ -1,0 +1,42 @@
+# Formatting for editors that read EditorConfig: https://editorconfig.org
+root = true
+
+# Two spaces, as the Google Shell Style Guide, StyLua, Taplo and Prettier
+# format shell, Lua, TOML, JSON and YAML.
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 2
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Two trailing spaces are a line break in Markdown.
+[*.md]
+trim_trailing_whitespace = false
+
+# fish_indent's fixed style, and the style of niri's default configuration.
+[*.{fish,kdl}]
+indent_size = 4
+
+# Noctalia's upstream template, kept as published.
+[dots/.config/noctalia/templates/vscode.json]
+indent_size = 4
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+
+# Written by the programs themselves, in their own format.
+[dots/.config/{btop/btop.conf,dolphinrc,gwenviewrc,katerc,kdeglobals,kiorc,konsolerc,kservicemenurc,kwriterc,nirimod/settings.json,nvim/lazyvim.json,nwg-look/config}]
+indent_size = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+
+[dots/.local/share/{kate/anonymous.katesession,konsole/Default.profile,kwrite/anonymous.katesession,kxmlgui5/dolphin/dolphinui.rc}]
+indent_size = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+
+# ASCII art, where every space and the missing final line break count.
+[dots/.config/fastfetch/logos/arch-linux.txt]
+insert_final_newline = unset
+trim_trailing_whitespace = false

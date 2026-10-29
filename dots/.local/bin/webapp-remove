@@ -1,0 +1,63 @@
+#!/bin/bash
+#
+# Removes a web app that webapp-install created: its launcher, and its icon
+# when webapp-install saved one.
+#
+# Usage: webapp-remove [NAME]
+# Without NAME, the web apps are listed to choose from.
+
+set -euo pipefail
+
+readonly DATA_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}"
+readonly APPS_DIR="${DATA_HOME}/applications"
+readonly ICONS_DIR="${DATA_HOME}/webapps/icons"
+
+die() {
+  echo "webapp-remove: $*" >&2
+  exit 1
+}
+
+# Prints the value of a key in a desktop entry.
+desktop_value() {
+  sed -n "s/^$2=//p" "$1" | head -n 1
+}
+
+main() {
+  local -a files=() names=()
+  local file
+  for file in "${APPS_DIR}"/*.desktop; do
+    [[ -f "${file}" ]] || continue
+    grep -q '^Exec=.*/webapp-launch"\? ' "${file}" || continue
+    files+=("${file}")
+    names+=("$(desktop_value "${file}" Name)")
+  done
+  [[ "${#files[@]}" -gt 0 ]] || die "no web apps are installed."
+
+  local name="${1:-}" i choice
+  if [[ -z "${name}" ]]; then
+    for i in "${!names[@]}"; do
+      echo "$((i + 1))) ${names[i]}"
+    done
+    read -r -p "Web app to remove: " choice
+    if [[ ! "${choice}" =~ ^[0-9]+$ ]] \
+      || ((choice < 1 || choice > ${#names[@]})); then
+      die "no web app number ${choice}."
+    fi
+    name="${names[choice - 1]}"
+  fi
+
+  for i in "${!names[@]}"; do
+    [[ "${names[i]}" == "${name}" ]] || continue
+    local icon
+    icon=$(desktop_value "${files[i]}" Icon)
+    if [[ "${icon}" == "${ICONS_DIR}"/* ]]; then
+      rm -f "${icon}"
+    fi
+    rm -f "${files[i]}"
+    echo "Removed ${name}"
+    return 0
+  done
+  die "no web app named ${name}."
+}
+
+main "$@"

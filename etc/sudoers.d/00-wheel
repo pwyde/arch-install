@@ -1,0 +1,2 @@
+# Members of the wheel group may run any command.
+%wheel ALL=(ALL:ALL) ALL
