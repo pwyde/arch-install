@@ -216,8 +216,7 @@ cleanup() {
 
   # Failures before the first write report themselves, and the summary explains
   # a failed verification.
-  if [[ "${exit_code}" -eq 0 ]] || [[ "${DISK_MODIFIED:-0}" -eq 0 ]] \
-    || [[ "${VERIFY_FAILED:-0}" -eq 1 ]]; then
+  if ((exit_code == 0 || !DISK_MODIFIED || VERIFY_FAILED)); then
     return
   fi
 
@@ -284,7 +283,7 @@ parse_args() {
   LOCALE="${DEFAULT_LOCALE}"
   SUBVOLUMES="${DEFAULT_SUBVOLUMES}"
 
-  while [[ $# -gt 0 ]]; do
+  while (($# > 0)); do
     case $1 in
       -h | --help)
         show_help
@@ -388,7 +387,7 @@ validate_disk() {
   local type
 
   if [[ -z "${DISK}" ]]; then
-    if [[ "${NON_INTERACTIVE}" -eq 1 ]]; then
+    if ((NON_INTERACTIVE)); then
       print_error "Option --yes requires --disk, which names the disk to" \
         "erase."
       exit 1
@@ -575,7 +574,7 @@ validate_inputs() {
   validate_disk
   validate_disk_unused
 
-  if [[ "$(id -u)" -ne 0 ]]; then
+  if ((EUID != 0)); then
     print_error "This script must be run as root."
     exit 1
   fi
@@ -699,14 +698,16 @@ setup_partitions() {
 
 # Asks for confirmation before the disk is erased.
 confirm_operation() {
-  if [[ "${NON_INTERACTIVE}" -eq 0 ]]; then
+  local reply
+
+  if ((!NON_INTERACTIVE)); then
     echo "WARNING: This will erase ALL data on ${DISK}"
     echo "The following partitions will be created:"
     echo "  ${EFI_PART}: 2048MB (EFI System Partition)"
     echo "  ${ROOT_PART}: Rest of disk (Linux LUKS)"
-    read -r -p "Are you sure you want to continue? (y/N) " REPLY
+    read -r -p "Are you sure you want to continue? (y/N) " reply
     echo
-    if [[ ! ${REPLY} =~ ^[Yy]$ ]]; then
+    if [[ ! "${reply}" =~ ^[Yy]$ ]]; then
       echo "Installation cancelled."
       exit 1
     fi
@@ -1089,7 +1090,7 @@ prompt_password() {
 # Prompts for both passwords, outside the chroot.
 prompt_for_passwords() {
   # Non-interactive mode sets temporary passwords instead of prompting.
-  if [[ "${NON_INTERACTIVE}" -eq 1 ]]; then
+  if ((NON_INTERACTIVE)); then
     print_msg "Non-interactive mode: Setting default temporary passwords"
     USER_PASSWORD="changeme"
     ROOT_PASSWORD="changeme"
@@ -1370,7 +1371,7 @@ assemble_cmdline() {
     -name '*.conf' 2>/dev/null \
     | LC_ALL=C.UTF-8 sort -V)
 
-  if [[ "${#files[@]}" -eq 0 ]]; then
+  if ((${#files[@]} == 0)); then
     echo ""
     return 0
   fi
@@ -1498,7 +1499,7 @@ cleanup() {
   rm -rf "${build_dir}"
   # rust is removed only if this build installed it; --packages may have
   # requested it.
-  if [[ "${installed_rust}" -eq 1 ]]; then
+  if ((installed_rust)); then
     pacman -Rns --noconfirm rust >/dev/null || true
   fi
 }
@@ -1820,7 +1821,7 @@ print_summary() {
   fi
 
   echo
-  if [[ "${VERIFY_FAILED}" -eq 1 ]]; then
+  if ((VERIFY_FAILED)); then
     echo "${RED}==>${WHITE} Finished with errors, and the system may not" \
       "boot.${NO_COLOR}"
     echo "    ${WHITE}Fix the errors above before rebooting; /mnt stays" \
@@ -1834,7 +1835,7 @@ print_summary() {
   echo "${BLUE}==>${WHITE} After reboot, log in as ${USERNAME}${NO_COLOR}"
 
   # Troubleshooting tips when verification failed or a boot file is missing.
-  if [[ "${VERIFY_FAILED}" -eq 1 ]] \
+  if ((VERIFY_FAILED)) \
     || [[ ! -f "/mnt/boot/EFI/Linux/arch_linux.efi" ]] \
     || [[ ! -f "/mnt/boot/EFI/BOOT/BOOTX64.EFI" ]]; then
     echo
@@ -1892,7 +1893,7 @@ main() {
   print_summary
   copy_installer_to_home
 
-  if [[ "${VERIFY_FAILED}" -eq 1 ]]; then
+  if ((VERIFY_FAILED)); then
     exit 1
   fi
 }

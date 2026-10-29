@@ -230,7 +230,7 @@ cleanup() {
   # Left only if a step failed while it was in use.
   [[ -z "${TEMP_FILE:-}" ]] || rm -f "${TEMP_FILE}"
 
-  if [[ "${exit_code}" -ne 0 ]] && [[ "${STARTED:-0}" -eq 1 ]]; then
+  if ((exit_code != 0 && STARTED)); then
     print_error "Script exited with error code ${exit_code}."
     print_msg "The script can be run again once the error is resolved."
   fi
@@ -285,7 +285,7 @@ require_value() {
 
 # Parses the command-line options.
 parse_args() {
-  while [[ $# -gt 0 ]]; do
+  while (($# > 0)); do
     case $1 in
       -h | --help)
         show_help
@@ -560,7 +560,7 @@ validate_packages() {
 # Validates the environment and the repository files.
 validate_inputs() {
   # makepkg refuses to run as root, and the copies belong to the user.
-  if [[ "${EUID}" -eq 0 ]]; then
+  if ((EUID == 0)); then
     print_error "This script must be run as the regular user, not as root."
     exit 1
   fi
@@ -622,7 +622,9 @@ validate_inputs() {
 
 # Asks for confirmation before anything is installed or overwritten.
 confirm_operation() {
-  if [[ "${NON_INTERACTIVE}" -eq 0 ]]; then
+  local output reply
+
+  if ((!NON_INTERACTIVE)); then
     echo "The following will be installed and configured:"
     echo "  - The niri compositor, the Noctalia shell and its greeter"
     echo "  - KDE applications, browsers, LibreOffice, GIMP, Inkscape and" \
@@ -641,7 +643,6 @@ confirm_operation() {
       echo "  - Keyboard layout in niri:" \
         "${XKB_LAYOUT}${XKB_VARIANT:+ (${XKB_VARIANT})}"
     fi
-    local output
     while IFS= read -r output; do
       [[ -n "${output}" ]] && echo "  - Display in niri: ${output}"
     done < <(describe_outputs)
@@ -652,9 +653,9 @@ confirm_operation() {
     echo "WARNING: Existing files with the same names" \
       "in ~/.config, ~/.local/bin"
     echo "         and ~/.local/share will be overwritten."
-    read -r -p "Are you sure you want to continue? (y/N) " REPLY
+    read -r -p "Are you sure you want to continue? (y/N) " reply
     echo
-    if [[ ! ${REPLY} =~ ^[Yy]$ ]]; then
+    if [[ ! "${reply}" =~ ^[Yy]$ ]]; then
       echo "Installation cancelled."
       exit 1
     fi
@@ -665,7 +666,7 @@ confirm_operation() {
 # official repositories and the AUR.
 paru_install() {
   local -a flags=(--needed)
-  if [[ "${NON_INTERACTIVE}" -eq 1 ]]; then
+  if ((NON_INTERACTIVE)); then
     flags+=(--noconfirm --skipreview)
   fi
 
@@ -681,7 +682,7 @@ update_system() {
   # -Syu also upgrades AUR packages, whose review would otherwise stop an
   # unattended run.
   local -a flags=()
-  if [[ "${NON_INTERACTIVE}" -eq 1 ]]; then
+  if ((NON_INTERACTIVE)); then
     flags+=(--noconfirm --skipreview)
   fi
 
@@ -993,7 +994,7 @@ configure_vscodium() {
   while IFS= read -r extension; do
     args+=(--install-extension "${extension}")
   done < <(jq -r '.recommendations[]' "${VSCODIUM_EXTENSIONS}")
-  [[ "${#args[@]}" -gt 0 ]] || return 0
+  ((${#args[@]} > 0)) || return 0
 
   # VSCodium only uses VSCODE_PORTABLE when the directory exists, and falls
   # back to ~/.vscode-oss and ~/.config/VSCodium otherwise.
