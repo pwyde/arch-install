@@ -727,7 +727,7 @@ create_partitions() {
   print_msg "Creating new GPT partition table on ${DISK}"
   sgdisk --zap-all "${DISK}" # Removes the existing GPT and MBR
   sgdisk --clear "${DISK}"   # Writes a new, empty GPT
-  sleep 1
+  udevadm settle             # Lets udev finish with the removed partitions
 
   # EFI System Partition, 2 GiB.
   print_msg "Creating EFI System Partition"
@@ -738,22 +738,15 @@ create_partitions() {
   print_msg "Creating root partition"
   sgdisk --new=2:0:0 --typecode=2:8309 --change-name=2:"Linux LUKS" "${DISK}"
 
-  # Makes the kernel reread the new partition table.
+  # Makes the kernel reread the new partition table, then waits until udev has
+  # handled the new partitions; its probes would otherwise race mkfs and
+  # cryptsetup for the devices.
   print_msg "Informing kernel of partition table change"
   partprobe "${DISK}"
-  sleep 3
+  udevadm settle
 
   print_msg "Checking new partition table"
   sgdisk --print "${DISK}"
-
-  # Waits up to ten seconds for both partitions to appear.
-  for _ in $(seq 1 10); do
-    if [[ -b "${EFI_PART}" ]] && [[ -b "${ROOT_PART}" ]]; then
-      break
-    fi
-    print_msg "Waiting for partitions to appear..."
-    sleep 1
-  done
 
   if [[ ! -b "${EFI_PART}" ]] || [[ ! -b "${ROOT_PART}" ]]; then
     print_error "Partitions did not appear after creation."
