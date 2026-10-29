@@ -106,10 +106,9 @@ print_error() {
   echo -e "${RED}==> ERROR:${NO_COLOR}${WHITE}" "${@}" "${NO_COLOR}" >&2
 }
 
-# Reports a failed run. Once the disk has been written to, the target is left
-# as it is: the live system's sandboxed services hold copies of the mounts
-# under /mnt, which keep the LUKS container open until the next boot. A new run
-# after a reboot starts over on a clean disk.
+# Reports a failed run. Once the disk has been written to, nothing is undone:
+# the target stays mounted and the LUKS container open. A reboot gives the next
+# run a clean live system, and that run erases the disk again.
 cleanup() {
   local exit_code=$? failed_command="${BASH_COMMAND}"
 
@@ -442,7 +441,7 @@ validate_disk_unused() {
   else
     return 0
   fi
-  # Those commands cannot release what a failed run leaves; see cleanup.
+  # A failed run leaves the disk in use on purpose; see cleanup.
   print_error "After a failed installation, reboot the installation medium" \
     "instead."
   exit 1
