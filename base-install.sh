@@ -444,6 +444,36 @@ validate_disk() {
   DISK=$(readlink -f -- "${DISK}")
 }
 
+# sgdisk would erase a partition table the kernel still uses, and partprobe
+# would then fail with the disk half wiped. /mnt and the name cryptroot are
+# the installer's own.
+validate_disk_unused() {
+  local busy line
+
+  # Every device on the disk that is mounted or used as swap, and every one
+  # other than a partition, such as an open LUKS container.
+  busy=$(lsblk -lnpo NAME,TYPE,MOUNTPOINT "${DISK}" \
+    | awk '($2 != "disk" && $2 != "part") || $3 != ""')
+  if [[ -n "${busy}" ]]; then
+    print_error "${DISK} is in use. Release these first, for example with" \
+      "umount, swapoff or cryptsetup close:"
+    while IFS= read -r line; do
+      print_error "  ${line}"
+    done <<<"${busy}"
+    exit 1
+  fi
+
+  if mountpoint -q /mnt; then
+    print_error "/mnt is already in use. Unmount it first: umount -R /mnt"
+    exit 1
+  fi
+  if [[ -e /dev/mapper/cryptroot ]]; then
+    print_error "/dev/mapper/cryptroot is already open. Close it first:" \
+      "cryptsetup close cryptroot"
+    exit 1
+  fi
+}
+
 # systemd-firstboot --root only checks that the keymap name is well-formed,
 # not that the keymap exists.
 validate_keymap() {
@@ -573,6 +603,7 @@ validate_packages() {
 # Validates the options and the live environment.
 validate_inputs() {
   validate_disk
+  validate_disk_unused
 
   # Root privileges are required.
   if [[ "$(id -u)" -ne 0 ]]; then
@@ -736,20 +767,6 @@ create_partitions() {
   DISK_MODIFIED=1
   print_msg "Creating partitions on ${DISK}"
 
-  # Unmounts the disk's partitions and disables swap.
-  for part in $(lsblk -npo NAME "${DISK}" | tail -n +2); do
-    umount "${part}" 2>/dev/null || true
-  done
-  swapoff -a || true
-
-  # Closes any open LUKS containers.
-  for mapper in /dev/mapper/*; do
-    [[ -e "${mapper}" ]] || continue
-    if [[ "${mapper}" != "/dev/mapper/control" ]]; then
-      cryptsetup close "${mapper}" 2>/dev/null || true
-    fi
-  done
-
   # New GPT partition table.
   print_msg "Creating new GPT partition table on ${DISK}"
   sgdisk --zap-all "${DISK}" # Removes the existing GPT and MBR
@@ -796,18 +813,6 @@ create_partitions() {
 format_partitions() {
   print_msg "Format EFI partition with FAT32"
   mkfs.fat -F32 -n "EFI" "${EFI_PART}"
-
-  # Closes cryptroot if it is already open.
-  if [[ -e "/dev/mapper/cryptroot" ]]; then
-    print_msg "Found existing cryptroot mapping, attempting to close it..."
-    umount -R /mnt 2>/dev/null || true
-    cryptsetup close cryptroot || {
-      print_error "Could not close existing cryptroot mapping."
-      print_msg "Please manually unmount and close with: umount -R /mnt;" \
-        "cryptsetup close cryptroot"
-      exit 1
-    }
-  fi
 
   # An existing LUKS header is wiped first.
   if cryptsetup isLuks "${ROOT_PART}" 2>/dev/null; then

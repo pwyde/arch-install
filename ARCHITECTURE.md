@@ -57,12 +57,15 @@ decisions of both. [README.md](./README.md) covers installation and usage;
 Steps 1 and 2 run only on the first invocation, not in the re-run under
 `script(1)`, and neither runs for `--help`, which works from any shell. Every
 check that can fail without consequence runs before step 8.
+
 Step 5 checks each option against a strict pattern, which makes escaping
-unnecessary where the values are substituted, and against the data of the
-live system: the time zone, the UTF-8 locale and the absence of a system
-account with the given username. Packages given with `--packages` are
-resolved against a temporary copy of the sync databases, so the network
-connection is already required at this step.
+unnecessary where the values are substituted, and against the data of the live
+system: the time zone, the UTF-8 locale and the absence of a system account with
+the given username. The disk must be a whole disk that is not in use: nothing on
+it may be mounted, used as swap or held by a LUKS container, LVM or RAID, and
+`/mnt` and `/dev/mapper/cryptroot` must be free. Packages given with
+`--packages` are resolved against a temporary copy of the sync databases, so the
+network connection is already required at this step.
 
 Until the first write to the disk, a failure exits quietly; the `EXIT` trap only
 removes the temporary sync databases. After it, the trap also unmounts the
