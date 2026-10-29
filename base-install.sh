@@ -82,79 +82,6 @@ readonly YELLOW=$'\033[93m'
 readonly WHITE=$'\033[1;97m'
 readonly NO_COLOR=$'\033[0m'
 
-# Set by the first step that writes to the disk. A failure before it leaves
-# nothing behind and reports itself; after it, cleanup asks for a reboot.
-DISK_MODIFIED=0
-# Set by verify_installation when the installed system may not boot. The run
-# then fails, but the target stays mounted for the repairs the errors suggest.
-VERIFY_FAILED=0
-
-# Only EXIT runs cleanup: a signal handler would see the status of whatever
-# command the signal interrupted, which is 0 more often than not. Converting the
-# signals to an exit gives cleanup the real code, and only one trap fires.
-trap cleanup EXIT
-trap 'exit 130' INT
-trap 'exit 143' TERM
-
-print_msg() {
-  echo "${GREEN}==>${NO_COLOR}${WHITE}" "$*${NO_COLOR}"
-}
-
-print_warning() {
-  echo "${YELLOW}==> WARNING:${NO_COLOR}${WHITE}" "$*${NO_COLOR}" >&2
-}
-
-print_error() {
-  echo "${RED}==> ERROR:${NO_COLOR}${WHITE}" "$*${NO_COLOR}" >&2
-}
-
-# Reports a failed run. Once the disk has been written to, nothing is undone:
-# the target stays mounted and the LUKS container open. A reboot gives the next
-# run a clean live system, and that run erases the disk again.
-cleanup() {
-  local exit_code=$? failed_command="${BASH_COMMAND}"
-
-  # Left only if package validation failed.
-  [[ -z "${PKG_DB_DIR:-}" ]] || rm -rf "${PKG_DB_DIR}"
-
-  # Failures before the first write report themselves, and the summary explains
-  # a failed verification.
-  if [[ "${exit_code}" -eq 0 ]] || [[ "${DISK_MODIFIED:-0}" -eq 0 ]] \
-    || [[ "${VERIFY_FAILED:-0}" -eq 1 ]]; then
-    return
-  fi
-
-  case "${exit_code}" in
-    130 | 143) print_error "The installation was interrupted." ;;
-    *)
-      print_error "The installation failed with exit code ${exit_code}."
-      # An explicit exit follows an error message of its own. Of a command
-      # with a heredoc, only the first line is shown.
-      if [[ "${failed_command}" != exit* ]]; then
-        print_error "Failed command: ${failed_command%%$'\n'*}"
-      fi
-      ;;
-  esac
-  print_error "Reboot the installation medium and run the installer again;" \
-    "the disk stays in use until then."
-}
-
-# Global variables
-DISK=""
-EFI_PART=""
-ROOT_PART=""
-HOSTNAME=""
-USERNAME=""
-TIMEZONE=""
-KEYMAP=""
-LOCALE=""
-SUBVOLUMES=""
-EXTRA_PACKAGES=""
-# Temporary sync databases of validate_packages, removed by cleanup on failure.
-PKG_DB_DIR=""
-NON_INTERACTIVE=0
-MICROCODE=""
-
 # ESP mount options. FAT has no permission bits; the mount supplies them: files
 # 0600, directories 0700, all owned by root. This matches what mkinitcpio would
 # set on a normal filesystem, where it builds initramfs images and UKIs under
@@ -237,12 +164,77 @@ readonly LIMINE_TOOL_CONF_SRC="${SCRIPT_DIR}/etc/limine-entry-tool.d/50-arch.con
 readonly LIMINE_PKG_SRC="${SCRIPT_DIR}/packages"
 readonly LIMINE_PKGS=(limine-mkinitcpio-hook limine-snapper-sync)
 
+# Global variables
+DISK=""
+EFI_PART=""
+ROOT_PART=""
+HOSTNAME=""
+USERNAME=""
+TIMEZONE=""
+KEYMAP=""
+LOCALE=""
+SUBVOLUMES=""
+EXTRA_PACKAGES=""
+# Temporary sync databases of validate_packages, removed by cleanup on failure.
+PKG_DB_DIR=""
+NON_INTERACTIVE=0
+MICROCODE=""
+# Set by the first step that writes to the disk. A failure before it leaves
+# nothing behind and reports itself; after it, cleanup asks for a reboot.
+DISK_MODIFIED=0
+# Set by verify_installation when the installed system may not boot. The run
+# then fails, but the target stays mounted for the repairs the errors suggest.
+VERIFY_FAILED=0
+
 # Password variables
 USER_PASSWORD=""
 ROOT_PASSWORD=""
 # Names the accounts that fell back to 'changeme'. print_summary repeats this at
 # the end, where a warning from the password prompt has long scrolled off.
 PASSWORD_FALLBACK=""
+
+print_msg() {
+  echo "${GREEN}==>${NO_COLOR}${WHITE}" "$*${NO_COLOR}"
+}
+
+print_warning() {
+  echo "${YELLOW}==> WARNING:${NO_COLOR}${WHITE}" "$*${NO_COLOR}" >&2
+}
+
+print_error() {
+  echo "${RED}==> ERROR:${NO_COLOR}${WHITE}" "$*${NO_COLOR}" >&2
+}
+
+# Reports a failed run. Once the disk has been written to, nothing is undone:
+# the target stays mounted and the LUKS container open. A reboot gives the next
+# run a clean live system, and that run erases the disk again.
+cleanup() {
+  local exit_code=$? failed_command="${BASH_COMMAND}"
+
+  # Left only if package validation failed.
+  [[ -z "${PKG_DB_DIR:-}" ]] || rm -rf "${PKG_DB_DIR}"
+
+  # Failures before the first write report themselves, and the summary explains
+  # a failed verification.
+  if [[ "${exit_code}" -eq 0 ]] || [[ "${DISK_MODIFIED:-0}" -eq 0 ]] \
+    || [[ "${VERIFY_FAILED:-0}" -eq 1 ]]; then
+    return
+  fi
+
+  case "${exit_code}" in
+    130 | 143) print_error "The installation was interrupted." ;;
+    *)
+      print_error "The installation failed with exit code ${exit_code}."
+      # An explicit exit follows an error message of its own. Of a command
+      # with a heredoc, only the first line is shown.
+      if [[ "${failed_command}" != exit* ]]; then
+        print_error "Failed command: ${failed_command%%$'\n'*}"
+      fi
+      ;;
+  esac
+  print_error "Reboot the installation medium and run the installer again;" \
+    "the disk stays in use until then."
+}
 
 # Help text.
 show_help() {
@@ -1864,6 +1856,13 @@ print_summary() {
 
 # Runs every installation step in order.
 main() {
+  # Only EXIT runs cleanup: a signal handler would see the status of whatever
+  # command the signal interrupted, which is 0 more often than not. Converting
+  # the signals to an exit gives cleanup the real code, and only one trap fires.
+  trap cleanup EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+
   # Runs before the re-run under script(1), whose process would fail the
   # parent check.
   if [[ -z "${ARCH_INSTALL_LOG:-}" ]]; then
