@@ -1084,13 +1084,14 @@ prompt_password() {
   local account=$1 change_command=$3 confirm
   local -n password=$2
 
-  # IFS= keeps leading and trailing spaces, which are part of the password.
+  # read trims leading and trailing whitespace on purpose, so an entry of only
+  # spaces counts as empty.
   print_msg "Setting password for ${account}"
   echo "Please enter password for ${account}:"
-  IFS= read -rs password
+  read -rs password
   echo
   echo "Please confirm password for ${account}:"
-  IFS= read -rs confirm
+  read -rs confirm
   echo
 
   if [[ -n "${password}" && "${password}" == "${confirm}" ]]; then
