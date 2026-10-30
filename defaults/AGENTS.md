@@ -18,3 +18,5 @@ Files installed to a path other than their own, unlike `etc/`. The root
   `etc/limine-entry-tool.d/50-arch.conf`; a change to one is made to both.
 - `bash/bashrc` is Bash without a shebang; check it with
   `shellcheck -s bash`.
+- `systemd/system-sleep/keyboard-backlight` runs without strict mode on purpose;
+  its comment explains why.

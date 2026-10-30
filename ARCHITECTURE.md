@@ -75,11 +75,16 @@ system and erases the disk again. After a failed check of the boot files in step
 14, the summary reports the errors, and the installer exits with status 1 but
 leaves the target mounted for the repairs that they suggest.
 
-`configure_system` runs its steps in a fixed order. Hibernation and Plymouth
-are configured before the boot setup, since both contribute kernel parameters
-and initramfs content. `limine-mkinitcpio-hook` is installed last, as its
-pacman hook builds the UKIs immediately from the configuration already in
-place. The AUR helper follows, and its failure does not fail the installation.
+`configure_system` runs its steps in a fixed order. The pacman step enables the
+multilib repository and fetches its database with `pacman -Syu` rather than a
+bare `-Sy`: the dependencies of the Limine packages and `rust` are installed
+later from the refreshed databases, and installing from them without the upgrade
+would be a partial upgrade. Hibernation and Plymouth are configured before the
+boot setup, since both contribute kernel parameters and initramfs content.
+`limine-mkinitcpio-hook` is installed once everything the UKIs contain is in
+place, as its pacman hook builds them immediately. Snapper and the services
+follow, and the AUR helper comes last; its failure does not fail the
+installation.
 
 ## Repository Layout
 

@@ -11,3 +11,6 @@ and `.config/niri/` and `.config/noctalia/` have their own AGENTS.md.
   requires changing that constant.
 - The scripts in `.local/bin/` are committed as executable (mode `100755`),
   since the copy keeps the mode.
+- `webapp-remove` recognizes the entries that `webapp-install` writes by their
+  `Exec` line and compares their names as the entries store them; a change to
+  either format is made in both scripts.

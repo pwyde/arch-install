@@ -103,6 +103,11 @@ The repository has no build system, CI, tests, database or migrations.
 - Markdown also follows `.claude/skills/markdown-documentation/SKILL.md`.
 - Bash follows the Google Shell Style Guide, `etc/profile.d/*.sh` is POSIX
   sh, and fish is formatted by `fish_indent`.
+- In Bash, a function declares its locals at the top, numbers are compared with
+  `(( ))`, lists are kept in arrays rather than space-separated strings, and
+  constants are `readonly`. A function that sets a variable of its caller takes
+  the variable's name and uses `local -n`. A script with a `main` calls it only
+  when executed, behind `if [[ "${BASH_SOURCE[0]}" == "${0}" ]]`.
 - Width is 80 columns for prose, comments and shell code. Exempt are literal
   paths, URLs and identifiers that cannot be split, fish code lines (not fish
   comments) and Markdown tables.

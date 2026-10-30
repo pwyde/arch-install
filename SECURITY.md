@@ -186,11 +186,12 @@ In approximate order of importance:
   Secure Boot the UKI accepts a command line passed by the bootloader. The
   embedded command line keeps the configuration in one place; it does not
   prevent tampering.
-- **Temporary account passwords.** With `--yes`, or after an empty or
-  mismatched password at the prompt, `base-install.sh` sets the password
-  `changeme` for the user and for root. The installation summary names the
-  affected accounts, and their passwords must be changed with `passwd` before
-  the machine is used. The LUKS passphrase is always entered interactively.
+- **Temporary account passwords.** With `--yes`, or after an empty or mismatched
+  password at the prompt, `base-install.sh` sets the password `changeme` for the
+  user and for root. The installation summary names the affected accounts and
+  the command that changes each password, `passwd` for the user and
+  `sudo passwd root` for root, which must be run before the machine is used. The
+  LUKS passphrase is always entered interactively.
 - **AUR packages are trusted as published.** The AUR holds user-submitted build
   files, which can run any code when a package is built or installed.
   `base-install.sh` builds the AUR helper paru from its current AUR build files
