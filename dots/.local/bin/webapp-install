@@ -117,6 +117,10 @@ main() {
   [[ "${name}" != */* ]] || die "the name cannot contain a slash."
   [[ "${name}" != *[[:cntrl:]]* ]] \
     || die "the name cannot contain control characters."
+  # The desktop entry stores both escaped, and webapp-remove, which finds a web
+  # app by the name in that entry, could not match it.
+  [[ "${name}" != *\\* ]] || die "the name cannot contain a backslash."
+  [[ "${name}" != " "* ]] || die "the name cannot start with a space."
 
   [[ "${url}" == *://* ]] || url="https://${url}"
   [[ "${url}" =~ ^https?://[^[:space:]]+$ ]] \
