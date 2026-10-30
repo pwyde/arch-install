@@ -160,15 +160,20 @@ run under "VM test needed" in the completion report.
 
 ## Completion Report
 
-End every task with:
+End every task with this list, written as Markdown rather than in a code
+block. An item with one value stays on its label's line; an item with several
+values gets one nested bullet per value.
 
-```text
-Changed:        <file>: <change>, one line per file
-Behavior:       <what an installer now does differently, or "none">
-Documentation:  <files updated, or why none were needed>
-Checks:         <command>: <result>; not run: <check> (<reason>)
-VM test needed: <scenario, or "none">
-Open questions: <decisions left to the maintainer, or "none">
+```markdown
+- **Changed:**
+  - `<file>`: <change>
+- **Behavior:** <what an installer now does differently, or "none">
+- **Documentation:** <files updated, or why none were needed>
+- **Checks:**
+  - `<command>`: <result>
+  - not run: <check> (<reason>)
+- **VM test needed:** <scenario, or "none">
+- **Open questions:** <decisions left to the maintainer, or "none">
 ```
 
 ## Nested AGENTS.md
