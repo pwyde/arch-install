@@ -311,7 +311,6 @@ EOF
   echo
 }
 
-# Help text.
 show_help() {
   cat <<EOF
 Usage: $(basename "$0") [options]
@@ -358,7 +357,6 @@ require_value() {
   fi
 }
 
-# Parses the command-line options.
 parse_args() {
   while (($# > 0)); do
     case $1 in
@@ -1214,7 +1212,6 @@ configure_lockscreen() {
   sed -i "s|@LOCKSCREEN_OUTPUT@|${connector}|g" "${NOCTALIA_LOCKSCREEN}"
 }
 
-# Prints the installation summary.
 print_summary() {
   local output
 
@@ -1239,7 +1236,6 @@ print_summary() {
   echo "${BLUE}==>${WHITE} Done. Reboot to start the greeter.${NO_COLOR}"
 }
 
-# Runs every installation step in order.
 main() {
   # Only EXIT runs cleanup: a signal handler would see the status of whatever
   # command the signal interrupted, which is 0 more often than not. Converting

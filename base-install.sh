@@ -82,6 +82,9 @@ readonly YELLOW=$'\033[93m'
 readonly WHITE=$'\033[1;97m'
 readonly NO_COLOR=$'\033[0m'
 
+# Size of the EFI System Partition; ARCHITECTURE.md explains the choice.
+readonly ESP_SIZE_MIB=2048
+
 # ESP mount options. FAT has no permission bits; the mount supplies them: files
 # 0600, directories 0700, all owned by root. This matches what mkinitcpio would
 # set on a normal filesystem, where it builds initramfs images and UKIs under
@@ -335,7 +338,6 @@ EOF
   echo
 }
 
-# Help text.
 show_help() {
   cat <<EOF
 Usage: $(basename "$0") [options]
@@ -373,7 +375,6 @@ require_value() {
   fi
 }
 
-# Parses the command-line options.
 parse_args() {
   # No default for DISK here: validate_disk applies it, except under --yes.
   HOSTNAME="${DEFAULT_HOSTNAME}"
@@ -820,7 +821,7 @@ confirm_operation() {
   if ((!NON_INTERACTIVE)); then
     echo "WARNING: This will erase ALL data on ${DISK}"
     echo "The following partitions will be created:"
-    echo "  ${EFI_PART}: 2048MB (EFI System Partition)"
+    echo "  ${EFI_PART}: ${ESP_SIZE_MIB} MiB (EFI System Partition)"
     echo "  ${ROOT_PART}: Rest of disk (Linux LUKS)"
     read -r -p "Are you sure you want to continue? (y/N) " reply
     echo
@@ -831,7 +832,7 @@ confirm_operation() {
   fi
 }
 
-# Partitions the disk: a 2 GiB ESP and a LUKS partition.
+# Partitions the disk: the ESP and a LUKS partition on the rest of it.
 create_partitions() {
   DISK_MODIFIED=1
   print_msg "Creating partitions on ${DISK}"
@@ -842,8 +843,8 @@ create_partitions() {
   udevadm settle             # Lets udev finish with the removed partitions
 
   print_msg "Creating EFI System Partition"
-  sgdisk --new=1:0:+2048M --typecode=1:ef00 --change-name=1:"EFI System" \
-    "${DISK}"
+  sgdisk --new="1:0:+${ESP_SIZE_MIB}M" --typecode=1:ef00 \
+    --change-name=1:"EFI System" "${DISK}"
 
   print_msg "Creating root partition"
   sgdisk --new=2:0:0 --typecode=2:8309 --change-name=2:"Linux LUKS" "${DISK}"
@@ -1330,8 +1331,8 @@ if [[ ! -f /sys/power/image_size ]]; then
   exit 0
 fi
 
-SWAP_SUBVOLUME="/swap"
-SWAP_FILE="/swap/swapfile"
+readonly SWAP_SUBVOLUME="/swap"
+readonly SWAP_FILE="/swap/swapfile"
 
 # A Btrfs subvolume cannot be snapshotted while it holds an active swapfile,
 # which is why the swapfile gets a subvolume of its own. Nested under @, it is
@@ -1346,8 +1347,8 @@ fi
 # Sized to total RAM, large enough for a full memory image.
 if ! swaplabel "${SWAP_FILE}" &>/dev/null; then
   echo "==> Creating swapfile in Btrfs subvolume"
-  MEM_TOTAL_KB="$(awk '/MemTotal/ {print $2}' /proc/meminfo)k"
-  btrfs filesystem mkswapfile -s "${MEM_TOTAL_KB}" "${SWAP_FILE}"
+  mem_total_kb="$(awk '/MemTotal/ {print $2}' /proc/meminfo)k"
+  btrfs filesystem mkswapfile -s "${mem_total_kb}" "${SWAP_FILE}"
 fi
 
 # pri=0 sits below zram (priority 100): everyday swapping goes to compressed
@@ -1365,14 +1366,14 @@ fi
 # relative to the unlocked LUKS device -- which is why it comes from
 # map-swapfile and not filefrag.
 echo "==> Adding resume kernel parameters"
-RESUME_DEVICE=$(findmnt -no SOURCE --first-only -T "${SWAP_FILE}" \
+resume_device=$(findmnt -no SOURCE --first-only -T "${SWAP_FILE}" \
   | sed 's/\[.*\]//')
-RESUME_OFFSET=$(btrfs inspect-internal map-swapfile -r "${SWAP_FILE}")
-if [[ -n "${RESUME_OFFSET}" ]]; then
+resume_offset=$(btrfs inspect-internal map-swapfile -r "${SWAP_FILE}")
+if [[ -n "${resume_offset}" ]]; then
   mkdir -p /etc/cmdline.d
-  echo "resume=${RESUME_DEVICE}" \
-    "resume_offset=${RESUME_OFFSET}" >/etc/cmdline.d/30-resume.conf
-  echo "Resume device: ${RESUME_DEVICE}, offset: ${RESUME_OFFSET}"
+  echo "resume=${resume_device}" \
+    "resume_offset=${resume_offset}" >/etc/cmdline.d/30-resume.conf
+  echo "Resume device: ${resume_device}, offset: ${resume_offset}"
 else
   echo "WARNING: Could not determine resume offset for ${SWAP_FILE};" \
     "hibernation will not resume." >&2
@@ -1629,7 +1630,6 @@ configure_snapshots() {
     limine-snapper-sync.service
 }
 
-# Enables the system services.
 enable_services() {
   print_msg "Enabling services"
   arch-chroot /mnt /bin/bash -e <<'EOF'
@@ -1814,7 +1814,6 @@ print_troubleshooting() {
   echo "  - Exit chroot and reboot"
 }
 
-# Prints the installation summary.
 print_summary() {
   local account
 
@@ -1896,7 +1895,6 @@ copy_installer_to_home() {
   fi
 }
 
-# Runs every installation step in order.
 main() {
   # Only EXIT runs cleanup: a signal handler would see the status of whatever
   # command the signal interrupted, which is 0 more often than not. Converting
