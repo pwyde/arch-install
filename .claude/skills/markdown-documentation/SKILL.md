@@ -18,13 +18,13 @@ Syntax details live in the references; load one only when the task needs it.
 
 | Topic | File | Load When |
 | --- | --- | --- |
-| Text formatting | [text-formatting.md](references/text-formatting.md) | Bold, italic, strikethrough, emphasis |
-| Lists | [lists.md](references/lists.md) | Ordered, unordered, nested and task lists |
-| Links, images, code blocks, tables | [links-and-images.md](references/links-and-images.md) | Link and image syntax, fenced code, table syntax |
-| Extended GFM syntax | [extended-syntax-github-flavored-markdown.md](references/extended-syntax-github-flavored-markdown.md) | Footnotes, task lists, autolinks, emoji |
-| Collapsible sections, highlighting, badges | [collapsible-sections.md](references/collapsible-sections.md) | `<details>`/`<summary>`, syntax highlighting, badges |
 | Alerts and callouts | [alerts-and-callouts.md](references/alerts-and-callouts.md) | Note, tip, important, warning, caution blocks |
+| Collapsible sections, highlighting, badges | [collapsible-sections.md](references/collapsible-sections.md) | `<details>`/`<summary>`, syntax highlighting, badges |
+| Extended GFM syntax | [extended-syntax-github-flavored-markdown.md](references/extended-syntax-github-flavored-markdown.md) | Footnotes, task lists, autolinks, emoji |
+| Links, images, code blocks, tables | [links-and-images.md](references/links-and-images.md) | Link and image syntax, fenced code, table syntax |
+| Lists | [lists.md](references/lists.md) | Ordered, unordered, nested and task lists |
 | New document skeleton | [doc-template.md](templates/doc-template.md) | Writing a new README or doc page from scratch; keep only the sections it needs |
+| Text formatting | [text-formatting.md](references/text-formatting.md) | Bold, italic, strikethrough, emphasis |
 
 ## Line Length and Wrapping
 

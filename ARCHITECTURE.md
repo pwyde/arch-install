@@ -85,14 +85,14 @@ place. The AUR helper follows, and its failure does not fail the installation.
 
 | Path | Contents |
 | --- | --- |
-| [`base-install.sh`](./base-install.sh) | The base installer, described in this document |
-| [`desktop-install.sh`](./desktop-install.sh) | The desktop installer, run on the installed system |
-| [`etc/`](./etc/) | Configuration files, installed to the same path under `/etc`. `vim/xdg.vim` is appended to `/etc/vimrc`. The `greetd`, `pam.d/greetd` and `fonts/` files are installed by `desktop-install.sh` |
-| [`defaults/`](./defaults/) | Files installed elsewhere: the Limine configuration, the Plymouth theme, the Snapper configuration, the system-sleep hook and the user's bashrc. The greeter configuration and the niri session entry are installed by `desktop-install.sh` |
-| [`packages/`](./packages/) | Prebuilt AUR packages; see [Prebuilt Packages](#prebuilt-packages) |
-| [`dots/`](./dots/) | Desktop configuration under `.config/` and `.local/`, copied to the user's home directory by `desktop-install.sh` |
 | [`assets/wallpapers/`](./assets/wallpapers/) | Wallpapers, copied to `~/Pictures/Wallpapers` by `desktop-install.sh` |
+| [`base-install.sh`](./base-install.sh) | The base installer, described in this document |
+| [`defaults/`](./defaults/) | Files installed elsewhere: the Limine configuration, the Plymouth theme, the Snapper configuration, the system-sleep hook and the user's bashrc. The greeter configuration and the niri session entry are installed by `desktop-install.sh` |
+| [`desktop-install.sh`](./desktop-install.sh) | The desktop installer, run on the installed system |
+| [`dots/`](./dots/) | Desktop configuration under `.config/` and `.local/`, copied to the user's home directory by `desktop-install.sh` |
+| [`etc/`](./etc/) | Configuration files, installed to the same path under `/etc`. `vim/xdg.vim` is appended to `/etc/vimrc`. The `greetd`, `pam.d/greetd` and `fonts/` files are installed by `desktop-install.sh` |
 | `logs/` | Installation logs, created at run time and excluded from version control |
+| [`packages/`](./packages/) | Prebuilt AUR packages; see [Prebuilt Packages](#prebuilt-packages) |
 
 Files containing `@HOSTNAME@`, `@USERNAME@`, `@LOCALE@` or `@ROOT_UUID@` are
 templates; the installer substitutes the values when it installs them.
@@ -113,8 +113,8 @@ Btrfs subvolumes, all mounted with `compress=zstd:3,noatime,nodiscard`:
 | Subvolume | Mount point |
 | --- | --- |
 | `@` | `/` |
-| `@home` | `/home` |
 | `@cache` | `/var/cache` |
+| `@home` | `/home` |
 | `@log` | `/var/log` |
 | `@root` | `/root` |
 
@@ -159,12 +159,12 @@ the same FAT partition, and there is no separate `/efi`.
 
 | Path | Purpose |
 | --- | --- |
-| `/boot/vmlinuz-linux` | Kernel, installed directly onto the ESP |
-| `/boot/EFI/limine/limine_x64.efi` | Bootloader, registered as a UEFI boot entry |
 | `/boot/EFI/BOOT/BOOTX64.EFI` | Removable-media fallback, used when the firmware loses its NVRAM entry |
-| `/boot/EFI/Linux/arch_linux.efi` | UKI built by `mkinitcpio` |
+| `/boot/EFI/limine/limine_x64.efi` | Bootloader, registered as a UEFI boot entry |
 | `/boot/EFI/Linux/arch_linux-fallback.efi` | Fallback UKI, built without `autodetect` |
+| `/boot/EFI/Linux/arch_linux.efi` | UKI built by `mkinitcpio` |
 | `/boot/limine.conf` | Global options and default entry; boot entries written by `limine-entry-tool` |
+| `/boot/vmlinuz-linux` | Kernel, installed directly onto the ESP |
 
 - **The ESP is mounted before `pacstrap`**, which installs the kernel onto it.
   A kernel installed to the Btrfs root would be hidden once the ESP is mounted
@@ -214,11 +214,11 @@ the official logo, and the gray matches archlinux.org.
 | Color | Limine ([`limine.conf`](./defaults/limine/limine.conf)) | Plymouth theme |
 | --- | --- | --- |
 | `#000000` | `term_background`, `backdrop`, palette black | Window background |
-| `#999999` | `term_foreground`, `term_foreground_bright` | Password field, bullets, lock icon, messages |
 | `#1793D1` | `interface_help_color` (help keys) | Progress bar |
-| `#FFFFFF` | `interface_branding_color`, palette cyan | White of the logo |
 | `#1A1A1A` | `term_background_bright`, bright palette black | -- |
 | `#333333` | -- | Progress bar track |
+| `#999999` | `term_foreground`, `term_foreground_bright` | Password field, bullets, lock icon, messages |
+| `#FFFFFF` | `interface_branding_color`, palette cyan | White of the logo |
 
 The remaining palette slots (red, green, yellow, blue, magenta and white)
 keep Nord values. Limine draws the selected menu entry in reverse video, which
@@ -461,13 +461,13 @@ Further systemd and service configuration:
 
 | Area | Configuration |
 | --- | --- |
+| Core dumps | [`etc/systemd/coredump.conf.d/`](./etc/systemd/coredump.conf.d/) disables them with `Storage=none` and `ProcessSizeMax=0`, as a dump holds the memory of the crashed process, including keys and passphrases. |
 | Index rebuilds | Drop-ins in [`man-db.timer.d/`](./etc/systemd/system/man-db.timer.d/) and [`plocate-updatedb.timer.d/`](./etc/systemd/system/plocate-updatedb.timer.d/) move both timers from midnight to late morning, without the catch-up run after a missed slot. The packages enable the timers themselves. |
+| IPv6 | Enabled, with rotating privacy addresses from [`10-ipv6-privacy.conf`](./etc/NetworkManager/conf.d/10-ipv6-privacy.conf). |
+| Journal | [`etc/systemd/journald.conf.d/`](./etc/systemd/journald.conf.d/) caps the journal at 500M instead of 10% of the filesystem, which holds about a month of logs. |
 | Locate index | A drop-in in [`plocate-updatedb.service.d/`](./etc/systemd/system/plocate-updatedb.service.d/) indexes the Btrfs subvolumes, which `updatedb` skips as bind mounts by default, and excludes `/.snapshots`. The run is skipped on battery. `/etc/updatedb.conf` is left untouched, as pacman tracks it as a backup file. |
 | Shutdown | Three drop-ins under [`etc/systemd/`](./etc/systemd/) lower `DefaultTimeoutStopSec` to 5 s for system and user services, and `TimeoutStopSec` of `user@.service` from 120 s to 10 s. Units that declare their own timeout keep it. |
 | sshd | A drop-in in [`etc/ssh/sshd_config.d/`](./etc/ssh/sshd_config.d/) allows key authentication only, refuses root and limits `AllowUsers` to the account the installer creates. Remote login requires a public key installed from the console first. `Ciphers`, `KexAlgorithms` and `MACs` are not set, leaving OpenSSH's defaults, which lead with hybrid post-quantum key exchange. |
-| Journal | [`etc/systemd/journald.conf.d/`](./etc/systemd/journald.conf.d/) caps the journal at 500M instead of 10% of the filesystem, which holds about a month of logs. |
-| Core dumps | [`etc/systemd/coredump.conf.d/`](./etc/systemd/coredump.conf.d/) disables them with `Storage=none` and `ProcessSizeMax=0`, as a dump holds the memory of the crashed process, including keys and passphrases. |
-| IPv6 | Enabled, with rotating privacy addresses from [`10-ipv6-privacy.conf`](./etc/NetworkManager/conf.d/10-ipv6-privacy.conf). |
 | Wi-Fi | Power save is disabled by [`20-wifi-powersave.conf`](./etc/NetworkManager/conf.d/20-wifi-powersave.conf); it adds latency on an idle link, and some Intel firmware drops the connection while the radio sleeps. |
 
 Enabled services: `systemd-resolved`, `systemd-timesyncd`, zram swap, `sshd`,
@@ -485,9 +485,9 @@ specification, which keeps the home directory free of dotfiles.
 | --- | --- |
 | [`00-xdg.sh`](./etc/profile.d/00-xdg.sh) | Sets `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_STATE_HOME` and `XDG_CACHE_HOME` to the specification's defaults for every login shell, and moves the Python history, Cargo, rustup and the readline configuration into them |
 | [`10-defaults.sh`](./etc/profile.d/10-defaults.sh) | Sets `EDITOR`, `VISUAL`, `PAGER`, `LESS` and colored man pages; a value already set is kept |
-| [`zz-xdg-bash.sh`](./etc/profile.d/zz-xdg-bash.sh) | Loads `~/.config/bash/bashrc` in bash login shells, and keeps the history in `~/.local/state/bash/` |
-| [`xdg.vim`](./etc/vim/xdg.vim) | Appended to `/etc/vimrc`; moves Vim's `viminfo` to the state directory and netrw's files to the data directory |
 | [`bashrc`](./defaults/bash/bashrc) | The user's bashrc, installed to `~/.config/bash/bashrc` |
+| [`xdg.vim`](./etc/vim/xdg.vim) | Appended to `/etc/vimrc`; moves Vim's `viminfo` to the state directory and netrw's files to the data directory |
+| [`zz-xdg-bash.sh`](./etc/profile.d/zz-xdg-bash.sh) | Loads `~/.config/bash/bashrc` in bash login shells, and keeps the history in `~/.local/state/bash/` |
 
 - **The profile scripts run in name order.** `00-xdg.sh` runs first, so the
   other `profile.d` files can rely on its variables, and `zz-xdg-bash.sh` runs
@@ -586,17 +586,17 @@ does not support.
 
 | Array | Contents |
 | --- | --- |
-| `DEFAULT_COMPOSITOR_PACKAGES` | niri, nirimod, PipeWire, WirePlumber, the XDG desktop portals, `xwayland-satellite`, and tools for brightness, media keys and the clipboard |
-| `DEFAULT_NOCTALIA_PACKAGES` | The Noctalia shell and greeter |
-| `DEFAULT_TERMINAL_PACKAGES` | kitty, fish, Starship, fastfetch, btop and superfile |
-| `DEFAULT_KDE_PACKAGES` | Dolphin, Kate, Konsole, Ark, Gwenview, Okular and Haruna, and the KDE services and integration they require outside Plasma |
 | `DEFAULT_BROWSER_PACKAGES` | Firefox, Chromium, Zen Browser and Pywalfox |
-| `DEFAULT_OFFICE_PACKAGES` | LibreOffice with English spelling dictionaries, GIMP and Inkscape |
-| `DEFAULT_DEVELOPMENT_PACKAGES` | VSCodium with the Visual Studio Marketplace |
-| `DEFAULT_THEME_PACKAGES` | Qt and GTK themes, Papirus icons, `nwg-look` and the cursor theme |
-| `DEFAULT_FONT_PACKAGES` | JetBrains Mono Nerd Font, Inter, Noto and Liberation |
 | `DEFAULT_CLI_PACKAGES` | bat, duf, dust, eza, fd, fzf, glow, procs, ripgrep and zoxide |
+| `DEFAULT_COMPOSITOR_PACKAGES` | niri, nirimod, PipeWire, WirePlumber, the XDG desktop portals, `xwayland-satellite`, and tools for brightness, media keys and the clipboard |
+| `DEFAULT_DEVELOPMENT_PACKAGES` | VSCodium with the Visual Studio Marketplace |
+| `DEFAULT_FONT_PACKAGES` | JetBrains Mono Nerd Font, Inter, Noto and Liberation |
+| `DEFAULT_KDE_PACKAGES` | Dolphin, Kate, Konsole, Ark, Gwenview, Okular and Haruna, and the KDE services and integration they require outside Plasma |
 | `DEFAULT_NEOVIM_PACKAGES` | Neovim and the tools LazyVim's plugins require |
+| `DEFAULT_NOCTALIA_PACKAGES` | The Noctalia shell and greeter |
+| `DEFAULT_OFFICE_PACKAGES` | LibreOffice with English spelling dictionaries, GIMP and Inkscape |
+| `DEFAULT_TERMINAL_PACKAGES` | kitty, fish, Starship, fastfetch, btop and superfile |
+| `DEFAULT_THEME_PACKAGES` | Qt and GTK themes, Papirus icons, `nwg-look` and the cursor theme |
 
 - **One transaction for the desktop.** The Noctalia, terminal, KDE, browser,
   office, development, theme and font packages are installed by a single paru
@@ -651,13 +651,13 @@ does not support.
 
 | Destination | Source | Purpose |
 | --- | --- | --- |
+| `/etc/fonts/conf.d/50-generic-families.conf` | [`etc/fonts/conf.d/50-generic-families.conf`](./etc/fonts/conf.d/50-generic-families.conf) | The fonts for sans-serif, serif, monospace and `system-ui`, which web pages mostly rely on |
 | `/etc/greetd/config.toml` | [`etc/greetd/config.toml`](./etc/greetd/config.toml) | Starts the greeter on the first virtual terminal |
 | `/etc/pam.d/greetd` | [`etc/pam.d/greetd`](./etc/pam.d/greetd) | Unlocks KWallet at login |
-| `/var/lib/noctalia-greeter/greeter.toml` | [`defaults/noctalia-greeter/greeter.toml`](./defaults/noctalia-greeter/greeter.toml) | Keyboard layout and display of the login screen |
 | `/usr/local/share/wayland-sessions/niri.desktop` | [`defaults/wayland-sessions/niri.desktop`](./defaults/wayland-sessions/niri.desktop) | The niri session, logging to the journal |
-| `/etc/fonts/conf.d/50-generic-families.conf` | [`etc/fonts/conf.d/50-generic-families.conf`](./etc/fonts/conf.d/50-generic-families.conf) | The fonts for sans-serif, serif, monospace and `system-ui`, which web pages mostly rely on |
-| Polkit rule | `noctalia-greeter passwordless-sync` | Appearance sync without authentication |
+| `/var/lib/noctalia-greeter/greeter.toml` | [`defaults/noctalia-greeter/greeter.toml`](./defaults/noctalia-greeter/greeter.toml) | Keyboard layout and display of the login screen |
 | Login shell | `chsh` | fish for the installing user |
+| Polkit rule | `noctalia-greeter passwordless-sync` | Appearance sync without authentication |
 
 ### User Configuration
 

@@ -9,12 +9,12 @@ imports this file, so rules are written here.
 
 | Path | Role |
 | --- | --- |
-| `base-install.sh` | Runs as root from the Arch Linux ISO in UEFI mode; erases the target disk and installs LUKS2, Btrfs, Limine, UKIs and Snapper |
-| `desktop-install.sh` | Runs as the regular user on an installed system; installs niri, Noctalia and greetd with paru and copies `dots/` |
-| `etc/` | Installed to the same path under `/etc` |
-| `defaults/` | Installed to other locations; see ARCHITECTURE.md, Repository Layout |
-| `dots/` | Merged into `$HOME` by `desktop-install.sh`, without the `AGENTS.md` files |
 | `assets/wallpapers/` | Copied to `~/Pictures/Wallpapers` |
+| `base-install.sh` | Runs as root from the Arch Linux ISO in UEFI mode; erases the target disk and installs LUKS2, Btrfs, Limine, UKIs and Snapper |
+| `defaults/` | Installed to other locations; see ARCHITECTURE.md, Repository Layout |
+| `desktop-install.sh` | Runs as the regular user on an installed system; installs niri, Noctalia and greetd with paru and copies `dots/` |
+| `dots/` | Merged into `$HOME` by `desktop-install.sh`, without the `AGENTS.md` files |
+| `etc/` | Installed to the same path under `/etc` |
 | `packages/` | Prebuilt AUR packages, installed by `base-install.sh` with `pacman -U` |
 
 The repository has no build system, CI, tests, database or migrations.
