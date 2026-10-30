@@ -1019,19 +1019,24 @@ install_neovim_plugins() {
   echo
 }
 
-# Installs the VSCodium extensions that extensions.json lists: the Noctalia
-# theme extension, whose colors Noctalia renders, and Catppuccin Icons. The
-# settings.json from copy_dotfiles selects both. The install runs outside the
-# niri session, which leaves VSCODE_PORTABLE and VSCODE_CLI_DATA_DIR to be set
-# here. Not fatal: VSCodium then starts with its default themes.
+# Installs the VSCodium extensions that extensions.json lists, among them the
+# Noctalia theme extension, whose colors Noctalia renders, and Catppuccin Icons,
+# both selected by the settings.json from copy_dotfiles. The install runs
+# outside the niri session, which leaves VSCODE_PORTABLE and VSCODE_CLI_DATA_DIR
+# to be set here. Not fatal: VSCodium then starts with its default themes.
 configure_vscodium() {
   print_msg "Installing the VSCodium extensions"
-  local extension
+  local recommended extension
   local -a args=()
+  if ! recommended=$(jq -r '.recommendations[]' "${VSCODIUM_EXTENSIONS}"); then
+    print_warning "The VSCodium extension list could not be read; VSCodium" \
+      "starts with its default themes."
+    return 0
+  fi
+  [[ -n "${recommended}" ]] || return 0
   while IFS= read -r extension; do
     args+=(--install-extension "${extension}")
-  done < <(jq -r '.recommendations[]' "${VSCODIUM_EXTENSIONS}")
-  ((${#args[@]} > 0)) || return 0
+  done <<<"${recommended}"
 
   # VSCodium only uses VSCODE_PORTABLE when the directory exists, and falls
   # back to ~/.vscode-oss and ~/.config/VSCodium otherwise.
