@@ -752,13 +752,16 @@ install_neovim() {
   paru_install "${DEFAULT_NEOVIM_PACKAGES[@]}"
 }
 
-# Adds a sed expression to the caller's edits array: the placeholder takes the
-# value, or its line is deleted when the value is empty.
+# Adds a sed expression to the array named by $1: the placeholder $2 takes the
+# value $3, or its line is deleted when the value is empty.
 set_or_delete() {
-  if [[ -n "$2" ]]; then
-    edits+=(-e "s/${1}/${2}/")
+  local -n expressions=$1
+  local placeholder=$2 value=$3
+
+  if [[ -n "${value}" ]]; then
+    expressions+=(-e "s/${placeholder}/${value}/")
   else
-    edits+=(-e "/${1}/d")
+    expressions+=(-e "/${placeholder}/d")
   fi
 }
 
@@ -797,10 +800,11 @@ install_greeter_config() {
     mode="${OUTPUT_MODE[${connector}]:-}"
     resolution="${mode%@*}"
     edits+=(-e "s/@OUTPUT_NAME@/${connector}/")
-    set_or_delete "@OUTPUT_WIDTH@" "${resolution:+${resolution%x*}}"
-    set_or_delete "@OUTPUT_HEIGHT@" "${resolution:+${resolution#*x}}"
-    set_or_delete "@OUTPUT_REFRESH_RATE@" "${OUTPUT_RATE[${connector}]:-}"
-    set_or_delete "@OUTPUT_SCALE@" "${OUTPUT_SCALE[${connector}]:-}"
+    set_or_delete edits "@OUTPUT_WIDTH@" "${resolution:+${resolution%x*}}"
+    set_or_delete edits "@OUTPUT_HEIGHT@" "${resolution:+${resolution#*x}}"
+    set_or_delete edits "@OUTPUT_REFRESH_RATE@" \
+      "${OUTPUT_RATE[${connector}]:-}"
+    set_or_delete edits "@OUTPUT_SCALE@" "${OUTPUT_SCALE[${connector}]:-}"
   fi
   sed "${edits[@]}" "${GREETER_CONF_SRC}" \
     | sudo install -m 0644 -o "${owner}" -g "${group}" /dev/stdin \

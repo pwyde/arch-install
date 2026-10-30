@@ -191,7 +191,7 @@ USER_PASSWORD=""
 ROOT_PASSWORD=""
 # Names the accounts that fell back to 'changeme'. print_summary repeats this at
 # the end, where a warning from the password prompt has long scrolled off.
-PASSWORD_FALLBACK=""
+PASSWORD_FALLBACK=()
 
 print_msg() {
   echo "${GREEN}==>${NO_COLOR}${WHITE}" "$*${NO_COLOR}"
@@ -459,8 +459,9 @@ validate_keymap() {
 # the chroot. Strict patterns make escaping unnecessary, and the live system
 # ships the same time zone and locale data as the target.
 validate_options() {
-  local pattern subvol listed="" has_root=0
+  local pattern subvol has_root=0
   local -a subvols
+  local -A listed=()
 
   # A single label, since /etc/hosts appends .localdomain to it.
   pattern='^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$'
@@ -517,11 +518,11 @@ validate_options() {
         "digits, '_' or '-'."
       exit 1
     fi
-    if [[ " ${listed} " == *" ${subvol} "* ]]; then
+    if [[ -n "${listed["${subvol}"]:-}" ]]; then
       print_error "Subvolume '${subvol}' is listed more than once."
       exit 1
     fi
-    listed="${listed} ${subvol}"
+    listed["${subvol}"]=1
     [[ "${subvol}" != "@" ]] || has_root=1
   done
   if ((has_root == 0)); then
@@ -1106,7 +1107,7 @@ prompt_password() {
     print_msg "Passwords do not match. Setting temporary password 'changeme'"
   fi
   password="changeme"
-  PASSWORD_FALLBACK+="${account} "
+  PASSWORD_FALLBACK+=("${account}")
   print_warning "Change the password for ${account} after the first login" \
     "with: ${change_command}"
 }
@@ -1118,7 +1119,7 @@ prompt_for_passwords() {
     print_msg "Non-interactive mode: Setting default temporary passwords"
     USER_PASSWORD="changeme"
     ROOT_PASSWORD="changeme"
-    PASSWORD_FALLBACK="${USERNAME} root "
+    PASSWORD_FALLBACK=("${USERNAME}" root)
     return
   fi
 
@@ -1809,6 +1810,8 @@ print_troubleshooting() {
 
 # Prints the installation summary.
 print_summary() {
+  local account
+
   echo
   print_heading "iNSTALLATiON SUMMARY"
   echo "${WHITE}Disk:${NO_COLOR} ${DISK}"
@@ -1833,17 +1836,18 @@ print_summary() {
     "second"
   echo "credential: losing the passphrase means losing the data.${NO_COLOR}"
 
-  if [[ -n "${PASSWORD_FALLBACK}" ]]; then
+  if ((${#PASSWORD_FALLBACK[@]} > 0)); then
     echo
     echo "${YELLOW}The temporary password 'changeme' was set for:" \
-      "${PASSWORD_FALLBACK% }"
+      "${PASSWORD_FALLBACK[*]}"
     echo "Log in with it and change it immediately:"
-    if [[ " ${PASSWORD_FALLBACK}" == *" ${USERNAME} "* ]]; then
-      echo "  ${USERNAME}: passwd"
-    fi
-    if [[ " ${PASSWORD_FALLBACK}" == *" root "* ]]; then
-      echo "  root: sudo passwd root"
-    fi
+    for account in "${PASSWORD_FALLBACK[@]}"; do
+      if [[ "${account}" == root ]]; then
+        echo "  root: sudo passwd root"
+      else
+        echo "  ${account}: passwd"
+      fi
+    done
     printf '%s' "${NO_COLOR}"
   fi
 
