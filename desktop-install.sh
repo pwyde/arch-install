@@ -378,17 +378,23 @@ validate_xkb_layout() {
   fi
 }
 
-# Every connector must exist and have a monitor attached, and a resolution
-# must be one that monitor reports. The kernel lists no refresh rates, which
-# leaves the rate unchecked; niri picks a mode itself when it does not match.
-# niri rejects a scale outside 0 to 10, and stores positions as 32-bit
-# integers.
+# Every connector given with --display, --scale or --position must exist and
+# have a monitor attached. The connectors are recorded in the order they first
+# appear, which is why the options are checked in this order.
 validate_displays() {
+  validate_display_modes
+  validate_display_scales
+  validate_display_positions
+}
+
+# A resolution must be one that monitor reports. The kernel lists no refresh
+# rates, which leaves the rate unchecked; niri picks a mode itself when it does
+# not match.
+validate_display_modes() {
   local entry connector resolution rate status_file
   local display_re='^([A-Za-z0-9-]+):([0-9]+x[0-9]+)'
   display_re+='(@([0-9]+(\.[0-9]{1,3})?))?$'
-  local scale_re='^([A-Za-z0-9-]+):([0-9]+(\.[0-9]+)?)$'
-  local position_re='^([A-Za-z0-9-]+):(-?[0-9]{1,9}),(-?[0-9]{1,9})$'
+
   for entry in "${DISPLAYS[@]}"; do
     if [[ ! "${entry}" =~ ${display_re} ]]; then
       print_error "Invalid --display value '${entry}'; expected" \
@@ -415,6 +421,12 @@ validate_displays() {
     OUTPUT_RATE[${connector}]="${rate}"
     add_output "${connector}"
   done
+}
+
+# niri rejects a scale outside 0 to 10.
+validate_display_scales() {
+  local entry connector
+  local scale_re='^([A-Za-z0-9-]+):([0-9]+(\.[0-9]+)?)$'
 
   for entry in "${SCALES[@]}"; do
     if [[ ! "${entry}" =~ ${scale_re} ]] \
@@ -435,6 +447,12 @@ validate_displays() {
     OUTPUT_SCALE[${connector}]="${BASH_REMATCH[2]}"
     add_output "${connector}"
   done
+}
+
+# niri stores positions as 32-bit integers.
+validate_display_positions() {
+  local entry connector
+  local position_re='^([A-Za-z0-9-]+):(-?[0-9]{1,9}),(-?[0-9]{1,9})$'
 
   for entry in "${POSITIONS[@]}"; do
     if [[ ! "${entry}" =~ ${position_re} ]]; then
