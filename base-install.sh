@@ -481,13 +481,19 @@ validate_secure_boot() {
   esac
 }
 
-# Validates the options, the live environment and the repository files.
+# Validates the options, the live environment and the repository files. The
+# option values reach sed expressions, configuration files and commands run in
+# the chroot; strict patterns make escaping them unnecessary.
 validate_inputs() {
   validate_disk
   validate_disk_unused
   validate_environment
   validate_keymap
-  validate_options
+  validate_hostname
+  validate_username
+  validate_timezone
+  validate_locale
+  validate_subvolumes
   validate_packages
   validate_repository
 }
@@ -591,49 +597,53 @@ validate_keymap() {
   fi
 }
 
-# The values reach sed expressions, configuration files and commands run in
-# the chroot. Strict patterns make escaping unnecessary, and the live system
-# ships the same time zone and locale data as the target.
-validate_options() {
-  local pattern subvol has_root=0
-  local -a subvols
-  local -A listed=()
+# A single label, since /etc/hosts appends .localdomain to it.
+validate_hostname() {
+  local pattern='^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$'
 
-  # A single label, since /etc/hosts appends .localdomain to it.
-  pattern='^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$'
   if [[ ! "${HOSTNAME}" =~ ${pattern} ]]; then
     print_error "Invalid hostname '${HOSTNAME}': letters, digits and inner" \
       "hyphens only, at most 63 characters."
     exit 1
   fi
+}
 
-  # The pattern useradd accepts, without the '$' of machine accounts.
-  pattern='^[a-z_][a-z0-9_-]{0,31}$'
+# The pattern useradd accepts, without the '$' of machine accounts. An existing
+# account would gain a password and SSH access. The live system has the
+# target's base accounts; configure_users catches those that packages add.
+validate_username() {
+  local pattern='^[a-z_][a-z0-9_-]{0,31}$'
+
   if [[ ! "${USERNAME}" =~ ${pattern} ]]; then
     print_error "Invalid username '${USERNAME}': lowercase letters, digits," \
       "'_' and '-' only, at most 32 characters, not starting with a digit" \
       "or '-'."
     exit 1
   fi
-  # An existing account would gain a password and SSH access. The live system
-  # has the target's base accounts; configure_users catches those that
-  # packages add.
   if getent passwd "${USERNAME}" >/dev/null; then
     print_error "Username '${USERNAME}' is reserved for a system account."
     exit 1
   fi
+}
 
-  # The pattern excludes '.', which keeps the path below zoneinfo.
-  pattern='^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+# The pattern excludes '.', which keeps the path below zoneinfo. The live
+# system ships the same time zone data as the target.
+validate_timezone() {
+  local pattern='^[A-Za-z0-9_+-]+(/[A-Za-z0-9_+-]+)*$'
+
   if [[ ! "${TIMEZONE}" =~ ${pattern} \
     || ! -f "/usr/share/zoneinfo/${TIMEZONE}" ]]; then
     print_error "Unknown time zone '${TIMEZONE}'."
     exit 1
   fi
+}
 
-  # locale-gen generates only the locales listed in locale.gen. The locale sets
-  # LC_CTYPE, so a legacy character set would replace UTF-8 for every program.
-  pattern='^[A-Za-z0-9_.@-]+$'
+# locale-gen generates only the locales listed in locale.gen, which the live
+# system ships as the target does. The locale sets LC_CTYPE, so a legacy
+# character set would replace UTF-8 for every program.
+validate_locale() {
+  local pattern='^[A-Za-z0-9_.@-]+$'
+
   if [[ ! "${LOCALE}" =~ ${pattern} ]] \
     || ! awk -v locale="${LOCALE}" '
       { sub(/^#/, "") }
@@ -643,10 +653,14 @@ validate_options() {
       "from /etc/locale.gen, such as sv_SE.UTF-8."
     exit 1
   fi
+}
 
-  # Each name becomes a path and a mount point, and @ holds the root
-  # filesystem.
-  pattern='^@[A-Za-z0-9_-]*$'
+# Each name becomes a path and a mount point, and @ holds the root filesystem.
+validate_subvolumes() {
+  local pattern='^@[A-Za-z0-9_-]*$' subvol has_root=0
+  local -a subvols
+  local -A listed=()
+
   read -ra subvols <<<"${SUBVOLUMES}"
   for subvol in "${subvols[@]}"; do
     if [[ ! "${subvol}" =~ ${pattern} ]]; then
