@@ -236,6 +236,82 @@ cleanup() {
   fi
 }
 
+# Re-runs the script under script(1), which records everything printed on the
+# terminal to the log. Typed passwords are never logged: input is not
+# recorded, and password prompts do not echo.
+#
+# The timestamp in the file name is the first run's. A later run in the same
+# checkout appends to that file, and script(1) marks where each run starts and
+# ends.
+start_logging() {
+  local arg
+  for arg in "$@"; do
+    case "${arg}" in -h | --help) return 0 ;; esac
+  done
+
+  if ! command -v script &>/dev/null; then
+    print_warning "script(1) is not available; continuing without a log file."
+    return 0
+  fi
+
+  mkdir -p "${LOG_DIR}"
+  local log_file
+  log_file=$(find "${LOG_DIR}" -maxdepth 1 -name 'desktop-install-*.log' \
+    | sort \
+    | tail -n 1)
+  if [[ -z "${log_file}" ]]; then
+    log_file="${LOG_DIR}/desktop-install-$(date +%Y%m%d-%H%M%S).log"
+  fi
+  print_msg "Logging to ${log_file}"
+
+  # script(1) runs the command through $SHELL; bash, to match the quoting.
+  local command
+  command=$(printf '%q ' env DESKTOP_INSTALL_LOG="${log_file}" \
+    "${SCRIPT_DIR}/$(basename "$0")" "$@")
+  exec env SHELL=/bin/bash script --quiet --append --flush --return \
+    --command "${command}" "${log_file}"
+}
+
+# Prints the title centered in an 80-column line of equals signs.
+print_heading() {
+  local title=" $1 " left right
+  local -i width=$(((80 - ${#title}) / 2))
+  printf -v left '%*s' "${width}" ''
+  printf -v right '%*s' "$((80 - ${#title} - width))" ''
+  echo "${WHITE}${left// /=}${BLUE}${title}${WHITE}${right// /=}${NO_COLOR}"
+}
+
+print_logo() {
+  # Color is set around the heredoc rather than inside it: the heredoc stays
+  # quoted, and the art is never subject to expansion.
+  printf '%s' "${BLUE}"
+  cat <<'EOF'
+                                       ▄
+                                      ▟█▙
+                                     ▟███▙
+                                    ▟█████▙
+                                   ▟███████▙
+                                  ▂▔▀▜██████▙
+                                 ▟██▅▂▝▜█████▙
+                                ▟█████████████▙
+                               ▟███████████████▙
+                              ▟█████████████████▙
+                             ▟███████████████████▙
+                            ▟█████████▛▀▀▜████████▙
+                           ▟████████▛      ▜███████▙
+                          ▟█████████        ████████▙
+                         ▟██████████        █████▆▅▄▃▂
+                        ▟██████████▛        ▜█████████▙
+                       ▟██████▀▀▀              ▀▀██████▙
+                      ▟███▀▘                       ▝▀███▙
+                     ▟▛▀                               ▀▜▙
+
+EOF
+  printf '%s' "${NO_COLOR}"
+  print_heading "DESKTOP iNSTALLATiON SCRiPT"
+  echo
+}
+
 # Help text.
 show_help() {
   cat <<EOF
@@ -335,6 +411,84 @@ parse_args() {
         exit 1
         ;;
     esac
+  done
+}
+
+# Validates the environment, the display manager and the repository files.
+validate_inputs() {
+  validate_environment
+  validate_display_manager
+  validate_repository
+}
+
+# The regular user, with the commands the installer runs.
+validate_environment() {
+  local cmd
+
+  # makepkg refuses to run as root, and the copies belong to the user.
+  if ((EUID == 0)); then
+    print_error "This script must be run as the regular user, not as root."
+    exit 1
+  fi
+
+  # Tools required on the installed system.
+  for cmd in paru sudo cp; do
+    if ! command -v "${cmd}" &>/dev/null; then
+      print_error "Required command not found: ${cmd}"
+      exit 1
+    fi
+  done
+}
+
+# greetd is enabled as display-manager.service, an alias that systemctl enable
+# does not take over from another display manager.
+validate_display_manager() {
+  local dm_link="/etc/systemd/system/display-manager.service" display_manager
+
+  if [[ -L "${dm_link}" ]]; then
+    display_manager=$(readlink "${dm_link}")
+    display_manager="${display_manager##*/}"
+    if [[ "${display_manager}" != "greetd.service" ]]; then
+      print_error "${display_manager} is enabled as the display manager," \
+        "which greetd would replace."
+      if [[ -e "${dm_link}" ]]; then
+        print_error "Disable it first: sudo systemctl disable" \
+          "${display_manager}"
+      else
+        # pacman removes a package without disabling its services.
+        print_error "Its unit no longer exists. Remove the leftover link" \
+          "first: sudo rm ${dm_link}"
+      fi
+      exit 1
+    fi
+  fi
+}
+
+# Everything the script copies out of this repository.
+validate_repository() {
+  local src
+  local -a repo_files=(
+    "${GREETER_CONF_SRC}"
+    "${GREETD_CONF_SRC}"
+    "${GREETD_PAM_SRC}"
+    "${FONTCONFIG_SRC}"
+    "${NIRI_SESSION_SRC}"
+  )
+
+  for src in "${WALLPAPERS_SRC}" "${DOTFILES_SRC}"; do
+    if [[ ! -d "${src}" ]]; then
+      print_error "Missing repository directory: ${src}"
+      print_error "Run the script from a full checkout of the repository."
+      exit 1
+    fi
+  done
+
+  for src in "${repo_files[@]}"; do
+    if [[ ! -f "${src}" ]]; then
+      print_error "Missing repository file: ${src}"
+      print_error "Run the script from a full checkout of the repository."
+      exit 1
+    fi
   done
 }
 
@@ -575,84 +729,6 @@ validate_packages() {
   done
 }
 
-# Validates the environment, the display manager and the repository files.
-validate_inputs() {
-  validate_environment
-  validate_display_manager
-  validate_repository
-}
-
-# The regular user, with the commands the installer runs.
-validate_environment() {
-  local cmd
-
-  # makepkg refuses to run as root, and the copies belong to the user.
-  if ((EUID == 0)); then
-    print_error "This script must be run as the regular user, not as root."
-    exit 1
-  fi
-
-  # Tools required on the installed system.
-  for cmd in paru sudo cp; do
-    if ! command -v "${cmd}" &>/dev/null; then
-      print_error "Required command not found: ${cmd}"
-      exit 1
-    fi
-  done
-}
-
-# greetd is enabled as display-manager.service, an alias that systemctl enable
-# does not take over from another display manager.
-validate_display_manager() {
-  local dm_link="/etc/systemd/system/display-manager.service" display_manager
-
-  if [[ -L "${dm_link}" ]]; then
-    display_manager=$(readlink "${dm_link}")
-    display_manager="${display_manager##*/}"
-    if [[ "${display_manager}" != "greetd.service" ]]; then
-      print_error "${display_manager} is enabled as the display manager," \
-        "which greetd would replace."
-      if [[ -e "${dm_link}" ]]; then
-        print_error "Disable it first: sudo systemctl disable" \
-          "${display_manager}"
-      else
-        # pacman removes a package without disabling its services.
-        print_error "Its unit no longer exists. Remove the leftover link" \
-          "first: sudo rm ${dm_link}"
-      fi
-      exit 1
-    fi
-  fi
-}
-
-# Everything the script copies out of this repository.
-validate_repository() {
-  local src
-  local -a repo_files=(
-    "${GREETER_CONF_SRC}"
-    "${GREETD_CONF_SRC}"
-    "${GREETD_PAM_SRC}"
-    "${FONTCONFIG_SRC}"
-    "${NIRI_SESSION_SRC}"
-  )
-
-  for src in "${WALLPAPERS_SRC}" "${DOTFILES_SRC}"; do
-    if [[ ! -d "${src}" ]]; then
-      print_error "Missing repository directory: ${src}"
-      print_error "Run the script from a full checkout of the repository."
-      exit 1
-    fi
-  done
-
-  for src in "${repo_files[@]}"; do
-    if [[ ! -f "${src}" ]]; then
-      print_error "Missing repository file: ${src}"
-      print_error "Run the script from a full checkout of the repository."
-      exit 1
-    fi
-  done
-}
-
 # Asks for confirmation before anything is installed or overwritten.
 confirm_operation() {
   local output reply
@@ -752,6 +828,15 @@ install_neovim() {
   paru_install "${DEFAULT_NEOVIM_PACKAGES[@]}"
 }
 
+install_extra_packages() {
+  if [[ -n "${EXTRA_PACKAGES}" ]]; then
+    print_msg "Installing additional packages"
+    local -a packages
+    read -ra packages <<<"${EXTRA_PACKAGES}"
+    paru_install "${packages[@]}"
+  fi
+}
+
 # Adds a sed expression to the array named by $1: the placeholder $2 takes the
 # value $3, or its line is deleted when the value is empty.
 set_or_delete() {
@@ -846,23 +931,6 @@ configure_greetd() {
   sudo systemctl enable greetd.service
 }
 
-# fish's package lists /usr/bin/fish in /etc/shells, which chsh requires. The
-# environment /etc/profile sets up for login shells comes from
-# ~/.config/fish/conf.d/00-profile.fish, as fish does not read that file.
-set_login_shell() {
-  local user current
-  user=$(id -un)
-  current=$(getent passwd "${user}" | cut -d: -f7)
-  [[ "${current}" != "${FISH_SHELL}" ]] || return 0
-
-  if ! grep -qx "${FISH_SHELL}" /etc/shells; then
-    print_error "${FISH_SHELL} is not listed in /etc/shells."
-    exit 1
-  fi
-  print_msg "Setting fish as the login shell for ${user}"
-  sudo chsh -s "${FISH_SHELL}" "${user}"
-}
-
 # Chooses the fonts for sans-serif, serif, monospace and the system-ui names,
 # which web pages mostly rely on. Applies to every user of the system.
 configure_fonts() {
@@ -885,13 +953,21 @@ enable_passwordless_sync() {
   fi
 }
 
-install_extra_packages() {
-  if [[ -n "${EXTRA_PACKAGES}" ]]; then
-    print_msg "Installing additional packages"
-    local -a packages
-    read -ra packages <<<"${EXTRA_PACKAGES}"
-    paru_install "${packages[@]}"
+# fish's package lists /usr/bin/fish in /etc/shells, which chsh requires. The
+# environment /etc/profile sets up for login shells comes from
+# ~/.config/fish/conf.d/00-profile.fish, as fish does not read that file.
+set_login_shell() {
+  local user current
+  user=$(id -un)
+  current=$(getent passwd "${user}" | cut -d: -f7)
+  [[ "${current}" != "${FISH_SHELL}" ]] || return 0
+
+  if ! grep -qx "${FISH_SHELL}" /etc/shells; then
+    print_error "${FISH_SHELL} is not listed in /etc/shells."
+    exit 1
   fi
+  print_msg "Setting fish as the login shell for ${user}"
+  sudo chsh -s "${FISH_SHELL}" "${user}"
 }
 
 # Creates ~/Pictures and the other XDG user directories, and records them in
@@ -922,49 +998,6 @@ copy_dotfiles() {
     find . ! -type d ! -name AGENTS.md \
       -exec cp -P --remove-destination --parents -t "${DOTFILES_DEST}" -- {} +
   )
-}
-
-# Swaps the five bindings 70-binds.kdl marks "Swedish:" for their alternatives:
-# with the se layout, the US bindings use symbols that need Shift or AltGr,
-# which niri cannot match. Each line is matched whole; a missing one is reported
-# and its pair left as it is.
-configure_swedish_binds() {
-  [[ "${XKB_LAYOUT}" == "se" ]] || return 0
-
-  print_msg "Switching the niri key bindings to the Swedish layout"
-  # Each US binding, followed by its Swedish alternative.
-  local -a pairs=(
-    'Mod+Shift+Slash { show-hotkey-overlay; }'
-    'Mod+Shift+7 { show-hotkey-overlay; }'
-    'Mod+BracketLeft  { consume-or-expel-window-left; }'
-    'Mod+aring          { consume-or-expel-window-left; }'
-    'Mod+BracketRight { consume-or-expel-window-right; }'
-    'Mod+dead_diaeresis { consume-or-expel-window-right; }'
-    'Mod+Equal { set-column-width "+10%"; }'
-    'Mod+plus       { set-column-width "+10%"; }'
-    'Mod+Shift+Equal { set-window-height "+10%"; }'
-    'Mod+Shift+plus { set-window-height "+10%"; }'
-  )
-  local i us se
-  TEMP_FILE=$(mktemp)
-  for ((i = 0; i < ${#pairs[@]}; i += 2)); do
-    us="    ${pairs[i]}"
-    se="    ${pairs[i + 1]}"
-    if ! grep -qxF -- "${us}" "${NIRI_BINDS}" \
-      || ! grep -qxF -- "    // ${pairs[i + 1]}" "${NIRI_BINDS}"; then
-      print_warning "Binding not found in ${NIRI_BINDS}, left unchanged:" \
-        "${pairs[i]}"
-      continue
-    fi
-    awk -v us="${us}" -v se="${se}" '
-      $0 == us { print "    // " substr(us, 5); next }
-      $0 == "    // " substr(se, 5) { print se; next }
-      { print }
-    ' "${NIRI_BINDS}" >"${TEMP_FILE}"
-    cat "${TEMP_FILE}" >"${NIRI_BINDS}"
-  done
-  rm -f "${TEMP_FILE}"
-  TEMP_FILE=""
 }
 
 # On Wayland, GTK 3 takes the theme, icons, cursor and fonts from GSettings,
@@ -1075,6 +1108,49 @@ configure_keyboard_layout() {
   } >>"${NIRI_USER_EXTRA}"
 }
 
+# Swaps the five bindings 70-binds.kdl marks "Swedish:" for their alternatives:
+# with the se layout, the US bindings use symbols that need Shift or AltGr,
+# which niri cannot match. Each line is matched whole; a missing one is reported
+# and its pair left as it is.
+configure_swedish_binds() {
+  [[ "${XKB_LAYOUT}" == "se" ]] || return 0
+
+  print_msg "Switching the niri key bindings to the Swedish layout"
+  # Each US binding, followed by its Swedish alternative.
+  local -a pairs=(
+    'Mod+Shift+Slash { show-hotkey-overlay; }'
+    'Mod+Shift+7 { show-hotkey-overlay; }'
+    'Mod+BracketLeft  { consume-or-expel-window-left; }'
+    'Mod+aring          { consume-or-expel-window-left; }'
+    'Mod+BracketRight { consume-or-expel-window-right; }'
+    'Mod+dead_diaeresis { consume-or-expel-window-right; }'
+    'Mod+Equal { set-column-width "+10%"; }'
+    'Mod+plus       { set-column-width "+10%"; }'
+    'Mod+Shift+Equal { set-window-height "+10%"; }'
+    'Mod+Shift+plus { set-window-height "+10%"; }'
+  )
+  local i us se
+  TEMP_FILE=$(mktemp)
+  for ((i = 0; i < ${#pairs[@]}; i += 2)); do
+    us="    ${pairs[i]}"
+    se="    ${pairs[i + 1]}"
+    if ! grep -qxF -- "${us}" "${NIRI_BINDS}" \
+      || ! grep -qxF -- "    // ${pairs[i + 1]}" "${NIRI_BINDS}"; then
+      print_warning "Binding not found in ${NIRI_BINDS}, left unchanged:" \
+        "${pairs[i]}"
+      continue
+    fi
+    awk -v us="${us}" -v se="${se}" '
+      $0 == us { print "    // " substr(us, 5); next }
+      $0 == "    // " substr(se, 5) { print se; next }
+      { print }
+    ' "${NIRI_BINDS}" >"${TEMP_FILE}"
+    cat "${TEMP_FILE}" >"${NIRI_BINDS}"
+  done
+  rm -f "${TEMP_FILE}"
+  TEMP_FILE=""
+}
+
 # Appended like the keyboard layout, after copy_dotfiles. Each connector gets
 # one output section with the settings given for it; niri keeps its defaults
 # for the rest.
@@ -1097,6 +1173,19 @@ configure_displays() {
   done
 }
 
+# Runs after copy_dotfiles, and also without --address, which leaves the
+# address empty instead of the placeholder. The sed replacement escapes the
+# characters sed treats specially: the delimiter and the ampersand.
+configure_location() {
+  local address="${LOCATION_ADDRESS//|/\\|}"
+  address="${address//&/\\&}"
+
+  if [[ -n "${LOCATION_ADDRESS}" ]]; then
+    print_msg "Setting the Noctalia location to ${LOCATION_ADDRESS}"
+  fi
+  sed -i "s|@LOCATION_ADDRESS@|${address}|" "${NOCTALIA_CONFIG}"
+}
+
 # Ties the lock screen widgets to the first display given with --display,
 # --scale or --position, or else to the first connected one. Without a display,
 # the file is removed and Noctalia uses its default lock screen.
@@ -1115,95 +1204,6 @@ configure_lockscreen() {
   fi
   print_msg "Placing the lock screen widgets on ${connector}"
   sed -i "s|@LOCKSCREEN_OUTPUT@|${connector}|g" "${NOCTALIA_LOCKSCREEN}"
-}
-
-# Runs after copy_dotfiles, and also without --address, which leaves the
-# address empty instead of the placeholder. The sed replacement escapes the
-# characters sed treats specially: the delimiter and the ampersand.
-configure_location() {
-  local address="${LOCATION_ADDRESS//|/\\|}"
-  address="${address//&/\\&}"
-
-  if [[ -n "${LOCATION_ADDRESS}" ]]; then
-    print_msg "Setting the Noctalia location to ${LOCATION_ADDRESS}"
-  fi
-  sed -i "s|@LOCATION_ADDRESS@|${address}|" "${NOCTALIA_CONFIG}"
-}
-
-# Re-runs the script under script(1), which records everything printed on the
-# terminal to the log. Typed passwords are never logged: input is not
-# recorded, and password prompts do not echo.
-#
-# The timestamp in the file name is the first run's. A later run in the same
-# checkout appends to that file, and script(1) marks where each run starts and
-# ends.
-start_logging() {
-  local arg
-  for arg in "$@"; do
-    case "${arg}" in -h | --help) return 0 ;; esac
-  done
-
-  if ! command -v script &>/dev/null; then
-    print_warning "script(1) is not available; continuing without a log file."
-    return 0
-  fi
-
-  mkdir -p "${LOG_DIR}"
-  local log_file
-  log_file=$(find "${LOG_DIR}" -maxdepth 1 -name 'desktop-install-*.log' \
-    | sort \
-    | tail -n 1)
-  if [[ -z "${log_file}" ]]; then
-    log_file="${LOG_DIR}/desktop-install-$(date +%Y%m%d-%H%M%S).log"
-  fi
-  print_msg "Logging to ${log_file}"
-
-  # script(1) runs the command through $SHELL; bash, to match the quoting.
-  local command
-  command=$(printf '%q ' env DESKTOP_INSTALL_LOG="${log_file}" \
-    "${SCRIPT_DIR}/$(basename "$0")" "$@")
-  exec env SHELL=/bin/bash script --quiet --append --flush --return \
-    --command "${command}" "${log_file}"
-}
-
-# Prints the title centered in an 80-column line of equals signs.
-print_heading() {
-  local title=" $1 " left right
-  local -i width=$(((80 - ${#title}) / 2))
-  printf -v left '%*s' "${width}" ''
-  printf -v right '%*s' "$((80 - ${#title} - width))" ''
-  echo "${WHITE}${left// /=}${BLUE}${title}${WHITE}${right// /=}${NO_COLOR}"
-}
-
-print_logo() {
-  # Color is set around the heredoc rather than inside it: the heredoc stays
-  # quoted, and the art is never subject to expansion.
-  printf '%s' "${BLUE}"
-  cat <<'EOF'
-                                       ▄
-                                      ▟█▙
-                                     ▟███▙
-                                    ▟█████▙
-                                   ▟███████▙
-                                  ▂▔▀▜██████▙
-                                 ▟██▅▂▝▜█████▙
-                                ▟█████████████▙
-                               ▟███████████████▙
-                              ▟█████████████████▙
-                             ▟███████████████████▙
-                            ▟█████████▛▀▀▜████████▙
-                           ▟████████▛      ▜███████▙
-                          ▟█████████        ████████▙
-                         ▟██████████        █████▆▅▄▃▂
-                        ▟██████████▛        ▜█████████▙
-                       ▟██████▀▀▀              ▀▀██████▙
-                      ▟███▀▘                       ▝▀███▙
-                     ▟▛▀                               ▀▜▙
-
-EOF
-  printf '%s' "${NO_COLOR}"
-  print_heading "DESKTOP iNSTALLATiON SCRiPT"
-  echo
 }
 
 # Prints the installation summary.

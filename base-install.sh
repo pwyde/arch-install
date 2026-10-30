@@ -235,6 +235,107 @@ cleanup() {
     "the disk stays in use until then."
 }
 
+# The Arch Linux installation image uses zsh as its default shell. Any parent
+# other than zsh or a program that starts a login session marks a nested shell.
+check_shell_nesting() {
+  local arg parent_cmd
+  for arg in "$@"; do
+    case "${arg}" in -h | --help) return 0 ;; esac
+  done
+
+  parent_cmd="$(ps -o comm= -p "${PPID}")"
+
+  case "${parent_cmd}" in
+    login | agetty | systemd | zsh)
+      print_msg "Top-level shell detected (parent: ${parent_cmd})"
+      echo
+      ;;
+    *)
+      print_error "This script must be started from a top-level shell, not" \
+        "from ${parent_cmd}."
+      exit 1
+      ;;
+  esac
+}
+
+# Re-runs the installer under script(1), which records everything printed on
+# the terminal to the log. A pipe through tee would also capture it, but pacman,
+# cryptsetup and makepkg change behavior when output is not a terminal, losing
+# progress bars and color. Typed passwords are never logged: input is not
+# recorded, and password prompts do not echo.
+#
+# The timestamp in the file name is the first run's. A later run in the same
+# checkout appends to that file: one log covers an install that needed several
+# attempts, and script(1) marks where each run starts and ends.
+start_logging() {
+  local arg
+  for arg in "$@"; do
+    case "${arg}" in -h | --help) return 0 ;; esac
+  done
+
+  if ! command -v script &>/dev/null; then
+    print_warning "script(1) is not available; continuing without a log file."
+    return 0
+  fi
+
+  mkdir -p "${LOG_DIR}"
+  local log_file
+  log_file=$(find "${LOG_DIR}" -maxdepth 1 -name 'base-install-*.log' \
+    | sort \
+    | tail -n 1)
+  if [[ -z "${log_file}" ]]; then
+    log_file="${LOG_DIR}/base-install-$(date +%Y%m%d-%H%M%S).log"
+  fi
+  print_msg "Logging to ${log_file}"
+
+  # script(1) runs the command through $SHELL; bash, to match the quoting.
+  local command
+  command=$(printf '%q ' env ARCH_INSTALL_LOG="${log_file}" \
+    "${SCRIPT_DIR}/$(basename "$0")" "$@")
+  exec env SHELL=/bin/bash script --quiet --append --flush --return \
+    --command "${command}" "${log_file}"
+}
+
+# Prints the title centered in an 80-column line of equals signs.
+print_heading() {
+  local title=" $1 " left right
+  local -i width=$(((80 - ${#title}) / 2))
+  printf -v left '%*s' "${width}" ''
+  printf -v right '%*s' "$((80 - ${#title} - width))" ''
+  echo "${WHITE}${left// /=}${BLUE}${title}${WHITE}${right// /=}${NO_COLOR}"
+}
+
+print_logo() {
+  # Color is set around the heredoc rather than inside it: the heredoc stays
+  # quoted, and the art is never subject to expansion.
+  printf '%s' "${BLUE}"
+  cat <<'EOF'
+                                       ▄
+                                      ▟█▙
+                                     ▟███▙
+                                    ▟█████▙
+                                   ▟███████▙
+                                  ▂▔▀▜██████▙
+                                 ▟██▅▂▝▜█████▙
+                                ▟█████████████▙
+                               ▟███████████████▙
+                              ▟█████████████████▙
+                             ▟███████████████████▙
+                            ▟█████████▛▀▀▜████████▙
+                           ▟████████▛      ▜███████▙
+                          ▟█████████        ████████▙
+                         ▟██████████        █████▆▅▄▃▂
+                        ▟██████████▛        ▜█████████▙
+                       ▟██████▀▀▀              ▀▀██████▙
+                      ▟███▀▘                       ▝▀███▙
+                     ▟▛▀                               ▀▜▙
+
+EOF
+  printf '%s' "${NO_COLOR}"
+  print_heading "ARCH LiNUX iNSTALLATiON SCRiPT"
+  echo
+}
+
 # Help text.
 show_help() {
   cat <<EOF
@@ -380,6 +481,17 @@ validate_secure_boot() {
   esac
 }
 
+# Validates the options, the live environment and the repository files.
+validate_inputs() {
+  validate_disk
+  validate_disk_unused
+  validate_environment
+  validate_keymap
+  validate_options
+  validate_packages
+  validate_repository
+}
+
 # --yes skips the only prompt that names the disk, so an unattended run needs
 # --disk. Links such as /dev/disk/by-id/... are resolved to the kernel name,
 # from which setup_partitions derives the partition names.
@@ -440,6 +552,30 @@ validate_disk_unused() {
   print_error "After a failed installation, reboot the installation medium" \
     "instead."
   exit 1
+}
+
+# Root on a live system booted in UEFI mode, with the tools the installer runs.
+# validate_packages needs root as well, which is why this runs before it.
+validate_environment() {
+  local tool
+
+  if ((EUID != 0)); then
+    print_error "This script must be run as root."
+    exit 1
+  fi
+
+  if [[ ! -d /sys/firmware/efi/efivars ]]; then
+    print_error "System not booted in UEFI mode. This script requires UEFI" \
+      "boot."
+    exit 1
+  fi
+
+  for tool in sgdisk cryptsetup mkfs.fat mkfs.btrfs; do
+    if ! command -v "${tool}" &>/dev/null; then
+      print_error "Required tool '${tool}' not found. Please install it first."
+      exit 1
+    fi
+  done
 }
 
 # systemd-firstboot --root only checks that the keymap name is well-formed,
@@ -574,41 +710,6 @@ validate_packages() {
   fi
   rm -rf "${PKG_DB_DIR}"
   PKG_DB_DIR=""
-}
-
-# Validates the options, the live environment and the repository files.
-validate_inputs() {
-  validate_disk
-  validate_disk_unused
-  validate_environment
-  validate_keymap
-  validate_options
-  validate_packages
-  validate_repository
-}
-
-# Root on a live system booted in UEFI mode, with the tools the installer runs.
-# validate_packages needs root as well, which is why this runs before it.
-validate_environment() {
-  local tool
-
-  if ((EUID != 0)); then
-    print_error "This script must be run as root."
-    exit 1
-  fi
-
-  if [[ ! -d /sys/firmware/efi/efivars ]]; then
-    print_error "System not booted in UEFI mode. This script requires UEFI" \
-      "boot."
-    exit 1
-  fi
-
-  for tool in sgdisk cryptsetup mkfs.fat mkfs.btrfs; do
-    if ! command -v "${tool}" &>/dev/null; then
-      print_error "Required tool '${tool}' not found. Please install it first."
-      exit 1
-    fi
-  done
 }
 
 # Everything the installer copies out of this repository. Checked now, before
@@ -1515,6 +1616,22 @@ configure_snapshots() {
     limine-snapper-sync.service
 }
 
+# Enables the system services.
+enable_services() {
+  print_msg "Enabling services"
+  arch-chroot /mnt /bin/bash -e <<'EOF'
+systemctl enable systemd-resolved systemd-timesyncd \
+  systemd-zram-setup@zram0.service sshd NetworkManager
+systemctl mask systemd-networkd
+
+# Periodic TRIM. The filesystems are mounted 'nodiscard': freed blocks are
+# discarded once a week in one batch instead of on every delete, as Arch,
+# Debian and Red Hat all recommend. TRIM reaches the SSD because the LUKS
+# container is opened with --allow-discards.
+systemctl enable fstrim.timer
+EOF
+}
+
 # makepkg refuses to run as root, and the user has no password-free sudo. Only
 # the build therefore runs as the user. Everything that needs root -- the build
 # dependency, the install, removing the dependency again -- runs as root around
@@ -1570,22 +1687,6 @@ EOF
     print_warning "build it after first boot from" \
       "https://aur.archlinux.org/paru.git"
   fi
-}
-
-# Enables the system services.
-enable_services() {
-  print_msg "Enabling services"
-  arch-chroot /mnt /bin/bash -e <<'EOF'
-systemctl enable systemd-resolved systemd-timesyncd \
-  systemd-zram-setup@zram0.service sshd NetworkManager
-systemctl mask systemd-networkd
-
-# Periodic TRIM. The filesystems are mounted 'nodiscard': freed blocks are
-# discarded once a week in one batch instead of on every delete, as Arch,
-# Debian and Red Hat all recommend. TRIM reaches the SSD because the LUKS
-# container is opened with --allow-discards.
-systemctl enable fstrim.timer
-EOF
 }
 
 # Checks that the installed system has everything it needs to boot.
@@ -1667,124 +1768,6 @@ verify_installation() {
     find "/mnt/boot" -type f \( -name "*.efi" -o -name "*.EFI" \) | sort
   else
     print_warning "EFI partition not mounted, cannot check its contents."
-  fi
-}
-
-# The Arch Linux installation image uses zsh as its default shell. Any parent
-# other than zsh or a program that starts a login session marks a nested shell.
-check_shell_nesting() {
-  local arg parent_cmd
-  for arg in "$@"; do
-    case "${arg}" in -h | --help) return 0 ;; esac
-  done
-
-  parent_cmd="$(ps -o comm= -p "${PPID}")"
-
-  case "${parent_cmd}" in
-    login | agetty | systemd | zsh)
-      print_msg "Top-level shell detected (parent: ${parent_cmd})"
-      echo
-      ;;
-    *)
-      print_error "This script must be started from a top-level shell, not" \
-        "from ${parent_cmd}."
-      exit 1
-      ;;
-  esac
-}
-
-# Re-runs the installer under script(1), which records everything printed on
-# the terminal to the log. A pipe through tee would also capture it, but pacman,
-# cryptsetup and makepkg change behavior when output is not a terminal, losing
-# progress bars and color. Typed passwords are never logged: input is not
-# recorded, and password prompts do not echo.
-#
-# The timestamp in the file name is the first run's. A later run in the same
-# checkout appends to that file: one log covers an install that needed several
-# attempts, and script(1) marks where each run starts and ends.
-start_logging() {
-  local arg
-  for arg in "$@"; do
-    case "${arg}" in -h | --help) return 0 ;; esac
-  done
-
-  if ! command -v script &>/dev/null; then
-    print_warning "script(1) is not available; continuing without a log file."
-    return 0
-  fi
-
-  mkdir -p "${LOG_DIR}"
-  local log_file
-  log_file=$(find "${LOG_DIR}" -maxdepth 1 -name 'base-install-*.log' \
-    | sort \
-    | tail -n 1)
-  if [[ -z "${log_file}" ]]; then
-    log_file="${LOG_DIR}/base-install-$(date +%Y%m%d-%H%M%S).log"
-  fi
-  print_msg "Logging to ${log_file}"
-
-  # script(1) runs the command through $SHELL; bash, to match the quoting.
-  local command
-  command=$(printf '%q ' env ARCH_INSTALL_LOG="${log_file}" \
-    "${SCRIPT_DIR}/$(basename "$0")" "$@")
-  exec env SHELL=/bin/bash script --quiet --append --flush --return \
-    --command "${command}" "${log_file}"
-}
-
-# Prints the title centered in an 80-column line of equals signs.
-print_heading() {
-  local title=" $1 " left right
-  local -i width=$(((80 - ${#title}) / 2))
-  printf -v left '%*s' "${width}" ''
-  printf -v right '%*s' "$((80 - ${#title} - width))" ''
-  echo "${WHITE}${left// /=}${BLUE}${title}${WHITE}${right// /=}${NO_COLOR}"
-}
-
-print_logo() {
-  # Color is set around the heredoc rather than inside it: the heredoc stays
-  # quoted, and the art is never subject to expansion.
-  printf '%s' "${BLUE}"
-  cat <<'EOF'
-                                       ▄
-                                      ▟█▙
-                                     ▟███▙
-                                    ▟█████▙
-                                   ▟███████▙
-                                  ▂▔▀▜██████▙
-                                 ▟██▅▂▝▜█████▙
-                                ▟█████████████▙
-                               ▟███████████████▙
-                              ▟█████████████████▙
-                             ▟███████████████████▙
-                            ▟█████████▛▀▀▜████████▙
-                           ▟████████▛      ▜███████▙
-                          ▟█████████        ████████▙
-                         ▟██████████        █████▆▅▄▃▂
-                        ▟██████████▛        ▜█████████▙
-                       ▟██████▀▀▀              ▀▀██████▙
-                      ▟███▀▘                       ▝▀███▙
-                     ▟▛▀                               ▀▜▙
-
-EOF
-  printf '%s' "${NO_COLOR}"
-  print_heading "ARCH LiNUX iNSTALLATiON SCRiPT"
-  echo
-}
-
-# Copies the repository, including the log up to this point, to the new user's
-# home. It runs last; a failure only warns, since it does not undo a finished
-# install.
-copy_installer_to_home() {
-  local name target
-  name=$(basename "${SCRIPT_DIR}")
-  target="/home/${USERNAME}/${name}"
-
-  print_msg "Copying the installer and its log to ${target}"
-  if mkdir -p "/mnt${target}" && cp -a "${SCRIPT_DIR}/." "/mnt${target}/"; then
-    arch-chroot /mnt chown -R "${USERNAME}:" "${target}" \
-      || print_warning "Copied, but ownership of ${target} could not be set."
-  else
-    print_warning "Could not copy the installer to ${target}."
   fi
 }
 
@@ -1880,6 +1863,23 @@ print_summary() {
     || [[ ! -f "/mnt/boot/EFI/Linux/arch_linux.efi" ]] \
     || [[ ! -f "/mnt/boot/EFI/BOOT/BOOTX64.EFI" ]]; then
     print_troubleshooting
+  fi
+}
+
+# Copies the repository, including the log up to this point, to the new user's
+# home. It runs last; a failure only warns, since it does not undo a finished
+# install.
+copy_installer_to_home() {
+  local name target
+  name=$(basename "${SCRIPT_DIR}")
+  target="/home/${USERNAME}/${name}"
+
+  print_msg "Copying the installer and its log to ${target}"
+  if mkdir -p "/mnt${target}" && cp -a "${SCRIPT_DIR}/." "/mnt${target}/"; then
+    arch-chroot /mnt chown -R "${USERNAME}:" "${target}" \
+      || print_warning "Copied, but ownership of ${target} could not be set."
+  else
+    print_warning "Could not copy the installer to ${target}."
   fi
 }
 
