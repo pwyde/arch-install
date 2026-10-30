@@ -524,6 +524,12 @@ validate_options() {
     fi
     listed["${subvol}"]=1
     [[ "${subvol}" != "@" ]] || has_root=1
+    # Its mount point is that of the ESP, which it would hide.
+    if [[ "${subvol}" == "@boot" ]]; then
+      print_error "Subvolume '@boot' would be mounted over the EFI partition" \
+        "at /boot."
+      exit 1
+    fi
   done
   if ((has_root == 0)); then
     print_error "The subvolumes must include '@' for the root filesystem."
@@ -799,7 +805,7 @@ setup_btrfs() {
 # Mounts the subvolumes and the ESP under /mnt.
 mount_filesystems() {
   local subvol mountpoint
-  local -a subvols
+  local -a subvols mounts=()
 
   print_msg "Mount subvolumes"
 
@@ -811,28 +817,29 @@ mount_filesystems() {
   print_msg "Mounting EFI partition to /mnt/boot"
   mount -o "${ESP_MOUNT_OPTS}" "${EFI_PART}" "/mnt/boot"
 
-  # The remaining subvolumes, each on its own mount point.
-  print_msg "Mounting other subvolumes"
+  # @cache and @log mount below /var; the others at /<name>.
   read -ra subvols <<<"${SUBVOLUMES}"
   for subvol in "${subvols[@]}"; do
-    if [[ "${subvol}" != "@" ]]; then
-      # @cache and @log mount below /var; the others at /<name>.
-      case "${subvol}" in
-        @home) mountpoint="/home" ;;
-        @cache) mountpoint="/var/cache" ;;
-        @log) mountpoint="/var/log" ;;
-        *)
-          mountpoint="${subvol#@}"
-          mountpoint="/${mountpoint}"
-          ;;
-      esac
-
-      print_msg "Mounting subvolume ${subvol} to /mnt${mountpoint}"
-      mkdir -p "/mnt${mountpoint}"
-      mount -o "subvol=${subvol},${BTRFS_MOUNT_OPTS}" /dev/mapper/cryptroot \
-        "/mnt${mountpoint}"
-    fi
+    case "${subvol}" in
+      @) mountpoint="/" ;;
+      @home) mountpoint="/home" ;;
+      @cache) mountpoint="/var/cache" ;;
+      @log) mountpoint="/var/log" ;;
+      *) mountpoint="/${subvol#@}" ;;
+    esac
+    mounts+=("${mountpoint} ${subvol}")
   done
+
+  # The remaining subvolumes in mount-point order, where a path sorts before
+  # every path below it: @var, mounted after @cache or @log, would hide them.
+  print_msg "Mounting other subvolumes"
+  while read -r mountpoint subvol; do
+    [[ "${subvol}" != "@" ]] || continue
+    print_msg "Mounting subvolume ${subvol} to /mnt${mountpoint}"
+    mkdir -p "/mnt${mountpoint}"
+    mount -o "subvol=${subvol},${BTRFS_MOUNT_OPTS}" /dev/mapper/cryptroot \
+      "/mnt${mountpoint}"
+  done < <(printf '%s\n' "${mounts[@]}" | LC_ALL=C sort)
 
   # A fresh subvolume is 0755, but root's home should be 0750; pacman warns
   # about the difference when it installs the filesystem package.

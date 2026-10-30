@@ -118,6 +118,11 @@ Btrfs subvolumes, all mounted with `compress=zstd:3,noatime,nodiscard`:
 | `@log` | `/var/log` |
 | `@root` | `/root` |
 
+Another name given with `--subvolumes` mounts at `/<name>`, without the `@`.
+The subvolumes are mounted in mount-point order, which keeps `@var` from hiding
+`@cache` and `@log`, and `@boot` is refused, since the ESP is mounted at
+`/boot`.
+
 Two further subvolumes are created later: `/swap` for the hibernation
 swapfile (see [Hibernation](#hibernation)), and `/.snapshots`, created by
 Snapper.
