@@ -1083,7 +1083,10 @@ sed -i "/VerbosePkgLists/s/^#//" /etc/pacman.conf
 # Whether the package ships the line commented out or set, as pacman 7 does.
 sed -i 's/^#\?ParallelDownloads = .*/ParallelDownloads = 16/' /etc/pacman.conf
 sed -i '/\[multilib\]/,/Include/s/^#//' /etc/pacman.conf
-pacman -Sy
+# Fetches the multilib database. The upgrade covers whatever the mirror changed
+# since pacstrap: the Limine packages' dependencies and rust come from these
+# databases, and installing them after a bare -Sy is a partial upgrade.
+SNAP_PAC_SKIP=y pacman -Syu --noconfirm
 EOF
 }
 
