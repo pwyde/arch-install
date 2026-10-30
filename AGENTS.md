@@ -63,6 +63,10 @@ The repository has no build system, CI, tests, database or migrations.
 - `main` calls one function per step: option parsing, every check that can
   fail, `confirm_operation` (skipped by `--yes`), then the changes. Both
   scripts use `set -euo pipefail` and an `EXIT` trap named `cleanup`.
+- Define functions in the order `main` calls them, after the print helpers and
+  `cleanup`. A function that calls steps of its own, such as `configure_system`,
+  comes before them; a helper used by one function comes right before it, and
+  helpers that several functions share stay together near their first use.
 - Install files with `install` and an explicit `-m` mode; sudoers drop-ins
   use `0440`. Create temporary files with `mktemp` and let `cleanup` remove
   them on failure.
