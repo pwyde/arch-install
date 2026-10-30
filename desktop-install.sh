@@ -244,7 +244,8 @@ cleanup() {
 # checkout appends to that file, and script(1) marks where each run starts and
 # ends.
 start_logging() {
-  local arg
+  local arg log_file command_line
+
   for arg in "$@"; do
     case "${arg}" in -h | --help) return 0 ;; esac
   done
@@ -255,7 +256,6 @@ start_logging() {
   fi
 
   mkdir -p "${LOG_DIR}"
-  local log_file
   log_file=$(find "${LOG_DIR}" -maxdepth 1 -name 'desktop-install-*.log' \
     | sort \
     | tail -n 1)
@@ -265,11 +265,10 @@ start_logging() {
   print_msg "Logging to ${log_file}"
 
   # script(1) runs the command through $SHELL; bash, to match the quoting.
-  local command
-  command=$(printf '%q ' env DESKTOP_INSTALL_LOG="${log_file}" \
+  command_line=$(printf '%q ' env DESKTOP_INSTALL_LOG="${log_file}" \
     "${SCRIPT_DIR}/$(basename "$0")" "$@")
   exec env SHELL=/bin/bash script --quiet --append --flush --return \
-    --command "${command}" "${log_file}"
+    --command "${command_line}" "${log_file}"
 }
 
 # Prints the title centered in an 80-column line of equals signs.
@@ -785,12 +784,13 @@ paru_install() {
 # Upgrades the system first. Installing from a stale package database risks a
 # partial upgrade, which Arch does not support.
 update_system() {
+  local -a flags=()
+
   STARTED=1
   print_msg "Upgrading the system"
 
   # -Syu also upgrades AUR packages, whose review would otherwise stop an
   # unattended run.
-  local -a flags=()
   if ((NON_INTERACTIVE)); then
     flags+=(--noconfirm --skipreview)
   fi
@@ -829,9 +829,10 @@ install_neovim() {
 }
 
 install_extra_packages() {
+  local -a packages
+
   if [[ -n "${EXTRA_PACKAGES}" ]]; then
     print_msg "Installing additional packages"
-    local -a packages
     read -ra packages <<<"${EXTRA_PACKAGES}"
     paru_install "${packages[@]}"
   fi
@@ -855,9 +856,11 @@ set_or_delete() {
 # same owner with mode 0644, as upstream sets it. The hook rewrites the file on
 # every upgrade but keeps its settings.
 install_greeter_config() {
+  local owner group connector mode resolution
+  local -a edits
+
   print_msg "Installing the greeter configuration"
 
-  local owner group
   if ! owner=$(stat -c '%U' "${GREETER_STATE_DIR}" 2>/dev/null); then
     print_error "${GREETER_STATE_DIR} does not exist; the noctalia-greeter" \
       "install hook did not run."
@@ -877,8 +880,8 @@ install_greeter_config() {
   # given loses its line, which leaves the greeter's own default: the preferred
   # mode's refresh rate and an automatic scale. Without any of the options, the
   # whole [output] section goes, and the greeter shows on every monitor.
-  local connector="${OUTPUT_ORDER[0]:-}" mode resolution
-  local -a edits=(-e "s/@XKB_LAYOUT@/${XKB_LAYOUT:-${DEFAULT_XKB_LAYOUT}}/")
+  connector="${OUTPUT_ORDER[0]:-}"
+  edits=(-e "s/@XKB_LAYOUT@/${XKB_LAYOUT:-${DEFAULT_XKB_LAYOUT}}/")
   if [[ -z "${connector}" ]]; then
     edits+=(-e '/^\[output\]$/,/^$/d')
   else
@@ -903,13 +906,14 @@ install_greeter_config() {
 # virtio-gpu hardware cursor plane (wlroots issue 3921). The greeter's
 # compositor then draws the cursor itself instead.
 configure_greetd() {
+  local session="/usr/bin/noctalia-greeter-session" expression
+
   print_msg "Configuring greetd to start the Noctalia greeter"
   sudo install -D -m 0644 "${GREETD_CONF_SRC}" /etc/greetd/config.toml
 
   if systemd-detect-virt --vm --quiet; then
     print_msg "Virtual machine detected; disabling hardware cursors in the" \
       "greeter"
-    local session="/usr/bin/noctalia-greeter-session" expression
     expression="s|^command = \"${session}\"\$|"
     expression+="command = \"env WLR_NO_HARDWARE_CURSORS=1 ${session}\"|"
     sudo sed -i "${expression}" /etc/greetd/config.toml
@@ -1005,7 +1009,6 @@ copy_dotfiles() {
 # then follow. The keys are filled from settings.ini and stored by dconf in
 # ~/.config/dconf/user. Runs after copy_dotfiles, which installs the file.
 configure_gtk_settings() {
-  print_msg "Applying the GTK settings to GSettings"
   local -A keys=(
     [gtk-theme-name]=gtk-theme
     [gtk-icon-theme-name]=icon-theme
@@ -1014,6 +1017,8 @@ configure_gtk_settings() {
     [gtk-font-name]=font-name
   )
   local setting value
+
+  print_msg "Applying the GTK settings to GSettings"
   for setting in "${!keys[@]}"; do
     value=$(awk -F= -v key="${setting}" '$1 == key { print $2; exit }' \
       "${GTK3_SETTINGS}")
@@ -1040,10 +1045,11 @@ configure_gtk_settings() {
 # Neovim from quitting before they are done, for up to ten minutes. Runs after
 # copy_dotfiles. Not fatal: Neovim installs whatever is missing when it starts.
 install_neovim_plugins() {
-  print_msg "Installing the Neovim plugins"
   local parsers="require('nvim-treesitter')"
   parsers+=".install(LazyVim.opts('nvim-treesitter').ensure_installed or {})"
   parsers+=":wait(600000)"
+
+  print_msg "Installing the Neovim plugins"
   if ! nvim --headless "+Lazy! sync" "+lua ${parsers}" +qa; then
     print_warning "The Neovim plugins could not be installed; Neovim installs" \
       "them on its first start."
@@ -1058,9 +1064,10 @@ install_neovim_plugins() {
 # outside the niri session, which leaves VSCODE_PORTABLE and VSCODE_CLI_DATA_DIR
 # to be set here. Not fatal: VSCodium then starts with its default themes.
 configure_vscodium() {
-  print_msg "Installing the VSCodium extensions"
   local recommended extension
   local -a args=()
+
+  print_msg "Installing the VSCodium extensions"
   if ! recommended=$(jq -r '.recommendations[]' "${VSCODIUM_EXTENSIONS}"); then
     print_warning "The VSCodium extension list could not be read; VSCodium" \
       "starts with its default themes."
@@ -1113,9 +1120,6 @@ configure_keyboard_layout() {
 # which niri cannot match. Each line is matched whole; a missing one is reported
 # and its pair left as it is.
 configure_swedish_binds() {
-  [[ "${XKB_LAYOUT}" == "se" ]] || return 0
-
-  print_msg "Switching the niri key bindings to the Swedish layout"
   # Each US binding, followed by its Swedish alternative.
   local -a pairs=(
     'Mod+Shift+Slash { show-hotkey-overlay; }'
@@ -1130,6 +1134,10 @@ configure_swedish_binds() {
     'Mod+Shift+plus { set-window-height "+10%"; }'
   )
   local i us se
+
+  [[ "${XKB_LAYOUT}" == "se" ]] || return 0
+
+  print_msg "Switching the niri key bindings to the Swedish layout"
   TEMP_FILE=$(mktemp)
   for ((i = 0; i < ${#pairs[@]}; i += 2)); do
     us="    ${pairs[i]}"
@@ -1208,6 +1216,8 @@ configure_lockscreen() {
 
 # Prints the installation summary.
 print_summary() {
+  local output
+
   echo
   print_heading "iNSTALLATiON SUMMARY"
   echo "${WHITE}Compositor:${NO_COLOR} niri"
@@ -1215,7 +1225,6 @@ print_summary() {
   if [[ -n "${EXTRA_PACKAGES}" ]]; then
     echo "${WHITE}Additional packages:${NO_COLOR} ${EXTRA_PACKAGES}"
   fi
-  local output
   while IFS= read -r output; do
     [[ -n "${output}" ]] && echo "${WHITE}Display:${NO_COLOR} ${output}"
   done < <(describe_outputs)

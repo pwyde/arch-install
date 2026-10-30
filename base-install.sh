@@ -268,7 +268,8 @@ check_shell_nesting() {
 # checkout appends to that file: one log covers an install that needed several
 # attempts, and script(1) marks where each run starts and ends.
 start_logging() {
-  local arg
+  local arg log_file command_line
+
   for arg in "$@"; do
     case "${arg}" in -h | --help) return 0 ;; esac
   done
@@ -279,7 +280,6 @@ start_logging() {
   fi
 
   mkdir -p "${LOG_DIR}"
-  local log_file
   log_file=$(find "${LOG_DIR}" -maxdepth 1 -name 'base-install-*.log' \
     | sort \
     | tail -n 1)
@@ -289,11 +289,10 @@ start_logging() {
   print_msg "Logging to ${log_file}"
 
   # script(1) runs the command through $SHELL; bash, to match the quoting.
-  local command
-  command=$(printf '%q ' env ARCH_INSTALL_LOG="${log_file}" \
+  command_line=$(printf '%q ' env ARCH_INSTALL_LOG="${log_file}" \
     "${SCRIPT_DIR}/$(basename "$0")" "$@")
   exec env SHELL=/bin/bash script --quiet --append --flush --return \
-    --command "${command}" "${log_file}"
+    --command "${command_line}" "${log_file}"
 }
 
 # Prints the title centered in an 80-column line of equals signs.
@@ -444,7 +443,7 @@ parse_args() {
 
 # Exits when Secure Boot is on, since nothing written to the ESP is signed.
 validate_secure_boot() {
-  local sb_var state=""
+  local sb_var sb_line state=""
 
   sb_var="/sys/firmware/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c"
 
@@ -452,7 +451,6 @@ validate_secure_boot() {
     # Four bytes of EFI variable attributes, then the state byte.
     state=$(od -An -t u1 -j 4 -N 1 "${sb_var}" 2>/dev/null | tr -d '[:space:]')
   elif command -v bootctl >/dev/null 2>&1; then
-    local sb_line
     sb_line=$(bootctl status 2>/dev/null | grep -m1 "Secure Boot:" || true)
     case "${sb_line}" in
       *enabled*) state=1 ;;
@@ -1254,6 +1252,8 @@ prompt_for_passwords() {
 
 # Creates the user and sets both passwords, prompted for outside the chroot.
 configure_users() {
+  local skel_file sudoers_file
+
   print_msg "Configuring users"
 
   # The target is freshly installed, so an account of that name comes from a
@@ -1275,7 +1275,6 @@ configure_users() {
   # Bash reads the user's configuration from XDG directories instead of the
   # skeleton files useradd copied, which are removed while still unchanged.
   print_msg "Moving the bash configuration to XDG directories"
-  local skel_file
   for skel_file in .bashrc .bash_profile .bash_logout; do
     if cmp -s "/mnt/home/${USERNAME}/${skel_file}" \
       "/mnt/etc/skel/${skel_file}"; then
@@ -1293,7 +1292,6 @@ configure_users() {
 
   # 0440 and root-owned, or sudo refuses to read them.
   print_msg "Configuring sudo"
-  local sudoers_file
   for sudoers_file in "${SUDOERS_FILES[@]}"; do
     install -D -m 0440 "${SUDOERS_SRC}/${sudoers_file}" \
       "/mnt/etc/sudoers.d/${sudoers_file}"
@@ -1405,9 +1403,9 @@ EOF
 # Must run before configure_boot: the plymouth hook reads the default theme when
 # mkinitcpio builds the UKI, and the command line is embedded at the same time.
 configure_plymouth() {
-  print_msg "Configuring Plymouth"
-
   local theme_dir="/mnt/usr/share/plymouth/themes/arch-linux"
+
+  print_msg "Configuring Plymouth"
 
   # The whole theme directory is copied; files added to it need no script
   # change. --no-preserve gives root-owned files 0644 and directories 0755.
@@ -1435,6 +1433,8 @@ EOF
 
 # Installs the Limine configuration, the initramfs hooks and the command line.
 configure_boot() {
+  local root_uuid pattern
+
   print_msg "Configuring boot"
 
   # The boot files belong on the ESP, which mount_filesystems mounted as FAT.
@@ -1465,7 +1465,6 @@ configure_boot() {
   # blkid prints nothing and still succeeds when it cannot read a UUID. An
   # empty one would pass the later checks for rd.luks.name and leave a system
   # that cannot unlock its root.
-  local root_uuid pattern
   pattern='^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$'
   root_uuid=$(blkid -s UUID -o value "${ROOT_PART}")
   if [[ ! "${root_uuid}" =~ ${pattern} ]]; then
