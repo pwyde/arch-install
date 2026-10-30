@@ -23,8 +23,9 @@ desktop_value() {
 }
 
 main() {
+  local name="${1:-}" file icon i choice
   local -a files=() names=()
-  local file
+
   for file in "${APPS_DIR}"/*.desktop; do
     [[ -f "${file}" ]] || continue
     grep -q '^Exec=.*/webapp-launch"\? ' "${file}" || continue
@@ -33,7 +34,6 @@ main() {
   done
   ((${#files[@]} > 0)) || die "no web apps are installed."
 
-  local name="${1:-}" i choice
   if [[ -z "${name}" ]]; then
     for i in "${!names[@]}"; do
       echo "$((i + 1))) ${names[i]}"
@@ -50,7 +50,6 @@ main() {
 
   for i in "${!names[@]}"; do
     [[ "${names[i]}" == "${name}" ]] || continue
-    local icon
     icon=$(desktop_value "${files[i]}" Icon)
     if [[ "${icon}" == "${ICONS_DIR}"/* ]]; then
       rm -f "${icon}"

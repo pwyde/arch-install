@@ -100,8 +100,71 @@ desktop_escape() {
   echo "${value}"
 }
 
+# Exits unless the name, URL and icon fit the desktop entry, where the name
+# also gives the file name.
+validate_input() {
+  local name=$1 url=$2 icon=$3
+
+  [[ -n "${name}" ]] || die "a name is required."
+  [[ "${name}" != */* ]] || die "the name cannot contain a slash."
+  [[ "${name}" != *[[:cntrl:]]* ]] \
+    || die "the name cannot contain control characters."
+  # The desktop entry stores both escaped, and webapp-remove, which finds a web
+  # app by the name in that entry, could not match it.
+  [[ "${name}" != *\\* ]] || die "the name cannot contain a backslash."
+  [[ "${name}" != " "* ]] || die "the name cannot start with a space."
+
+  [[ "${url}" =~ ^https?://[^[:space:]]+$ ]] \
+    || die "the URL must be http or https, without spaces."
+  [[ "${url}" != *[\"\`\$\\]* ]] \
+    || die "the URL cannot contain \", \`, \$ or \\."
+  [[ "${icon}" != *[[:cntrl:]]* ]] \
+    || die "the icon cannot contain control characters."
+}
+
+# Saves the icon $2 and sets the variable named by $1 to the entry's Icon value:
+# the file $4 for a downloaded, copied or site icon, an icon name as given, or
+# Chromium's icon when the site has none.
+# shellcheck disable=SC2034 # result refers to the caller's variable.
+save_icon() {
+  local -n result=$1
+  local icon=$2 url=$3 file=$4
+
+  result="${file}"
+  if [[ "${icon}" =~ ^https?:// ]]; then
+    download_image "${icon}" "${file}" \
+      || die "no image could be downloaded from ${icon}."
+  elif [[ -f "${icon}" ]]; then
+    cp "${icon}" "${file}"
+  elif [[ -n "${icon}" ]]; then
+    result="${icon}"
+  elif ! fetch_site_icon "${url}" "${file}"; then
+    rm -f "${file}"
+    echo "webapp-install: no icon found; using Chromium's." >&2
+    result="chromium"
+  fi
+}
+
+# Exec doubles each % in the URL, which the desktop entry would otherwise read
+# as a field code.
+write_desktop_entry() {
+  local file=$1 name=$2 url=$3 icon=$4
+
+  cat >"${file}" <<EOF
+[Desktop Entry]
+Type=Application
+Name=$(desktop_escape "${name}")
+Comment=Web app for $(desktop_escape "${url}")
+Exec="$(desktop_escape "${LAUNCHER}")" "${url//%/%%}"
+Icon=$(desktop_escape "${icon}")
+StartupNotify=true
+StartupWMClass=$(window_class "${url}")
+Categories=Network;
+EOF
+}
+
 main() {
-  local name="${1:-}" url="${2:-}" icon="${3:-}"
+  local name="${1:-}" url="${2:-}" icon="${3:-}" id icon_value desktop_file
 
   if [[ -z "${name}" ]]; then
     read -r -p "Name: " name
@@ -113,54 +176,15 @@ main() {
     read -r -p "Icon URL, file or name (empty for the site's icon): " icon
   fi
 
-  [[ -n "${name}" ]] || die "a name is required."
-  [[ "${name}" != */* ]] || die "the name cannot contain a slash."
-  [[ "${name}" != *[[:cntrl:]]* ]] \
-    || die "the name cannot contain control characters."
-  # The desktop entry stores both escaped, and webapp-remove, which finds a web
-  # app by the name in that entry, could not match it.
-  [[ "${name}" != *\\* ]] || die "the name cannot contain a backslash."
-  [[ "${name}" != " "* ]] || die "the name cannot start with a space."
-
   [[ "${url}" == *://* ]] || url="https://${url}"
-  [[ "${url}" =~ ^https?://[^[:space:]]+$ ]] \
-    || die "the URL must be http or https, without spaces."
-  [[ "${url}" != *[\"\`\$\\]* ]] \
-    || die "the URL cannot contain \", \`, \$ or \\."
-  [[ "${icon}" != *[[:cntrl:]]* ]] \
-    || die "the icon cannot contain control characters."
-
-  local id
+  validate_input "${name}" "${url}" "${icon}"
   id=$(app_id "${name}")
   [[ -n "${id}" ]] || die "the name needs at least one letter or digit."
-  local desktop_file="${APPS_DIR}/webapp-${id}.desktop"
+
   mkdir -p "${APPS_DIR}" "${ICONS_DIR}"
-
-  local icon_value="${ICONS_DIR}/${id}.png"
-  if [[ "${icon}" =~ ^https?:// ]]; then
-    download_image "${icon}" "${icon_value}" \
-      || die "no image could be downloaded from ${icon}."
-  elif [[ -f "${icon}" ]]; then
-    cp "${icon}" "${icon_value}"
-  elif [[ -n "${icon}" ]]; then
-    icon_value="${icon}"
-  elif ! fetch_site_icon "${url}" "${icon_value}"; then
-    rm -f "${icon_value}"
-    echo "webapp-install: no icon found; using Chromium's." >&2
-    icon_value="chromium"
-  fi
-
-  cat >"${desktop_file}" <<EOF
-[Desktop Entry]
-Type=Application
-Name=$(desktop_escape "${name}")
-Comment=Web app for $(desktop_escape "${url}")
-Exec="$(desktop_escape "${LAUNCHER}")" "${url//%/%%}"
-Icon=$(desktop_escape "${icon_value}")
-StartupNotify=true
-StartupWMClass=$(window_class "${url}")
-Categories=Network;
-EOF
+  save_icon icon_value "${icon}" "${url}" "${ICONS_DIR}/${id}.png"
+  desktop_file="${APPS_DIR}/webapp-${id}.desktop"
+  write_desktop_entry "${desktop_file}" "${name}" "${url}" "${icon_value}"
   echo "Created ${desktop_file}"
 }
 
