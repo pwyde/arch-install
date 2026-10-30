@@ -4,6 +4,9 @@
 # keyboard controller blocks the S4 power-off while the LEDs are lit, and the
 # machine hangs instead of powering off. The hook writes to sysfs itself, so it
 # also works without brightnessctl, which only the desktop installs.
+#
+# No strict mode: under set -e, one LED that cannot be written would stop the
+# loop and leave the others lit.
 
 sleep_action="${SYSTEMD_SLEEP_ACTION:-$2}"
 

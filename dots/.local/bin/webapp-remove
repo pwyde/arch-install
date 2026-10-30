@@ -61,4 +61,8 @@ main() {
   die "no web app named ${name}."
 }
 
-main "$@"
+# Runs only when executed, so that sourcing the script defines its functions
+# without removing a web app.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "$@"
+fi

@@ -1670,6 +1670,13 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# HOME and CARGO_HOME point inside the build directory, leaving neither the
+# cargo registry nor anything else behind in the user's home.
+as_user() {
+  runuser -u "${AUR_USER}" -- env HOME="${build_dir}" \
+    CARGO_HOME="${build_dir}/cargo" "$@"
+}
+
 # paru's makedepends is cargo, which rust and rustup both provide. rust is named
 # explicitly to keep --noconfirm from choosing a provider.
 if ! pacman -Q rust &>/dev/null; then
@@ -1678,13 +1685,6 @@ if ! pacman -Q rust &>/dev/null; then
 fi
 
 chown "${AUR_USER}": "${build_dir}"
-
-# HOME and CARGO_HOME point inside the build directory, leaving neither the
-# cargo registry nor anything else behind in the user's home.
-as_user() {
-  runuser -u "${AUR_USER}" -- env HOME="${build_dir}" \
-    CARGO_HOME="${build_dir}/cargo" "$@"
-}
 
 as_user git clone --depth 1 https://aur.archlinux.org/paru.git \
   "${build_dir}/paru"
@@ -1800,18 +1800,19 @@ print_boot_file() {
 print_troubleshooting() {
   echo
   print_heading "BOOT TROUBLESHOOTiNG"
-  echo "If the system does not boot, try these steps:"
-  echo "1. From the UEFI/BIOS setup, make sure Secure Boot is disabled"
-  echo "2. Make sure the EFI partition is set as the primary boot device"
-  echo "3. If it still does not boot, try rebuilding the boot setup:"
-  echo "  - Boot from the Arch Linux installation media"
-  echo "  - Open the encrypted root: cryptsetup open ${ROOT_PART} cryptroot"
-  echo "  - Mount the filesystems: mount -o subvol=@ /dev/mapper/cryptroot" \
-    "/mnt"
-  echo "  - Mount the ESP: mount ${EFI_PART} /mnt/boot"
-  echo "  - Chroot: arch-chroot /mnt"
-  echo "  - Rerun: limine-install && limine-mkinitcpio"
-  echo "  - Exit chroot and reboot"
+  cat <<EOF
+If the system does not boot, try these steps:
+1. From the UEFI/BIOS setup, make sure Secure Boot is disabled
+2. Make sure the EFI partition is set as the primary boot device
+3. If it still does not boot, try rebuilding the boot setup:
+  - Boot from the Arch Linux installation media
+  - Open the encrypted root: cryptsetup open ${ROOT_PART} cryptroot
+  - Mount the filesystems: mount -o subvol=@ /dev/mapper/cryptroot /mnt
+  - Mount the ESP: mount ${EFI_PART} /mnt/boot
+  - Chroot: arch-chroot /mnt
+  - Rerun: limine-install && limine-mkinitcpio
+  - Exit chroot and reboot
+EOF
 }
 
 print_summary() {
