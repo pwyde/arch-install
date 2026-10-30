@@ -1916,5 +1916,8 @@ main() {
   fi
 }
 
-# Entry point.
-main "$@"
+# Runs only when executed, so that sourcing the script defines its functions
+# without installing anything.
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "$@"
+fi
