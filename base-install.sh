@@ -843,10 +843,11 @@ mount_filesystems() {
   mount | grep "/mnt"
 }
 
-# Installs the base system with pacstrap.
+# Installs the base system with pacstrap, and its fstab.
 install_base_system() {
-  print_msg "Install base system"
   local -a packages=("${DEFAULT_PACKAGES[@]}") extra_packages
+
+  print_msg "Install base system"
   [[ -z "${MICROCODE}" ]] || packages+=("${MICROCODE}")
   read -ra extra_packages <<<"${EXTRA_PACKAGES}"
   packages+=("${extra_packages[@]}")
@@ -878,6 +879,11 @@ install_base_system() {
     exit 1
   }
 
+  generate_fstab
+}
+
+# Writes the fstab of the target from the filesystems mounted under /mnt.
+generate_fstab() {
   print_msg "Generate fstab"
   genfstab -U /mnt >>/mnt/etc/fstab
 
