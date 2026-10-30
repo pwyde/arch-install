@@ -109,7 +109,7 @@ main() {
   if [[ -z "${url}" ]]; then
     read -r -p "URL: " url
   fi
-  if [[ -z "${icon}" && $# -lt 2 ]]; then
+  if [[ -z "${icon}" ]] && (($# < 2)); then
     read -r -p "Icon URL, file or name (empty for the site's icon): " icon
   fi
 

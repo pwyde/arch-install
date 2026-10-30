@@ -31,7 +31,7 @@ main() {
     files+=("${file}")
     names+=("$(desktop_value "${file}" Name)")
   done
-  [[ "${#files[@]}" -gt 0 ]] || die "no web apps are installed."
+  ((${#files[@]} > 0)) || die "no web apps are installed."
 
   local name="${1:-}" i choice
   if [[ -z "${name}" ]]; then
