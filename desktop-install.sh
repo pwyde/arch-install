@@ -68,6 +68,7 @@ readonly DEFAULT_KDE_PACKAGES=(
   okular
   haruna
   libgsf
+  qt6-imageformats
   kio-admin
   purpose
   kdeconnect
