@@ -8,8 +8,9 @@ set -gx _ZO_FZF_OPTS (string join ' ' -- \
     --layout=reverse \
     --info=inline \
     --height=80% \
-    --multi \
-    "--preview='eza -hl --git --color=always --icons {2..}'" \
+    --no-sort \
+    --exit-0 \
+    "--preview='eza -hl --git --color=always --icons=always {2..}'" \
     --preview-window=right,border-sharp \
     "--bind='ctrl-space:toggle'" \
     "--bind='tab:down'" \

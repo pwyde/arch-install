@@ -722,6 +722,15 @@ directories.
 - **less** takes its options from
   [`10-less.fish`](./dots/.config/fish/conf.d/10-less.fish), which replaces the
   `-R` that `/etc/profile.d/10-defaults.sh` sets for every user.
+- **Tab opens fzf after `cd`, `cat`, `ls` and the eza aliases.**
+  [`20-fzf-complete.fish`](./dots/.config/fish/conf.d/20-fzf-complete.fish)
+  takes the list from fish's own completions. Other commands, options and tokens
+  with a variable, glob, brace expansion or command substitution keep the normal
+  completion.
+- **`rm` asks before larger removals.**
+  [`20-rm.fish`](./dots/.config/fish/conf.d/20-rm.fish) adds `-I` in interactive
+  shells, which asks once before removing more than three files or removing
+  recursively. A later `-f`, as in `rm -rf`, removes without asking.
 - **Web apps** are managed by the commands in
   [`dots/.local/bin/`](./dots/.local/bin/). `webapp-install` creates a
   desktop entry that opens a site in a Chromium window without tabs or
