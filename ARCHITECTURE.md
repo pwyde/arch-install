@@ -709,6 +709,19 @@ directories.
   extensions and caches in `~/.local/share/vscodium`. The installer creates
   the directory, which VSCodium requires, and installs the extensions that
   `extensions.json` recommends.
+- **Claude Code keeps its configuration in the XDG directory.** The installers
+  do not install the program, but
+  [`10-claude.conf`](./dots/.config/environment.d/10-claude.conf) sets
+  `CLAUDE_CONFIG_DIR` to `~/.config/claude` for the niri session, and
+  [`20-claude.fish`](./dots/.config/fish/conf.d/20-claude.fish) sets it for
+  shells outside the session, such as SSH logins.
+- **fish's line editing** is set in
+  [`10-editing.fish`](./dots/.config/fish/conf.d/10-editing.fish):
+  Ctrl+Backspace, Ctrl+Left and Ctrl+Right work on path components, Ctrl+Delete
+  removes a word, and each prompt merges the history of other running shells.
+- **less** takes its options from
+  [`10-less.fish`](./dots/.config/fish/conf.d/10-less.fish), which replaces the
+  `-R` that `/etc/profile.d/10-defaults.sh` sets for every user.
 - **Web apps** are managed by the commands in
   [`dots/.local/bin/`](./dots/.local/bin/). `webapp-install` creates a
   desktop entry that opens a site in a Chromium window without tabs or
