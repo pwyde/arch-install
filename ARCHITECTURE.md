@@ -689,7 +689,9 @@ directories.
   initialization and the KDE service cache rebuild at login.
 - **Noctalia** reads `10-default.toml` and `20-lockscreen-widgets.toml`.
   Its templates color fzf, eza, VSCodium, Claude Code, Chromium and, through
-  Pywalfox, Firefox from the current color scheme.
+  Pywalfox, Firefox from the current color scheme. The community plugin Keybind
+  Cheatsheet, which Noctalia fetches from its Git source, lists niri's bindings
+  in a panel that `Mod+F1` opens.
 - **GTK settings are stored in GSettings.** On Wayland, GTK 3 takes the
   theme, icons, cursor and fonts from GSettings, and its values replace those
   in `settings.ini`. The installer copies the values from

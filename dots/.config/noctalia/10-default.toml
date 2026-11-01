@@ -73,6 +73,14 @@ address = "@LOCATION_ADDRESS@"
 [lockscreen]
 transition = ["fade"]
 
+# Keybind Cheatsheet lists niri's bindings; Mod+F1 in niri's 70-binds.kdl opens
+# its panel. Noctalia fetches community plugins from their Git source. Only the
+# official source updates by itself, as community plugins are third-party code;
+# update them with "noctalia msg plugins update community".
+[plugins]
+auto_update = "official"
+enabled = ["kenn/keybind-cheatsheet"]
+
 [shell]
 font_family = "Inter"
 polkit_agent = true

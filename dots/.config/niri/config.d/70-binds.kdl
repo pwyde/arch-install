@@ -30,7 +30,7 @@ binds {
     // Mod+Shift+7 { show-hotkey-overlay; }
     Mod+Shift+Slash { show-hotkey-overlay; }
 
-    Super+Alt+L hotkey-overlay-title="Lock the Screen" { spawn-sh "noctalia msg session lock"; }
+    Mod+Alt+L hotkey-overlay-title="Lock the Screen" { spawn-sh "noctalia msg session lock"; }
     Mod+Shift+E { quit; }
     Ctrl+Alt+Delete { quit; }
     Mod+Shift+P { power-off-monitors; }
@@ -55,6 +55,9 @@ binds {
     Mod+D hotkey-overlay-title="Run an Application"          { spawn-sh "noctalia msg panel-toggle launcher"; }
     Mod+Space hotkey-overlay-title="Run an Application"      { spawn-sh "noctalia msg panel-toggle launcher"; }
     Mod+S hotkey-overlay-title="Noctalia Control Center"     { spawn-sh "noctalia msg panel-toggle control-center"; }
+    // The panel of the Keybind Cheatsheet plugin, enabled in Noctalia's
+    // 10-default.toml.
+    Mod+F1 hotkey-overlay-title="Keybind Cheatsheet"         { spawn-sh "noctalia msg panel-toggle kenn/keybind-cheatsheet:cheatsheet"; }
     // Noctalia recommends Mod+Comma, which niri assigns to
     // consume-window-into-column.
     Mod+Shift+S hotkey-overlay-title="Noctalia Settings"     { spawn-sh "noctalia msg settings-toggle"; }
