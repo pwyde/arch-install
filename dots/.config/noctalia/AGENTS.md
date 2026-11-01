@@ -12,8 +12,9 @@ Noctalia shell configuration and color templates, copied to
 - `templates/` uses the template color names, which did not change:
   `colors.surface_variant` and `colors.outline` remain valid there.
 - A new template is registered in `10-default.toml` under
-  `[theme.templates.user.<name>]`. `templates/vscode.json` is Noctalia's
-  upstream template, kept as published.
+  `[theme.templates.user.<name>]`. `templates/vscode.json` and
+  `templates/claude-code.json` are Noctalia's upstream templates, kept as
+  published.
 - `@LOCATION_ADDRESS@` in `10-default.toml` and `@LOCKSCREEN_OUTPUT@` in
   `20-lockscreen-widgets.toml` are filled in by `configure_location` and
   `configure_lockscreen`; keep both tokens.

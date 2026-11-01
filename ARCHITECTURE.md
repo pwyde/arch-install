@@ -661,6 +661,7 @@ does not support.
 
 | Destination | Source | Purpose |
 | --- | --- | --- |
+| `/etc/chromium/policies/managed/noctalia-color.json` | Noctalia's `chromium-based` template, through `pkexec` on its first application | Chromium's theme color; owned by the user, as described in [SECURITY.md](./SECURITY.md) |
 | `/etc/fonts/conf.d/50-generic-families.conf` | [`etc/fonts/conf.d/50-generic-families.conf`](./etc/fonts/conf.d/50-generic-families.conf) | The fonts for sans-serif, serif, monospace and `system-ui`, which web pages mostly rely on |
 | `/etc/greetd/config.toml` | [`etc/greetd/config.toml`](./etc/greetd/config.toml) | Starts the greeter on the first virtual terminal |
 | `/etc/pam.d/greetd` | [`etc/pam.d/greetd`](./etc/pam.d/greetd) | Unlocks KWallet at login |
@@ -687,8 +688,8 @@ directories.
   `90-user-extra.kdl` for local additions. niri starts Noctalia, the KWallet
   initialization and the KDE service cache rebuild at login.
 - **Noctalia** reads `10-default.toml` and `20-lockscreen-widgets.toml`.
-  Its templates color fzf, eza, VSCodium and, through Pywalfox, Firefox from
-  the current color scheme.
+  Its templates color fzf, eza, VSCodium, Claude Code, Chromium and, through
+  Pywalfox, Firefox from the current color scheme.
 - **GTK settings are stored in GSettings.** On Wayland, GTK 3 takes the
   theme, icons, cursor and fonts from GSettings, and its values replace those
   in `settings.ini`. The installer copies the values from

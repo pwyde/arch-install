@@ -71,6 +71,14 @@ One rule relaxes the defaults: `desktop-install.sh` allows the user to sync
 the desktop appearance to the greeter without authentication. The rule covers
 only that action.
 
+Noctalia's `chromium-based` color template relaxes another. After one
+authentication through pkexec, it leaves
+`/etc/chromium/policies/managed/noctalia-color.json` owned by the user. Chromium
+applies every policy in that file, so any program running as the user can set
+managed browser policies, for example to force the installation of an extension.
+Such a program can already influence Chromium through its flags file and
+profile, so the file adds little new exposure.
+
 ## Rationale for Omitting TPM2 Unlocking
 
 TPM2 unlocking replaces the passphrase with a key that the chip releases when

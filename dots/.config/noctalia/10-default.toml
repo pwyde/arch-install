@@ -90,6 +90,11 @@ wallpaper_scheme = "m3-tonal-spot"
 
 [theme.templates]
 builtin_ids = ["btop", "gtk3", "gtk4", "kcolorscheme", "kitty", "niri"]
+# chromium-based sets Chromium's theme color through a managed policy, which
+# Chromium reads only under /etc, so no XDG location exists for it. On the first
+# application, it asks for authentication through pkexec and creates
+# /etc/chromium/policies/managed/noctalia-color.json, owned by the user.
+# SECURITY.md describes the consequence.
 community_ids = [
   "fastfetch",
   "papirus-icons",
@@ -99,6 +104,7 @@ community_ids = [
   "lazyvim",
   "glow",
   "starship",
+  "chromium-based",
 ]
 
 # Pywalfox colors for Firefox. The community pywalfox template is not used: its
@@ -133,6 +139,15 @@ output_path = "$XDG_CONFIG_HOME/eza/theme.yml"
 [theme.templates.user.vscodium]
 input_path = "$XDG_CONFIG_HOME/noctalia/templates/vscode.json"
 output_path_dynamic = 'ls -d "${VSCODE_PORTABLE:-${XDG_DATA_HOME:-$HOME/.local/share}/vscodium}"/extensions/noctalia.noctaliatheme-*/themes/NoctaliaTheme-color-theme.json 2>/dev/null'
+
+# Claude Code colors, from the community claude-code template's color file. The
+# community template itself is not used: it writes to ~/.claude, while
+# ~/.config/environment.d/10-claude.conf moves the configuration of Claude Code
+# to ~/.config/claude, where it looks for themes. Select Noctalia once with
+# /theme; Claude Code reloads the theme when the file changes.
+[theme.templates.user.claude-code]
+input_path = "$XDG_CONFIG_HOME/noctalia/templates/claude-code.json"
+output_path = "$XDG_CONFIG_HOME/claude/themes/noctalia.json"
 
 [wallpaper]
 directory = "~/Pictures/Wallpapers"
