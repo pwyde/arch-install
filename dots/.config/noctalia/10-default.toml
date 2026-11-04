@@ -5,8 +5,8 @@ enabled = true
 capsule = true
 center = ["workspaces"]
 end = [
-  "tray",
   "media",
+  "tray",
   "volume",
   "notifications",
   "clipboard",
