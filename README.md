@@ -234,6 +234,9 @@ Example:
   monitor on the connector, and `--display` a resolution that the monitor
   reports. The refresh rate is not checked: niri chooses a mode itself when
   the rate does not match one exactly.
+- **The first connector** given with `--display`, `--position` or `--scale`,
+  or else the first connected one, shows the lock screen; the other monitors
+  stay black while the screen is locked.
 - **`--xkb-layout se`** also replaces the five niri key bindings that the
   Swedish layout cannot reach with the alternatives in
   [`70-binds.kdl`](./dots/.config/niri/config.d/70-binds.kdl).

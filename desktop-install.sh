@@ -1193,9 +1193,11 @@ configure_location() {
   sed -i "s|@LOCATION_ADDRESS@|${address}|" "${NOCTALIA_CONFIG}"
 }
 
-# Ties the lock screen widgets to the first display given with --display,
-# --scale or --position, or else to the first connected one. Without a display,
-# the file is removed and Noctalia uses its default lock screen.
+# Ties the lock screen to the first display given with --display, --scale or
+# --position, or else to the first connected one: the widgets are placed there,
+# and the other displays stay black. Without a display, the widget file and the
+# monitors line are removed, and Noctalia shows its default lock screen on
+# every display.
 configure_lockscreen() {
   local connector="${OUTPUT_ORDER[0]:-}"
   if [[ -z "${connector}" ]]; then
@@ -1205,12 +1207,14 @@ configure_lockscreen() {
 
   if [[ "${connector}" == "none" ]]; then
     print_warning "No connected display found; the lock screen keeps" \
-      "Noctalia's default layout."
+      "Noctalia's default layout on every display."
     rm -f "${NOCTALIA_LOCKSCREEN}"
+    sed -i '/^monitors = \["@LOCKSCREEN_OUTPUT@"\]$/d' "${NOCTALIA_CONFIG}"
     return 0
   fi
-  print_msg "Placing the lock screen widgets on ${connector}"
-  sed -i "s|@LOCKSCREEN_OUTPUT@|${connector}|g" "${NOCTALIA_LOCKSCREEN}"
+  print_msg "Showing the lock screen on ${connector} only"
+  sed -i "s|@LOCKSCREEN_OUTPUT@|${connector}|g" "${NOCTALIA_LOCKSCREEN}" \
+    "${NOCTALIA_CONFIG}"
 }
 
 print_summary() {

@@ -70,7 +70,13 @@ timeout = 1800.0
 [location]
 address = "@LOCATION_ADDRESS@"
 
+# The lock screen shows only on the display that holds the login box in
+# 20-lockscreen-widgets.toml; the other displays stay black. desktop-install.sh
+# fills in the connector or, without a connected display, removes the line.
+# When the connector is not present, Noctalia shows the lock screen on every
+# display.
 [lockscreen]
+monitors = ["@LOCKSCREEN_OUTPUT@"]
 transition = ["fade"]
 
 # Keybind Cheatsheet lists niri's bindings; Mod+F1 in niri's 70-binds.kdl opens

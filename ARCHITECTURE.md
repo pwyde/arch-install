@@ -761,8 +761,10 @@ anything is installed, and applied after the configuration has been copied.
   unchecked; it defaults to 60 Hz, and niri chooses a mode itself when the
   rate does not match one exactly. Each connector receives one `output` block
   in `90-user-extra.kdl`.
-- **The lock screen widgets** are placed on the first display given with an
-  option, or else on the first connected display.
+- **The lock screen** is tied to the first display given with an option, or
+  else to the first connected display. Its widgets are placed there, and the
+  other displays stay black while the screen is locked. If that connector is
+  not present later, Noctalia shows the lock screen on every display.
 - **The location** from `--address` is written to the Noctalia
   configuration, which resolves it when the desktop starts. Double quotes,
   backslashes and control characters are rejected, as the value is placed in

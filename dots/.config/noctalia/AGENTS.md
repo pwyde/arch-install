@@ -15,6 +15,8 @@ Noctalia shell configuration and color templates, copied to
   `[theme.templates.user.<name>]`. `templates/vscode.json` and
   `templates/claude-code.json` are Noctalia's upstream templates, kept as
   published.
-- `@LOCATION_ADDRESS@` in `10-default.toml` and `@LOCKSCREEN_OUTPUT@` in
-  `20-lockscreen-widgets.toml` are filled in by `configure_location` and
-  `configure_lockscreen`; keep both tokens.
+- `@LOCATION_ADDRESS@` in `10-default.toml` is filled in by
+  `configure_location`, and `@LOCKSCREEN_OUTPUT@` in `10-default.toml` and
+  `20-lockscreen-widgets.toml` by `configure_lockscreen`, which deletes the
+  `monitors` line by its exact text when no display is connected; keep the
+  tokens and that line as they are.
