@@ -48,6 +48,7 @@ readonly DEFAULT_PACKAGES=(
   cryptsetup
   dosfstools
   efibootmgr
+  expac
   git
   iptables
   limine
@@ -59,8 +60,10 @@ readonly DEFAULT_PACKAGES=(
   nano
   networkmanager
   openssh
+  pacman-contrib
   plocate
   plymouth
+  reflector
   snap-pac
   snapper
   sudo
@@ -161,6 +164,8 @@ readonly SLEEP_HOOK_SRC="${SCRIPT_DIR}/defaults/systemd/system-sleep/keyboard-ba
 readonly SNAPPER_CONFIG_SRC="${SCRIPT_DIR}/defaults/snapper/root"
 readonly SNAPPER_CONFD_SRC="${SCRIPT_DIR}/etc/conf.d/snapper"
 readonly LIMINE_TOOL_CONF_SRC="${SCRIPT_DIR}/etc/limine-entry-tool.d/50-arch.conf"
+readonly REFLECTOR_CONF_SRC="${SCRIPT_DIR}/etc/xdg/reflector/reflector.conf"
+readonly ORPHANS_HOOK_SRC="${SCRIPT_DIR}/etc/pacman.d/hooks/log-orphans.hook"
 # Prebuilt AUR packages. They are compiled with GraalVM native-image, which is
 # too heavy to run during an install; ARCHITECTURE.md describes how to rebuild
 # them.
@@ -744,6 +749,8 @@ validate_repository() {
     "${SNAPPER_CONFIG_SRC}"
     "${SNAPPER_CONFD_SRC}"
     "${LIMINE_TOOL_CONF_SRC}"
+    "${REFLECTOR_CONF_SRC}"
+    "${ORPHANS_HOOK_SRC}"
     "${MODULES_LOAD_SRC}"
     "${COREDUMP_CONF_SRC}"
     "${JOURNALD_CONF_SRC}"
@@ -1039,6 +1046,7 @@ configure_system() {
   harden_sshd
   configure_networkmanager
   configure_pacman
+  configure_reflector
 
   # Users: root and the regular user in the wheel group. Passwords are prompted
   # for outside the chroot.
@@ -1189,6 +1197,12 @@ configure_networkmanager() {
 }
 
 configure_pacman() {
+  # pacman reads local hooks from /etc/pacman.d/hooks/, next to the packages'
+  # hooks in /usr/share/libalpm/hooks/.
+  print_msg "Listing orphaned packages after each pacman transaction"
+  install -D -m 0644 "${ORPHANS_HOOK_SRC}" \
+    /mnt/etc/pacman.d/hooks/log-orphans.hook
+
   arch-chroot /mnt /bin/bash -e <<'EOF'
 echo "==> Configuring pacman"
 sed -i "/Color/s/^#//" /etc/pacman.conf
@@ -1202,6 +1216,30 @@ sed -i '/\[multilib\]/,/Include/s/^#//' /etc/pacman.conf
 # databases, and installing them after a bare -Sy is a partial upgrade.
 SNAP_PAC_SKIP=y pacman -Syu --noconfirm
 EOF
+}
+
+# Replaces the package's reflector.conf; pacman keeps the replaced file on
+# upgrades, as it is a backup file. The country comes from zone.tab, which
+# lists one country per canonical time zone. Aliases such as US/Eastern and
+# zones such as UTC have no entry, and their mirrors are chosen by download
+# rate alone. The ISO's mirror list, which pacstrap copied, stays in place
+# until the timer first runs.
+configure_reflector() {
+  local country
+
+  country=$(awk -F'\t' -v zone="${TIMEZONE}" '
+    $3 == zone { print $1; exit }' /mnt/usr/share/zoneinfo/zone.tab)
+
+  if [[ "${country}" =~ ^[A-Z]{2}$ ]]; then
+    print_msg "Preferring package mirrors in ${country}"
+    sed "s|@REFLECTOR_COUNTRY@|${country}|g" "${REFLECTOR_CONF_SRC}" \
+      | install -D -m 0644 /dev/stdin /mnt/etc/xdg/reflector/reflector.conf
+  else
+    print_msg "No country for ${TIMEZONE}; choosing package mirrors by" \
+      "download rate only"
+    sed '/^--country @REFLECTOR_COUNTRY@$/d' "${REFLECTOR_CONF_SRC}" \
+      | install -D -m 0644 /dev/stdin /mnt/etc/xdg/reflector/reflector.conf
+  fi
 }
 
 # Prompts for the password of an account into the variable named by $2. An
@@ -1642,6 +1680,11 @@ systemctl mask systemd-networkd
 # Debian and Red Hat all recommend. TRIM reaches the SSD because the LUKS
 # container is opened with --allow-discards.
 systemctl enable fstrim.timer
+
+# Weekly maintenance of pacman. paccache keeps the three newest versions of
+# each package in the cache, and reflector rewrites the mirror list with the
+# settings in /etc/xdg/reflector/reflector.conf.
+systemctl enable paccache.timer reflector.timer
 EOF
 }
 

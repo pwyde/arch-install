@@ -53,6 +53,9 @@ installation fails.
 - A Plymouth boot splash that also takes the LUKS passphrase.
 - System tuning and hardening: sysctl, sshd, journald, core dumps, shutdown
   timeouts and periodic TRIM.
+- pacman maintenance: the package cache is pruned and the mirror list is
+  refreshed with the fastest mirrors in the time zone's country every week, and
+  orphaned packages are listed after every transaction.
 - The [paru](https://github.com/Morganamilo/paru) AUR helper, built from
   source.
 - A complete log of the installation.

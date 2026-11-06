@@ -476,13 +476,16 @@ Further systemd and service configuration:
 | IPv6 | Enabled, with rotating privacy addresses from [`10-ipv6-privacy.conf`](./etc/NetworkManager/conf.d/10-ipv6-privacy.conf). |
 | Journal | [`etc/systemd/journald.conf.d/`](./etc/systemd/journald.conf.d/) caps the journal at 500M instead of 10% of the filesystem, which holds about a month of logs. |
 | Locate index | A drop-in in [`plocate-updatedb.service.d/`](./etc/systemd/system/plocate-updatedb.service.d/) indexes the Btrfs subvolumes, which `updatedb` skips as bind mounts by default, and excludes `/.snapshots`. The run is skipped on battery. `/etc/updatedb.conf` is left untouched, as pacman tracks it as a backup file. |
+| Mirror list | `reflector.timer` rewrites `/etc/pacman.d/mirrorlist` weekly with [`etc/xdg/reflector/reflector.conf`](./etc/xdg/reflector/reflector.conf), which replaces the package's file: of the 20 most recently synchronized HTTPS mirrors in the country of the time zone, the five with the highest download rate. The country code comes from `/usr/share/zoneinfo/zone.tab`; a time zone without an entry there, such as `UTC` or an alias such as `US/Eastern`, loses the country line, and the download rate alone decides. Until the first run, the system keeps the mirror list that `pacstrap` copied from the ISO. |
+| Orphaned packages | The pacman hook [`etc/pacman.d/hooks/log-orphans.hook`](./etc/pacman.d/hooks/log-orphans.hook) lists, after every transaction, the dependencies that no installed package requires or optionally requires, with the command that removes them. It removes nothing itself. |
+| Package cache | `paccache.timer` from `pacman-contrib` removes cached package files weekly and keeps the three newest versions of each package, the default in `/etc/conf.d/pacman-contrib`. |
 | Shutdown | Three drop-ins under [`etc/systemd/`](./etc/systemd/) lower `DefaultTimeoutStopSec` to 5 s for system and user services, and `TimeoutStopSec` of `user@.service` from 120 s to 10 s. Units that declare their own timeout keep it. |
 | sshd | A drop-in in [`etc/ssh/sshd_config.d/`](./etc/ssh/sshd_config.d/) allows key authentication only, refuses root and limits `AllowUsers` to the account the installer creates. Remote login requires a public key installed from the console first. `Ciphers`, `KexAlgorithms` and `MACs` are not set, leaving OpenSSH's defaults, which lead with hybrid post-quantum key exchange. |
 | Wi-Fi | Power save is disabled by [`20-wifi-powersave.conf`](./etc/NetworkManager/conf.d/20-wifi-powersave.conf); it adds latency on an idle link, and some Intel firmware drops the connection while the radio sleeps. |
 
 Enabled services: `systemd-resolved`, `systemd-timesyncd`, zram swap, `sshd`,
-`NetworkManager`, `fstrim.timer`, `snapper-cleanup.timer` and
-`limine-snapper-sync.service`.
+`NetworkManager`, `fstrim.timer`, `paccache.timer`, `reflector.timer`,
+`snapper-cleanup.timer` and `limine-snapper-sync.service`.
 
 ## User Environment
 
