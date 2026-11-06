@@ -565,7 +565,7 @@ have no per-user configuration; see [System-Wide Files](#system-wide-files).
 | Validation | `validate_inputs`, `validate_xkb_layout`, `validate_displays`, `validate_address`, `validate_packages` | Checks the account, the required commands, the display manager, the repository files and every option |
 | Confirmation | `confirm_operation` | Lists what will be installed and asks for confirmation |
 | Packages | `update_system`, `install_compositor`, `install_desktop_shell`, `install_cli_tools`, `install_neovim`, `install_extra_packages` | Upgrades the system and installs the packages |
-| System | `install_greeter_config`, `configure_greetd`, `configure_fonts`, `enable_passwordless_sync`, `set_login_shell` | Configures the login screen, the session, the fonts and the login shell |
+| System | `install_greeter_config`, `configure_greetd`, `enable_bluetooth`, `configure_fonts`, `enable_passwordless_sync`, `set_login_shell` | Configures the login screen, the session, Bluetooth, the fonts and the login shell |
 | User | `create_user_dirs`, `copy_wallpapers`, `copy_dotfiles`, `configure_gtk_settings`, `install_neovim_plugins`, `configure_vscodium` | Deploys the configuration to the home directory and applies it |
 | Options | `configure_keyboard_layout`, `configure_swedish_binds`, `configure_displays`, `configure_location`, `configure_lockscreen` | Applies the keyboard, display and location options |
 | Summary | `print_summary` | Prints the installation summary |
@@ -584,9 +584,9 @@ have no per-user configuration; see [System-Wide Files](#system-wide-files).
   `--needed`, the copy of `dots/` replaces files of the same name, and the
   blocks generated from the options are written to a file that the copy
   restores first.
-- **Optional steps are not fatal.** The Polkit rule, the GTK settings, the
-  Neovim plugins and the VSCodium extensions print a warning on failure, and
-  the installation continues.
+- **Optional steps are not fatal.** The Bluetooth service, the Polkit rule,
+  the GTK settings, the Neovim plugins and the VSCodium extensions print a
+  warning on failure, and the installation continues.
 
 ### Packages
 
@@ -598,7 +598,7 @@ does not support.
 | --- | --- |
 | `DEFAULT_BROWSER_PACKAGES` | Firefox, Chromium, Zen Browser and Pywalfox |
 | `DEFAULT_CLI_PACKAGES` | bat, duf, dust, eza, fd, fzf, glow, procs, ripgrep and zoxide |
-| `DEFAULT_COMPOSITOR_PACKAGES` | niri, nirimod, PipeWire, WirePlumber, the XDG desktop portals, `xwayland-satellite`, and tools for brightness, media keys and the clipboard |
+| `DEFAULT_COMPOSITOR_PACKAGES` | niri, nirimod, PipeWire, WirePlumber, BlueZ, the XDG desktop portals, `xwayland-satellite`, and tools for brightness, media keys and the clipboard |
 | `DEFAULT_DEVELOPMENT_PACKAGES` | VSCodium with the Visual Studio Marketplace |
 | `DEFAULT_FONT_PACKAGES` | JetBrains Mono Nerd Font, Inter, Noto and Liberation |
 | `DEFAULT_KDE_PACKAGES` | Dolphin, Kate, Konsole, Ark, Gwenview, Okular and Haruna, and the KDE services and integration they require outside Plasma |
@@ -643,6 +643,12 @@ does not support.
   runs `niri-session` through `systemd-cat`. Installed to
   `/usr/local/share/wayland-sessions/`, it takes precedence over the
   package's entry of the same name.
+- **Bluetooth is enabled and started.** Noctalia connects to BlueZ only when
+  the shell starts, so `bluetooth.service` runs before the first login.
+  Noctalia provides the control center tab and the pairing agent, and
+  PipeWire's Bluetooth plugin, part of `pipewire-audio`, carries the audio.
+  The bar has no Bluetooth widget, as the control center covers it. Without an
+  adapter, the unit's condition on `/sys/class/bluetooth` skips the start.
 - **fish is the login shell.** fish does not read `/etc/profile`, which sets
   the environment of login shells through `/etc/profile.d/`.
   [`00-profile.fish`](./dots/.config/fish/conf.d/00-profile.fish) runs it in
@@ -667,6 +673,7 @@ does not support.
 | `/etc/pam.d/greetd` | [`etc/pam.d/greetd`](./etc/pam.d/greetd) | Unlocks KWallet at login |
 | `/usr/local/share/wayland-sessions/niri.desktop` | [`defaults/wayland-sessions/niri.desktop`](./defaults/wayland-sessions/niri.desktop) | The niri session, logging to the journal |
 | `/var/lib/noctalia-greeter/greeter.toml` | [`defaults/noctalia-greeter/greeter.toml`](./defaults/noctalia-greeter/greeter.toml) | Keyboard layout and display of the login screen |
+| Bluetooth service | `systemctl enable --now bluetooth.service` | BlueZ, started at boot when an adapter is present |
 | Login shell | `chsh` | fish for the installing user |
 | Polkit rule | `noctalia-greeter passwordless-sync` | Appearance sync without authentication |
 

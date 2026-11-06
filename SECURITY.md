@@ -79,6 +79,14 @@ managed browser policies, for example to force the installation of an extension.
 Such a program can already influence Chromium through its flags file and
 profile, so the file adds little new exposure.
 
+`desktop-install.sh` also enables BlueZ, which adds a radio interface to the
+running system on a computer with a Bluetooth adapter. Pairing requires a
+confirmation in Noctalia's pairing agent. A device granted **Trust and allow**
+has its later service requests accepted without a prompt; turning off
+**Auto-reconnect** for the device revokes that trust. Turning Bluetooth off in
+Noctalia powers the adapter down through BlueZ; `rfkill block bluetooth` also
+blocks the radio in the kernel.
+
 ## Rationale for Omitting TPM2 Unlocking
 
 TPM2 unlocking replaces the passphrase with a key that the chip releases when

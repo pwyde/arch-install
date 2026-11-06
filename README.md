@@ -141,13 +141,15 @@ without Plasma.
 The installer validates its options, the connected displays and the repository
 files before any package is installed. Configuration is written to the user's
 home directory and follows the XDG base directories. System-wide changes are
-limited to the login manager, the session entry, the font defaults, the login
-shell and the rule that syncs the appearance to the greeter. The installer
-can be run again to restore the configuration from the repository.
+limited to the login manager, the session entry, the Bluetooth service, the
+font defaults, the login shell and the rule that syncs the appearance to the
+greeter. The installer can be run again to restore the configuration from the
+repository.
 
 ### Features
 
-- niri with PipeWire audio, XDG desktop portals and Xwayland support.
+- niri with PipeWire audio, Bluetooth, XDG desktop portals and Xwayland
+  support.
 - The Noctalia shell and greeter, with the desktop appearance synced to the
   login screen.
 - KDE applications, web browsers, LibreOffice, GIMP, Inkscape and VSCodium.
@@ -294,6 +296,7 @@ from that copy and adds its own log next to the first.
 - [ArchWiki - niri](https://wiki.archlinux.org/title/Niri)
 - [ArchWiki - greetd](https://wiki.archlinux.org/title/Greetd)
 - [ArchWiki - PipeWire](https://wiki.archlinux.org/title/PipeWire)
+- [ArchWiki - Bluetooth](https://wiki.archlinux.org/title/Bluetooth)
 - [ArchWiki - XDG Base Directory](https://wiki.archlinux.org/title/XDG_Base_Directory)
 - [ArchWiki - XDG MIME Applications](https://wiki.archlinux.org/title/XDG_MIME_Applications)
 - [ArchWiki - Font configuration](https://wiki.archlinux.org/title/Font_configuration)

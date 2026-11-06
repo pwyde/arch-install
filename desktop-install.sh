@@ -6,7 +6,8 @@
 # repository.
 #
 # Features:
-# - niri with PipeWire audio, XDG desktop portals and Xwayland support
+# - niri with PipeWire audio, Bluetooth, XDG desktop portals and Xwayland
+#   support
 # - Noctalia shell and greeter, with themes, fonts and a cursor theme
 # - KDE applications, browsers, office, graphics and development tools
 # - kitty, fish, Neovim and command-line tools
@@ -39,6 +40,7 @@ readonly DEFAULT_COMPOSITOR_PACKAGES=(
   ddcutil
   playerctl
   brightnessctl
+  bluez
 )
 # The desktop shell and its greeter.
 readonly DEFAULT_NOCTALIA_PACKAGES=(
@@ -743,6 +745,7 @@ confirm_operation() {
     fi
     echo "  - The greetd login manager with the Noctalia greeter, from the" \
       "next boot"
+    echo "  - The Bluetooth service, started now and at every boot"
     echo "  - Appearance sync to the greeter without a password prompt"
     echo "  - Fish as the login shell"
     echo "  - Wallpapers and configuration files copied to the home directory"
@@ -932,6 +935,18 @@ configure_greetd() {
     /usr/local/share/wayland-sessions/niri.desktop
 
   sudo systemctl enable greetd.service
+}
+
+# Noctalia connects to BlueZ only when the shell starts, so the service runs
+# before the first login. Without an adapter, the unit's condition on
+# /sys/class/bluetooth skips the start. Not fatal: the desktop works without
+# Bluetooth.
+enable_bluetooth() {
+  print_msg "Enabling the Bluetooth service"
+  if ! sudo systemctl enable --now bluetooth.service; then
+    print_warning "The Bluetooth service could not be enabled; Noctalia" \
+      "shows no Bluetooth controls."
+  fi
 }
 
 # Chooses the fonts for sans-serif, serif, monospace and the system-ui names,
@@ -1273,6 +1288,7 @@ main() {
 
   install_greeter_config
   configure_greetd
+  enable_bluetooth
   configure_fonts
   enable_passwordless_sync
   set_login_shell
