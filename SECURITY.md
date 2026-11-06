@@ -96,6 +96,18 @@ has its later service requests accepted without a prompt; turning off
 Noctalia powers the adapter down through BlueZ; `rfkill block bluetooth` also
 blocks the radio in the kernel.
 
+`virt-install.sh` keeps management of the system's virtual machines behind
+administrator authentication by default. The libvirt package's Polkit rule
+lets members of the `libvirt` group manage them without a password, which
+amounts to root access: a virtual machine can be given any host disk or
+device. Without `--group`, the installer adds no user to the group, so
+virt-manager and `virsh` ask for the administrator password through Polkit.
+`--group` relaxes this default on request: it adds the installing user to the
+group, and any program running as that user can then gain root access without
+a password, as with a `NOPASSWD` sudo rule. The disk images reside inside the
+encrypted volume, on a subvolume of their own unless `--skip-subvolume` is
+given.
+
 ## Rationale for Omitting TPM2 Unlocking
 
 TPM2 unlocking replaces the passphrase with a key that the chip releases when

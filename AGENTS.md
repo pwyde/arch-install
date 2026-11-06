@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Two Bash installers for Arch Linux and the configuration files they deploy.
+Three Bash installers for Arch Linux and the configuration files they deploy.
 [README.md](README.md) covers usage, [ARCHITECTURE.md](ARCHITECTURE.md) the
 design and [SECURITY.md](SECURITY.md) the threat model. CLAUDE.md only
 imports this file, so rules are written here.
@@ -16,6 +16,7 @@ imports this file, so rules are written here.
 | `dots/` | Merged into `$HOME` by `desktop-install.sh`, without the `AGENTS.md` files |
 | `etc/` | Installed to the same path under `/etc` |
 | `packages/` | Prebuilt AUR packages, installed by `base-install.sh` with `pacman -U` |
+| `virt-install.sh` | Runs as the regular user on an installed system; installs QEMU/KVM, libvirt and virt-manager with pacman, with a Btrfs subvolume for disk images |
 
 The repository has no build system, CI, tests, database or migrations.
 
@@ -24,10 +25,11 @@ The repository has no build system, CI, tests, database or migrations.
 ### Safety
 
 - Never run an installer outside a virtual machine: `base-install.sh` erases
-  a disk, and `desktop-install.sh` upgrades the system, writes to `/etc` and
-  overwrites files in `$HOME`. `--help` or `-h` is the only invocation
-  allowed on the development machine. Behavior changes are tested in the
-  maintainer's VM; see VM Test.
+  a disk, `desktop-install.sh` upgrades the system, writes to `/etc` and
+  overwrites files in `$HOME`, and `virt-install.sh` upgrades the system,
+  creates a Btrfs subvolume and writes to `/etc`. `--help` or `-h` is the only
+  invocation allowed on the development machine. Behavior changes are tested
+  in the maintainer's VM; see VM Test.
 - Do not run on the development machine:
   - privilege escalation: `sudo`, `doas`, `pkexec`, `run0` and `su`
   - package transactions: `pacman` and `paru` other than read-only queries
@@ -57,12 +59,13 @@ The repository has no build system, CI, tests, database or migrations.
 
 ### Installer Structure
 
-- Keep the installers independent: neither references, calls or depends on
-  the other. `desktop-install.sh` must work on any Arch Linux system with a
-  sudo-capable user and paru.
+- Keep the installers independent: none references, calls or depends on
+  another. `desktop-install.sh` must work on any Arch Linux system with a
+  sudo-capable user and paru, and `virt-install.sh` on any with a
+  sudo-capable user.
 - `main` calls one function per step: option parsing, every check that can
-  fail, `confirm_operation` (skipped by `--yes`), then the changes. Both
-  scripts use `set -euo pipefail` and an `EXIT` trap named `cleanup`.
+  fail, `confirm_operation` (skipped by `--yes`), then the changes. Every
+  script uses `set -euo pipefail` and an `EXIT` trap named `cleanup`.
 - Define functions in the order `main` calls them, after the print helpers and
   `cleanup`. A function that calls steps of its own, such as `configure_system`,
   comes before them; a helper used by one function comes right before it, and
@@ -78,6 +81,8 @@ The repository has no build system, CI, tests, database or migrations.
   system-wide steps in ARCHITECTURE.md (Login and Session, System-Wide
   Files). User configuration goes under `$HOME`, in XDG locations where the
   program supports them.
+- `virt-install.sh` refuses to run as root as well; all of its changes are
+  system-wide and use `sudo`.
 
 ### Configuration Files
 

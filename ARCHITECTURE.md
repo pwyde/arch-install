@@ -1,8 +1,9 @@
 # Architecture
 
 This document describes how `base-install.sh` builds the installed system, how
-`desktop-install.sh` adds the desktop to it and the reasoning behind the design
-decisions of both. [README.md](./README.md) covers installation and usage;
+`desktop-install.sh` adds the desktop to it, how `virt-install.sh` adds virtual
+machines and the reasoning behind the design decisions of each.
+[README.md](./README.md) covers installation and usage;
 [SECURITY.md](./SECURITY.md) covers the threat model.
 
 ## Contents
@@ -27,13 +28,19 @@ decisions of both. [README.md](./README.md) covers installation and usage;
   - [System-Wide Files](#system-wide-files)
   - [User Configuration](#user-configuration)
   - [Keyboard and Displays](#keyboard-and-displays)
+- [Virtualization Installation](#virtualization-installation):
+  - [Virtualization Installation Sequence](#virtualization-installation-sequence)
+  - [Virtual Machine Hosting](#virtual-machine-hosting)
+  - [Virtualization Files](#virtualization-files)
 - [Logging](#logging)
 
 ## Installation Sequence
 
 `base-install.sh` runs as a single sequence of functions, called in order by
-`main`. The sequence of `desktop-install.sh` is described under
-[Desktop Installation Sequence](#desktop-installation-sequence).
+`main`. The sequences of `desktop-install.sh` and `virt-install.sh` are
+described under
+[Desktop Installation Sequence](#desktop-installation-sequence) and
+[Virtualization Installation Sequence](#virtualization-installation-sequence).
 
 | Step | Function | Purpose |
 | --- | --- | --- |
@@ -95,9 +102,10 @@ installation.
 | [`defaults/`](./defaults/) | Files installed elsewhere: the Limine configuration, the Plymouth theme, the Snapper configuration, the system-sleep hook and the user's bashrc. The greeter configuration and the niri session entry are installed by `desktop-install.sh` |
 | [`desktop-install.sh`](./desktop-install.sh) | The desktop installer, run on the installed system |
 | [`dots/`](./dots/) | Desktop configuration under `.config/` and `.local/`, copied to the user's home directory by `desktop-install.sh` |
-| [`etc/`](./etc/) | Configuration files, installed to the same path under `/etc`. `vim/xdg.vim` is appended to `/etc/vimrc`. The `greetd`, `pam.d/greetd`, `fonts/` and `nftables.d/` files are installed by `desktop-install.sh` |
+| [`etc/`](./etc/) | Configuration files, installed to the same path under `/etc`. `vim/xdg.vim` is appended to `/etc/vimrc`. The `greetd`, `pam.d/greetd`, `fonts/` and `nftables.d/` files are installed by `desktop-install.sh`, and `conf.d/libvirt-guests` by `virt-install.sh` |
 | `logs/` | Installation logs, created at run time and excluded from version control |
 | [`packages/`](./packages/) | Prebuilt AUR packages; see [Prebuilt Packages](#prebuilt-packages) |
+| [`virt-install.sh`](./virt-install.sh) | The virtualization installer, run on the installed system |
 
 Files containing `@HOSTNAME@`, `@USERNAME@`, `@LOCALE@` or `@ROOT_UUID@` are
 templates; the installer substitutes the values when it installs them.
@@ -788,9 +796,110 @@ anything is installed, and applied after the configuration has been copied.
   backslashes and control characters are rejected, as the value is placed in
   a TOML string.
 
+## Virtualization Installation
+
+`virt-install.sh` runs as the regular user on an installed Arch Linux system
+and installs QEMU/KVM with libvirt and virt-manager. It does not depend on
+either of the other installers; it requires only a user with sudo privileges
+and a full checkout of the repository. Its packages all come from the official
+repositories, so it uses pacman rather than paru.
+
+### Virtualization Installation Sequence
+
+| Phase | Functions | Purpose |
+| --- | --- | --- |
+| Logging | `start_logging` | Re-runs the installer under `script(1)` |
+| Input | `parse_args` | Parses the command-line options |
+| Validation | `validate_inputs`, `validate_shutdown_timeout`, `validate_packages`, `validate_virtualization`, `validate_images_location`, `validate_firewall` | Checks the account, the required commands, `libvirtd`, the repository files and every option; warns about missing KVM and a firewall without a rule for the bridges; decides where the disk images go |
+| Confirmation | `confirm_operation` | Lists what will be installed and asks for confirmation |
+| Packages | `update_system`, `install_packages`, `install_extra_packages` | Upgrades the system and installs the packages |
+| System | `create_images_subvolume`, `enable_libvirt`, `configure_default_network`, `configure_guest_shutdown`, `add_to_libvirt_group` | Creates the disk image subvolume, enables the daemons, the default network and the shutdown of running guests, and adds the user to the `libvirt` group with `--group` |
+| Summary | `print_summary` | Prints the installation summary |
+
+- **Missing KVM is not fatal.** Without `/dev/kvm`, QEMU emulates the
+  processor; the installer warns and continues. In a virtual machine, KVM
+  requires nested virtualization.
+- **Options are validated first.** The shutdown timeout must be 1 to 3600
+  seconds: 0 would make `libvirt-guests` wait without limit, which would hold
+  up the shutdown of the host. Additional packages are looked up with
+  `pacman -Si`, or as a group with `pacman -Sg`, in the package databases as
+  they stand before the upgrade.
+- **The default network, guest shutdown and group membership are optional
+  steps.** Each prints a warning on failure, and the installation continues.
+  `--no-network` skips the network, `--skip-subvolume` the subvolume and
+  without `--group`, no group membership is added.
+
+### Virtual Machine Hosting
+
+| Package | Purpose |
+| --- | --- |
+| `qemu-desktop` | QEMU with KVM, with the display, audio and USB support of a desktop |
+| `libvirt` | The libvirt daemons, `virsh` and the default network |
+| `edk2-ovmf` | UEFI firmware for guests, with Secure Boot |
+| `virt-manager` | The graphical manager |
+| `dnsmasq` | DHCP and DNS on the default network |
+| `swtpm` | The TPM emulator that Windows 11 requires |
+| `e2fsprogs` | `chattr`, for the disk image subvolume |
+
+- **Disk images get a Btrfs subvolume of their own.** Snapper snapshots `/`
+  before and after every pacman transaction, and images on `/` would keep
+  every snapshot holding old copies of disks many gigabytes in size. The
+  subvolume `@libvirt-images` is created at the top level of the filesystem,
+  next to the others, and snapshots of `/` do not include it.
+  Copy-on-write is disabled on it with `chattr +C`, which new images inherit:
+  copy-on-write fragments files that change in place, as disk images do. Such
+  files lose Btrfs checksums and compression, the trade-off the ArchWiki
+  recommends for virtual machine images.
+- **The subvolume is mounted through `/etc/fstab`**, like the subvolumes of
+  `base-install.sh`. The entry names the root filesystem by UUID and repeats
+  the mount options of `/` with the subvolume replaced: Btrfs takes most
+  options from the first mount of the filesystem, and `noatime` applies to each
+  mount point. The entry is checked on its own with `findmnt --verify` before
+  it is appended, as an entry that fails to mount at boot leaves the system in
+  emergency mode, and a rerun finds it and adds no second one. On a root
+  filesystem other than Btrfs, on a directory that already holds files and on
+  a directory that another filesystem is mounted on, or listed for in
+  `/etc/fstab`, `/var/lib/libvirt/images` is left as it is.
+- **libvirt runs as modular daemons**, one per driver, which libvirt
+  recommends over the monolithic `libvirtd`: `virtqemud`, `virtnetworkd`,
+  `virtstoraged`, `virtnodedevd` and `virtsecretd`. Each is socket-activated
+  and exits when idle; the services are enabled as well, so that the daemons
+  start at boot and start the networks and guests marked for autostart. The
+  installer refuses to run while `libvirtd` is enabled.
+- **The default network** is libvirt's NAT network on `virbr0`, with dnsmasq
+  for DHCP and DNS. It is marked for autostart and started. libvirt manages
+  its NAT rules in its own nftables table.
+- **Running guests are shut down with the host.** `libvirt-guests.service`
+  shuts them down cleanly, with the settings in
+  [`etc/conf.d/libvirt-guests`](./etc/conf.d/libvirt-guests): no guest is
+  started at boot beyond those marked for autostart, and each guest has the
+  seconds of `--shutdown-timeout`, 120 by default, to shut down. The package
+  default would suspend guests, which writes their memory to disk. The service
+  has no stop timeout of its own, so the shortened default stop timeout of the
+  system does not end the guests early.
+- **Managing virtual machines requires authentication by default.** The
+  libvirt package's Polkit rule lets members of the `libvirt` group manage the
+  system's virtual machines without a password. Without `--group`, the
+  installer adds no user to the group, so virt-manager and `virsh` ask for
+  administrator authentication; [SECURITY.md](./SECURITY.md) explains why.
+  `--group` adds the installing user with `usermod -aG`, which takes effect at
+  the next login.
+
+### Virtualization Files
+
+| Destination | Source | Purpose |
+| --- | --- | --- |
+| `/etc/conf.d/libvirt-guests` | [`etc/conf.d/libvirt-guests`](./etc/conf.d/libvirt-guests) | Clean shutdown of running guests with the host |
+| `/etc/fstab` | Entry appended by `create_images_subvolume` | Mounts `@libvirt-images` at `/var/lib/libvirt/images` |
+| Btrfs subvolume | `btrfs subvolume create` | `@libvirt-images`, without copy-on-write |
+| libvirt daemons | `systemctl enable` and `systemctl start` | The five modular daemons and their sockets |
+| Default network | `virsh net-autostart` and `virsh net-start` | NAT on `virbr0`, started at every boot |
+| Guest shutdown | `systemctl enable --now libvirt-guests.service` | Shuts down running guests before the host |
+| Group membership | `usermod -aG libvirt`, with `--group` | Manages virtual machines without a password |
+
 ## Logging
 
-Both installers record all terminal output in
+The installers record all terminal output in
 `logs/<script-name>-<timestamp>.log` in the repository they run from.
 
 - **The complete terminal session is recorded.** Each installer re-runs

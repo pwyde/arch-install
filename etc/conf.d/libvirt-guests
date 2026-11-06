@@ -1,0 +1,14 @@
+# Read by libvirt-guests.service, which acts on the system's virtual machines
+# when the host boots and shuts down. Settings not given here keep the defaults
+# of /usr/lib/libvirt/libvirt-guests.sh.
+
+# Starts no guest at boot beyond those marked for autostart, which libvirt
+# starts itself, instead of every guest that was running at the last shutdown.
+ON_BOOT=ignore
+
+# Shuts guests down cleanly instead of suspending them, which would write the
+# memory of each guest to disk. A guest still running after SHUTDOWN_TIMEOUT
+# seconds is left to the shutdown of the host, which ends it. virt-install.sh
+# fills in the timeout from its --shutdown-timeout option.
+ON_SHUTDOWN=shutdown
+SHUTDOWN_TIMEOUT=@SHUTDOWN_TIMEOUT@

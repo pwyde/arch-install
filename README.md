@@ -13,7 +13,9 @@ an empty disk to a complete desktop in two scripts. `base-install.sh` builds an
 encrypted, snapshot-protected system that can boot a recent snapshot from the
 boot menu. `desktop-install.sh` adds a Wayland desktop built on
 [niri](https://niri-wm.github.io/niri/) and [Noctalia](https://noctalia.dev/),
-with the applications, themes and configuration already in place.
+with the applications, themes and configuration already in place. A third,
+optional script, `virt-install.sh`, adds QEMU/KVM virtual machines with libvirt
+and virt-manager.
 
 The choices are made in advance and applied the same way on every run, which
 results in a secure, consistent and reproducible system without hours of
@@ -249,9 +251,116 @@ Example:
   the desktop starts.
 - **`--yes`** also skips paru's review of the AUR build files.
 
+## Virtualization Installation
+
+`virt-install.sh` adds **QEMU/KVM** virtualization to an installed system,
+managed by **libvirt** and **virt-manager**. It runs independently of the
+other installers and can be used with or without the desktop.
+
+The installer validates its options, checks for a conflicting libvirt daemon
+and decides where the disk images go before any package is installed. Every
+change is system-wide: the packages, a Btrfs subvolume for disk images, the
+libvirt daemons, the default network, the shutdown of running guests and, with
+`--group`, the user's group membership. The installer can be run again; each
+step is repeated without harm.
+
+### Features
+
+- QEMU with KVM, UEFI firmware with Secure Boot and a TPM emulator, enough for
+  Windows 11 guests.
+- libvirt's modular daemons, started on demand through their sockets.
+- A Btrfs subvolume for disk images, outside the snapshots of `/` and without
+  copy-on-write.
+- The default NAT network, with DHCP and DNS for guests, started at every
+  boot.
+- Running guests shut down cleanly before the host does.
+- Administrator authentication through Polkit for managing virtual machines,
+  or membership in the `libvirt` group, given as an option.
+- Additional packages, the default network, the subvolume and the shutdown
+  timeout, given as options.
+- A complete log of the installation.
+
+### Requirements
+
+- An Arch Linux system with a regular user account that has `sudo`
+  privileges.
+- A processor with AMD-V or Intel VT-x enabled in the firmware setup. Without
+  it, the installer continues, and virtual machines run without hardware
+  acceleration.
+- libvirt's monolithic `libvirtd` not enabled. The installer checks this before
+  it installs anything.
+- A network connection.
+- A full checkout of the repository.
+
+### Instructions
+
+Run the installer as the regular user from the repository:
+
+```bash
+cd ~/arch-install
+./virt-install.sh
+```
+
+The installer asks for confirmation and upgrades the system before it
+installs anything. `sudo` asks for the password when it is needed. virt-manager
+asks for the administrator password when it connects to the system's virtual
+machines.
+
+> [!NOTE]
+> On a firewall that drops incoming traffic, guests need DHCP and DNS on the
+> `virbr*` bridges. The ruleset of `base-install.sh` accepts them; for another
+> nftables ruleset, the installer prints a warning.
+
+### Usage
+
+```text
+./virt-install.sh --help
+
+Usage: virt-install.sh [options]
+
+Options:
+  -g, --group                Add the user to the libvirt group, which manages
+                             virtual machines without a password prompt
+                             (default: the administrator password, through
+                             Polkit)
+  -n, --no-network           Do not start libvirt's default NAT network, now or
+                             at boot
+  -p, --packages PACKAGES    Additional packages from the official
+                             repositories (no AUR), space-separated
+                             (appended to defaults)
+  -s, --skip-subvolume       Keep disk images on the root filesystem, without
+                             a Btrfs subvolume of their own
+  -t, --shutdown-timeout SECONDS
+                             Seconds each running guest has to shut down
+                             with the host, 1 to 3600
+                             (default: 120)
+  -y, --yes                  Non-interactive mode, no confirmation prompts
+  -h, --help                 Show this help message
+```
+
+Example:
+
+```bash
+./virt-install.sh --shutdown-timeout 300 --packages "guestfs-tools"
+```
+
+- **`--group`** adds the user to the `libvirt` group, whose members manage the
+  system's virtual machines without a password. That amounts to root access;
+  [SECURITY.md](./SECURITY.md) explains why. It takes effect at the next
+  login.
+- **`--no-network`** leaves libvirt's default network stopped, for guests
+  that use a bridge to the local network or no network at all. The network
+  stays defined and can be started later with `sudo virsh net-start default`.
+- **`--packages`** accepts packages and groups from the official
+  repositories only, as the installer uses pacman.
+- **`--skip-subvolume`** keeps the disk images in `/var/lib/libvirt/images` on
+  the root filesystem, where snapshots of `/` include them.
+- **`--shutdown-timeout`** is the time each running guest has to shut down
+  with the host. A guest still running afterwards is ended.
+
 ## Logging
 
-Both installers record all terminal output in
+The installers record all terminal output in
 `logs/<script-name>-<timestamp>.log` in the repository they run from.
 Passwords are never recorded. A repeated run in the same checkout appends to
 the existing log.
@@ -259,14 +368,16 @@ the existing log.
 After a successful installation, `base-install.sh` copies the repository and
 its log to the new user's home directory, under the name of the checkout
 directory (`~/arch-install` for a default clone). `desktop-install.sh` runs
-from that copy and adds its own log next to the first.
+from that copy and adds its own log next to the first, as does
+`virt-install.sh`.
 
 ## Documentation
 
-- [ARCHITECTURE.md](./ARCHITECTURE.md) describes both installations in depth:
+- [ARCHITECTURE.md](./ARCHITECTURE.md) describes the installations in depth:
   boot chain, filesystem layout, snapshots, hibernation, initramfs, Plymouth,
-  system tuning and the prebuilt packages for the base system, and the
-  packages, login and session, and user configuration for the desktop.
+  system tuning and the prebuilt packages for the base system, the packages,
+  login and session, and user configuration for the desktop, and the disk
+  image subvolume, daemons and network for virtualization.
 - [SECURITY.md](./SECURITY.md) describes the threat model, and why TPM2
   unlocking and UEFI Secure Boot are not used.
 
@@ -304,3 +415,11 @@ from that copy and adds its own log next to the first.
 - [ArchWiki - XDG MIME Applications](https://wiki.archlinux.org/title/XDG_MIME_Applications)
 - [ArchWiki - Font configuration](https://wiki.archlinux.org/title/Font_configuration)
 - [LazyVim - Documentation](https://www.lazyvim.org/)
+
+### Virtualization Installation
+
+- [ArchWiki - libvirt](https://wiki.archlinux.org/title/Libvirt)
+- [ArchWiki - QEMU](https://wiki.archlinux.org/title/QEMU)
+- [ArchWiki - Btrfs / Disabling CoW](https://wiki.archlinux.org/title/Btrfs#Disabling_CoW)
+- [libvirt - Daemons](https://libvirt.org/daemons.html)
+- [libvirt - libvirt-guests](https://libvirt.org/manpages/libvirt-guests.html)
