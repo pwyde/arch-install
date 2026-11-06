@@ -79,6 +79,18 @@ binds {
     XF86AudioPrev  allow-when-locked=true { spawn-sh "noctalia msg media previous"; }
     XF86AudioNext  allow-when-locked=true { spawn-sh "noctalia msg media next"; }
 
+    // The same functions on F7 to F12 for keyboards without media keys, in the
+    // order that many keyboards print on these keys for their Fn layer. Only
+    // the volume steps repeat while held; a held key does not skip several
+    // tracks or toggle back and forth.
+    Mod+F7        repeat=false allow-when-locked=true { spawn-sh "noctalia msg media previous"; }
+    Mod+F8        repeat=false allow-when-locked=true { spawn-sh "noctalia msg media toggle"; }
+    Mod+F9        repeat=false allow-when-locked=true { spawn-sh "noctalia msg media next"; }
+    Mod+F10       repeat=false allow-when-locked=true { spawn-sh "noctalia msg volume-mute"; }
+    Mod+Shift+F10 repeat=false allow-when-locked=true { spawn-sh "noctalia msg mic-mute"; }
+    Mod+F11                    allow-when-locked=true { spawn-sh "noctalia msg volume-down"; }
+    Mod+F12                    allow-when-locked=true { spawn-sh "noctalia msg volume-up"; }
+
     XF86MonBrightnessUp   allow-when-locked=true { spawn-sh "noctalia msg brightness-up"; }
     XF86MonBrightnessDown allow-when-locked=true { spawn-sh "noctalia msg brightness-down"; }
 
