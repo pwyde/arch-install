@@ -25,8 +25,12 @@ if status is-interactive
             return
         end
 
+        # fish lists the entries in natural, case-insensitive order. The token
+        # is the query, so every entry of a directory such as "Documents/"
+        # matches equally; --tiebreak=index keeps such entries in that order
+        # instead of putting the shortest names first.
         set -l picks (complete -C -- "$(commandline -cp)" | string split -f1 \t |
-            fzf --select-1 --exit-0 --height=50% --query=$token $fzf_opts)
+            fzf --select-1 --exit-0 --height=50% --tiebreak=index --query=$token $fzf_opts)
         commandline -f repaint
         set -q picks[1] || return
 
