@@ -66,12 +66,13 @@ apply a baseline that limits what is exposed while the volume is unlocked:
 - **Network stack hardening.** Strict reverse path filtering, no ICMP redirects
   and no replies to broadcast pings.
 - **Firewall.** nftables drops incoming connections by default. Replies to
-  outgoing connections, loopback, ICMP and DHCPv6 replies pass. SSH and, with
-  the desktop, KDE Connect accept connections only from local network
-  addresses: the private IPv4 ranges and IPv6 unique local and link-local
-  addresses. Public Wi-Fi networks hand out such addresses as well, so other
-  devices on such a network can still reach both services. Outgoing and
-  forwarded traffic is not filtered.
+  outgoing connections, loopback, ICMP and DHCPv6 replies pass, as do DHCP
+  and DNS requests from virtual machines on libvirt's `virbr*` bridges. SSH
+  and, with the desktop, KDE Connect accept connections only from local
+  network addresses: the private IPv4 ranges and IPv6 unique local and
+  link-local addresses. Public Wi-Fi networks hand out such addresses as well,
+  so other devices on such a network can still reach both services. Outgoing
+  and forwarded traffic is not filtered.
 - **Automatic screen lock.** The desktop locks the screen after 15 minutes of
   inactivity.
 
