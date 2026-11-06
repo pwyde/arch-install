@@ -6,8 +6,8 @@
 # repository.
 #
 # Features:
-# - niri with PipeWire audio, Bluetooth, XDG desktop portals and Xwayland
-#   support
+# - niri with PipeWire audio, Bluetooth, power profiles, XDG desktop portals
+#   and Xwayland support
 # - Noctalia shell and greeter, with themes, fonts and a cursor theme
 # - KDE applications, browsers, office, graphics and development tools
 # - kitty, fish, Neovim and command-line tools
@@ -41,6 +41,7 @@ readonly DEFAULT_COMPOSITOR_PACKAGES=(
   playerctl
   brightnessctl
   bluez
+  power-profiles-daemon
 )
 # The desktop shell and its greeter.
 readonly DEFAULT_NOCTALIA_PACKAGES=(
@@ -746,6 +747,7 @@ confirm_operation() {
     echo "  - The greetd login manager with the Noctalia greeter, from the" \
       "next boot"
     echo "  - The Bluetooth service, started now and at every boot"
+    echo "  - The power profiles service, started now and at every boot"
     echo "  - Appearance sync to the greeter without a password prompt"
     echo "  - Fish as the login shell"
     echo "  - Wallpapers and configuration files copied to the home directory"
@@ -946,6 +948,16 @@ enable_bluetooth() {
   if ! sudo systemctl enable --now bluetooth.service; then
     print_warning "The Bluetooth service could not be enabled; Noctalia" \
       "shows no Bluetooth controls."
+  fi
+}
+
+# Like BlueZ, power-profiles-daemon is found only when Noctalia starts. Not
+# fatal: without it, Noctalia offers no power profiles.
+enable_power_profiles() {
+  print_msg "Enabling the power profiles service"
+  if ! sudo systemctl enable --now power-profiles-daemon.service; then
+    print_warning "The power profiles service could not be enabled;" \
+      "Noctalia offers no power profiles."
   fi
 }
 
@@ -1289,6 +1301,7 @@ main() {
   install_greeter_config
   configure_greetd
   enable_bluetooth
+  enable_power_profiles
   configure_fonts
   enable_passwordless_sync
   set_login_shell

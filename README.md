@@ -141,15 +141,15 @@ without Plasma.
 The installer validates its options, the connected displays and the repository
 files before any package is installed. Configuration is written to the user's
 home directory and follows the XDG base directories. System-wide changes are
-limited to the login manager, the session entry, the Bluetooth service, the
-font defaults, the login shell and the rule that syncs the appearance to the
-greeter. The installer can be run again to restore the configuration from the
-repository.
+limited to the login manager, the session entry, the Bluetooth and power
+profiles services, the font defaults, the login shell and the rule that syncs
+the appearance to the greeter. The installer can be run again to restore the
+configuration from the repository.
 
 ### Features
 
-- niri with PipeWire audio, Bluetooth, XDG desktop portals and Xwayland
-  support.
+- niri with PipeWire audio, Bluetooth, power profiles, XDG desktop portals
+  and Xwayland support.
 - The Noctalia shell and greeter, with the desktop appearance synced to the
   login screen.
 - KDE applications, web browsers, LibreOffice, GIMP, Inkscape and VSCodium.
