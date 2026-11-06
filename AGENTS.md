@@ -165,7 +165,8 @@ run under "VM test needed" in the completion report.
   files, and add it to ARCHITECTURE.md.
 - **Step added, removed or reordered:** update the sequence table in
   ARCHITECTURE.md.
-- **Encryption, SSH, sudo, Polkit, PAM or sysctl:** update SECURITY.md.
+- **Encryption, SSH, sudo, Polkit, PAM, sysctl or the firewall:** update
+  SECURITY.md.
 
 ## Completion Report
 

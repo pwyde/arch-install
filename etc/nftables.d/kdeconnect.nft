@@ -1,0 +1,5 @@
+# KDE Connect, included in the local_input chain of /etc/nftables.conf, which
+# only local network addresses reach. Devices find each other by UDP broadcasts
+# to port 1716 and connect over TCP, both within ports 1714 to 1764.
+tcp dport 1714-1764 accept
+udp dport 1714-1764 accept

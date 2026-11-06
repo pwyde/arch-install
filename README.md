@@ -51,8 +51,8 @@ installation fails.
 - Hibernation to a Btrfs swapfile the size of RAM where supported, alongside
   zram swap.
 - A Plymouth boot splash that also takes the LUKS passphrase.
-- System tuning and hardening: sysctl, sshd, journald, core dumps, shutdown
-  timeouts and periodic TRIM.
+- System tuning and hardening: an nftables firewall, sysctl, sshd, journald,
+  core dumps, shutdown timeouts and periodic TRIM.
 - pacman maintenance: the package cache is pruned and the mirror list is
   refreshed with the fastest mirrors in the time zone's country every week, and
   orphaned packages are listed after every transaction.
@@ -145,9 +145,9 @@ The installer validates its options, the connected displays and the repository
 files before any package is installed. Configuration is written to the user's
 home directory and follows the XDG base directories. System-wide changes are
 limited to the login manager, the session entry, the Bluetooth and power
-profiles services, the font defaults, the login shell and the rule that syncs
-the appearance to the greeter. The installer can be run again to restore the
-configuration from the repository.
+profiles services, KDE Connect's firewall ports, the font defaults, the login
+shell and the rule that syncs the appearance to the greeter. The installer can
+be run again to restore the configuration from the repository.
 
 ### Features
 

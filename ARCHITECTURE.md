@@ -95,7 +95,7 @@ installation.
 | [`defaults/`](./defaults/) | Files installed elsewhere: the Limine configuration, the Plymouth theme, the Snapper configuration, the system-sleep hook and the user's bashrc. The greeter configuration and the niri session entry are installed by `desktop-install.sh` |
 | [`desktop-install.sh`](./desktop-install.sh) | The desktop installer, run on the installed system |
 | [`dots/`](./dots/) | Desktop configuration under `.config/` and `.local/`, copied to the user's home directory by `desktop-install.sh` |
-| [`etc/`](./etc/) | Configuration files, installed to the same path under `/etc`. `vim/xdg.vim` is appended to `/etc/vimrc`. The `greetd`, `pam.d/greetd` and `fonts/` files are installed by `desktop-install.sh` |
+| [`etc/`](./etc/) | Configuration files, installed to the same path under `/etc`. `vim/xdg.vim` is appended to `/etc/vimrc`. The `greetd`, `pam.d/greetd`, `fonts/` and `nftables.d/` files are installed by `desktop-install.sh` |
 | `logs/` | Installation logs, created at run time and excluded from version control |
 | [`packages/`](./packages/) | Prebuilt AUR packages; see [Prebuilt Packages](#prebuilt-packages) |
 
@@ -472,6 +472,7 @@ Further systemd and service configuration:
 | Area | Configuration |
 | --- | --- |
 | Core dumps | [`etc/systemd/coredump.conf.d/`](./etc/systemd/coredump.conf.d/) disables them with `Storage=none` and `ProcessSizeMax=0`, as a dump holds the memory of the crashed process, including keys and passphrases. |
+| Firewall | [`etc/nftables.conf`](./etc/nftables.conf) replaces the package's file. Incoming traffic is dropped except replies, loopback, ICMP and DHCPv6 replies; SSH is accepted from local network addresses only, the private IPv4 ranges and IPv6 unique local and link-local addresses. Files in `/etc/nftables.d/` add rules to the chain for local networks. The file replaces only its own table, `inet firewall`, which leaves the tables of libvirt, Docker and Podman in place, and filters neither outgoing nor forwarded traffic. A virtual machine host that serves DHCP or DNS to its guests needs a rule of its own for that. `verify_installation` checks the ruleset with `nft -c`. |
 | Index rebuilds | Drop-ins in [`man-db.timer.d/`](./etc/systemd/system/man-db.timer.d/) and [`plocate-updatedb.timer.d/`](./etc/systemd/system/plocate-updatedb.timer.d/) move both timers from midnight to late morning, without the catch-up run after a missed slot. The packages enable the timers themselves. |
 | IPv6 | Enabled, with rotating privacy addresses from [`10-ipv6-privacy.conf`](./etc/NetworkManager/conf.d/10-ipv6-privacy.conf). |
 | Journal | [`etc/systemd/journald.conf.d/`](./etc/systemd/journald.conf.d/) caps the journal at 500M instead of 10% of the filesystem, which holds about a month of logs. |
@@ -484,8 +485,8 @@ Further systemd and service configuration:
 | Wi-Fi | Power save is disabled by [`20-wifi-powersave.conf`](./etc/NetworkManager/conf.d/20-wifi-powersave.conf); it adds latency on an idle link, and some Intel firmware drops the connection while the radio sleeps. |
 
 Enabled services: `systemd-resolved`, `systemd-timesyncd`, zram swap, `sshd`,
-`NetworkManager`, `fstrim.timer`, `paccache.timer`, `reflector.timer`,
-`snapper-cleanup.timer` and `limine-snapper-sync.service`.
+`NetworkManager`, `nftables`, `fstrim.timer`, `paccache.timer`,
+`reflector.timer`, `snapper-cleanup.timer` and `limine-snapper-sync.service`.
 
 ## User Environment
 
@@ -568,7 +569,7 @@ have no per-user configuration; see [System-Wide Files](#system-wide-files).
 | Validation | `validate_inputs`, `validate_xkb_layout`, `validate_displays`, `validate_address`, `validate_packages` | Checks the account, the required commands, the display manager, the repository files and every option |
 | Confirmation | `confirm_operation` | Lists what will be installed and asks for confirmation |
 | Packages | `update_system`, `install_compositor`, `install_desktop_shell`, `install_cli_tools`, `install_neovim`, `install_extra_packages` | Upgrades the system and installs the packages |
-| System | `install_greeter_config`, `configure_greetd`, `enable_bluetooth`, `enable_power_profiles`, `configure_fonts`, `enable_passwordless_sync`, `set_login_shell` | Configures the login screen, the session, Bluetooth, power profiles, the fonts and the login shell |
+| System | `install_greeter_config`, `configure_greetd`, `enable_bluetooth`, `enable_power_profiles`, `open_kdeconnect_ports`, `configure_fonts`, `enable_passwordless_sync`, `set_login_shell` | Configures the login screen, the session, Bluetooth, power profiles, the firewall, the fonts and the login shell |
 | User | `create_user_dirs`, `copy_wallpapers`, `copy_dotfiles`, `configure_gtk_settings`, `install_neovim_plugins`, `configure_vscodium` | Deploys the configuration to the home directory and applies it |
 | Options | `configure_keyboard_layout`, `configure_swedish_binds`, `configure_displays`, `configure_location`, `configure_lockscreen` | Applies the keyboard, display and location options |
 | Summary | `print_summary` | Prints the installation summary |
@@ -588,9 +589,9 @@ have no per-user configuration; see [System-Wide Files](#system-wide-files).
   blocks generated from the options are written to a file that the copy
   restores first.
 - **Optional steps are not fatal.** The Bluetooth and power profiles
-  services, the Polkit rule, the GTK settings, the Neovim plugins and the
-  VSCodium extensions print a warning on failure, and the installation
-  continues.
+  services, the firewall reload, the Polkit rule, the GTK settings, the Neovim
+  plugins and the VSCodium extensions print a warning on failure, and the
+  installation continues.
 
 ### Packages
 
@@ -678,6 +679,7 @@ does not support.
 | `/etc/chromium/policies/managed/noctalia-color.json` | Noctalia's `chromium-based` template, through `pkexec` on its first application | Chromium's theme color; owned by the user, as described in [SECURITY.md](./SECURITY.md) |
 | `/etc/fonts/conf.d/50-generic-families.conf` | [`etc/fonts/conf.d/50-generic-families.conf`](./etc/fonts/conf.d/50-generic-families.conf) | The fonts for sans-serif, serif, monospace and `system-ui`, which web pages mostly rely on |
 | `/etc/greetd/config.toml` | [`etc/greetd/config.toml`](./etc/greetd/config.toml) | Starts the greeter on the first virtual terminal |
+| `/etc/nftables.d/kdeconnect.nft` | [`etc/nftables.d/kdeconnect.nft`](./etc/nftables.d/kdeconnect.nft) | KDE Connect's ports 1714 to 1764, open to local networks; takes effect where `/etc/nftables.conf` includes the directory, as the one from `base-install.sh` does |
 | `/etc/pam.d/greetd` | [`etc/pam.d/greetd`](./etc/pam.d/greetd) | Unlocks KWallet at login |
 | `/usr/local/share/wayland-sessions/niri.desktop` | [`defaults/wayland-sessions/niri.desktop`](./defaults/wayland-sessions/niri.desktop) | The niri session, logging to the journal |
 | `/var/lib/noctalia-greeter/greeter.toml` | [`defaults/noctalia-greeter/greeter.toml`](./defaults/noctalia-greeter/greeter.toml) | Keyboard layout and display of the login screen |

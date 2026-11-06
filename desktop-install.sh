@@ -167,6 +167,7 @@ readonly GREETD_CONF_SRC="${SCRIPT_DIR}/etc/greetd/config.toml"
 readonly GREETD_PAM_SRC="${SCRIPT_DIR}/etc/pam.d/greetd"
 readonly FONTCONFIG_SRC="${SCRIPT_DIR}/etc/fonts/conf.d/50-generic-families.conf"
 readonly NIRI_SESSION_SRC="${SCRIPT_DIR}/defaults/wayland-sessions/niri.desktop"
+readonly KDECONNECT_FIREWALL_SRC="${SCRIPT_DIR}/etc/nftables.d/kdeconnect.nft"
 
 # Destinations
 readonly WALLPAPERS_DEST="${HOME}/Pictures/Wallpapers"
@@ -474,6 +475,7 @@ validate_repository() {
     "${GREETD_PAM_SRC}"
     "${FONTCONFIG_SRC}"
     "${NIRI_SESSION_SRC}"
+    "${KDECONNECT_FIREWALL_SRC}"
   )
 
   for src in "${WALLPAPERS_SRC}" "${DOTFILES_SRC}"; do
@@ -748,6 +750,7 @@ confirm_operation() {
       "next boot"
     echo "  - The Bluetooth service, started now and at every boot"
     echo "  - The power profiles service, started now and at every boot"
+    echo "  - KDE Connect's ports in the firewall, for local networks only"
     echo "  - Appearance sync to the greeter without a password prompt"
     echo "  - Fish as the login shell"
     echo "  - Wallpapers and configuration files copied to the home directory"
@@ -958,6 +961,22 @@ enable_power_profiles() {
   if ! sudo systemctl enable --now power-profiles-daemon.service; then
     print_warning "The power profiles service could not be enabled;" \
       "Noctalia offers no power profiles."
+  fi
+}
+
+# The rules take effect where /etc/nftables.conf includes /etc/nftables.d/ in
+# a chain for local networks, as the one from base-install.sh does; elsewhere
+# the file is inert. nftables.service loads the ruleset once and exits, so
+# starting it again reloads the rules. Not fatal: without them, KDE Connect
+# finds no devices, and the rest of the desktop works.
+open_kdeconnect_ports() {
+  print_msg "Opening KDE Connect's ports for local networks"
+  sudo install -D -m 0644 "${KDECONNECT_FIREWALL_SRC}" \
+    /etc/nftables.d/kdeconnect.nft
+  if systemctl is-enabled --quiet nftables.service \
+    && ! sudo systemctl start nftables.service; then
+    print_warning "The firewall could not be reloaded; KDE Connect's ports" \
+      "open at the next boot."
   fi
 }
 
@@ -1302,6 +1321,7 @@ main() {
   configure_greetd
   enable_bluetooth
   enable_power_profiles
+  open_kdeconnect_ports
   configure_fonts
   enable_passwordless_sync
   set_login_shell

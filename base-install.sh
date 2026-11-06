@@ -59,6 +59,7 @@ readonly DEFAULT_PACKAGES=(
   mkinitcpio
   nano
   networkmanager
+  nftables
   openssh
   pacman-contrib
   plocate
@@ -141,6 +142,7 @@ readonly SYSCTL_FILES=(
 readonly MODULES_LOAD_SRC="${SCRIPT_DIR}/etc/modules-load.d/bbr.conf"
 readonly NM_CONF_SRC="${SCRIPT_DIR}/etc/NetworkManager/conf.d"
 readonly NM_CONF_FILES=(10-ipv6-privacy.conf 20-wifi-powersave.conf)
+readonly NFTABLES_CONF_SRC="${SCRIPT_DIR}/etc/nftables.conf"
 readonly COREDUMP_CONF_SRC="${SCRIPT_DIR}/etc/systemd/coredump.conf.d/10-disable-coredumps.conf"
 readonly JOURNALD_CONF_SRC="${SCRIPT_DIR}/etc/systemd/journald.conf.d/10-journal-size.conf"
 readonly SSHD_CONF_SRC="${SCRIPT_DIR}/etc/ssh/sshd_config.d/10-hardening.conf"
@@ -755,6 +757,7 @@ validate_repository() {
     "${COREDUMP_CONF_SRC}"
     "${JOURNALD_CONF_SRC}"
     "${SSHD_CONF_SRC}"
+    "${NFTABLES_CONF_SRC}"
     "${MANDB_TIMER_SRC}"
     "${UPDATEDB_TIMER_SRC}"
     "${UPDATEDB_SERVICE_SRC}"
@@ -1045,6 +1048,7 @@ configure_system() {
   configure_shell_environment
   harden_sshd
   configure_networkmanager
+  configure_firewall
   configure_pacman
   configure_reflector
 
@@ -1194,6 +1198,15 @@ configure_networkmanager() {
     install -D -m 0644 "${NM_CONF_SRC}/${nm_file}" \
       "/mnt/etc/NetworkManager/conf.d/${nm_file}"
   done
+}
+
+# Replaces the package's /etc/nftables.conf, which pacman keeps on upgrades as
+# a backup file. /etc/nftables.d/ holds rules for local networks that other
+# installers add, such as desktop-install.sh for KDE Connect.
+configure_firewall() {
+  print_msg "Installing the nftables firewall"
+  install -m 0644 "${NFTABLES_CONF_SRC}" /mnt/etc/nftables.conf
+  install -d -m 0755 /mnt/etc/nftables.d
 }
 
 configure_pacman() {
@@ -1672,7 +1685,7 @@ enable_services() {
   print_msg "Enabling services"
   arch-chroot /mnt /bin/bash -e <<'EOF'
 systemctl enable systemd-resolved systemd-timesyncd \
-  systemd-zram-setup@zram0.service sshd NetworkManager
+  systemd-zram-setup@zram0.service sshd NetworkManager nftables
 systemctl mask systemd-networkd
 
 # Periodic TRIM. The filesystems are mounted 'nodiscard': freed blocks are
@@ -1809,6 +1822,14 @@ verify_installation() {
     /mnt/etc/mkinitcpio.conf.d/hooks.conf 2>/dev/null; then
     print_warning "plymouth is missing from HOOKS in" \
       "/etc/mkinitcpio.conf.d/hooks.conf; there will be no boot splash."
+  fi
+
+  # nft -c parses the ruleset against the live kernel without loading it. A
+  # ruleset that fails to load leaves the installed system without a firewall.
+  print_msg "Checking the firewall ruleset"
+  if ! arch-chroot /mnt nft -c -f /etc/nftables.conf; then
+    print_warning "/etc/nftables.conf does not load; the system will boot" \
+      "without a firewall."
   fi
 
   print_msg "Checking user setup"

@@ -9,6 +9,6 @@ applies as well.
 - `cmdline.d/` is the source of the kernel command line. `base-install.sh`
   embeds it in the UKI and mirrors it into `/etc/default/limine`; a new file
   is added to `CMDLINE_FILES`.
-- `ssh/`, `sudoers.d/`, `pam.d/`, `sysctl.d/6*-hardening.conf` and
-  `systemd/coredump.conf.d/` are security-relevant: a change there is
-  reflected in SECURITY.md.
+- `ssh/`, `sudoers.d/`, `pam.d/`, `sysctl.d/6*-hardening.conf`,
+  `systemd/coredump.conf.d/`, `nftables.conf` and `nftables.d/` are
+  security-relevant: a change there is reflected in SECURITY.md.

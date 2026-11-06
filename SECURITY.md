@@ -57,13 +57,21 @@ apply a baseline that limits what is exposed while the volume is unlocked:
   username that names an existing system account, such as root, which would
   otherwise receive a password and SSH access. It checks the live system before
   the disk is erased, and the installed system again when it creates the user,
-  which catches accounts added by packages from `--packages`.
+  which catches accounts added by packages from `--packages`. The firewall
+  admits SSH connections from local network addresses only.
 - **No core dumps.** systemd-coredump stores nothing, and setuid programs
   never dump core, so process memory is not written to disk.
 - **Kernel restrictions.** The kernel log and kernel pointers are restricted
   to root, and ptrace is limited to a process's own descendants.
 - **Network stack hardening.** Strict reverse path filtering, no ICMP redirects
   and no replies to broadcast pings.
+- **Firewall.** nftables drops incoming connections by default. Replies to
+  outgoing connections, loopback, ICMP and DHCPv6 replies pass. SSH and, with
+  the desktop, KDE Connect accept connections only from local network
+  addresses: the private IPv4 ranges and IPv6 unique local and link-local
+  addresses. Public Wi-Fi networks hand out such addresses as well, so other
+  devices on such a network can still reach both services. Outgoing and
+  forwarded traffic is not filtered.
 - **Automatic screen lock.** The desktop locks the screen after 15 minutes of
   inactivity.
 
