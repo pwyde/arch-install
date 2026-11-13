@@ -8,9 +8,9 @@ machines and the reasoning behind the design decisions of each.
 
 ## Contents
 
-- [Installation Sequence](#installation-sequence)
 - [Repository Layout](#repository-layout)
-- Base Installation:
+- [Base Installation](#base-installation):
+  - [Base Installation Sequence](#base-installation-sequence)
   - [Filesystem Layout](#filesystem-layout)
   - [Boot Chain](#boot-chain)
   - [Initramfs](#initramfs)
@@ -34,13 +34,35 @@ machines and the reasoning behind the design decisions of each.
   - [Virtualization Files](#virtualization-files)
 - [Logging](#logging)
 
-## Installation Sequence
+## Repository Layout
 
-`base-install.sh` runs as a single sequence of functions, called in order by
-`main`. The sequences of `desktop-install.sh` and `virt-install.sh` are
-described under
-[Desktop Installation Sequence](#desktop-installation-sequence) and
-[Virtualization Installation Sequence](#virtualization-installation-sequence).
+| Path | Contents |
+| --- | --- |
+| [`assets/wallpapers/`](./assets/wallpapers/) | Wallpapers, copied to `~/Pictures/Wallpapers` by `desktop-install.sh` |
+| [`base-install.sh`](./base-install.sh) | The base installer, described in this document |
+| [`defaults/`](./defaults/) | Files installed elsewhere: the Limine configuration, the Plymouth theme, the Snapper configuration, the system-sleep hook and the user's bashrc. The greeter configuration and the niri session entry are installed by `desktop-install.sh` |
+| [`desktop-install.sh`](./desktop-install.sh) | The desktop installer, run on the installed system |
+| [`dots/`](./dots/) | Desktop configuration under `.config/` and `.local/`, copied to the user's home directory by `desktop-install.sh` |
+| [`etc/`](./etc/) | Configuration files, installed to the same path under `/etc`. `vim/xdg.vim` is appended to `/etc/vimrc`. The `greetd`, `pam.d/greetd`, `fonts/` and `nftables.d/` files are installed by `desktop-install.sh`, and `conf.d/libvirt-guests` by `virt-install.sh` |
+| `logs/` | Installation logs, created at run time and excluded from version control |
+| [`packages/`](./packages/) | Prebuilt AUR packages; see [Prebuilt Packages](#prebuilt-packages) |
+| [`virt-install.sh`](./virt-install.sh) | The virtualization installer, run on the installed system |
+
+Files containing `@HOSTNAME@`, `@USERNAME@`, `@LOCALE@` or `@ROOT_UUID@` are
+templates; the installer substitutes the values when it installs them.
+`desktop-install.sh` fills in the placeholders in the greeter and Noctalia
+configuration in the same way.
+
+## Base Installation
+
+`base-install.sh` runs as root from the Arch Linux ISO in UEFI mode, erases the
+target disk and installs Arch Linux on LUKS2 and Btrfs, booted by Limine with
+unified kernel images and protected by Snapper snapshots.
+
+### Base Installation Sequence
+
+The installer runs as a single sequence of functions, called in order by
+`main`.
 
 | Step | Function | Purpose |
 | --- | --- | --- |
@@ -93,26 +115,7 @@ place, as its pacman hook builds them immediately. Snapper and the services
 follow, and the AUR helper comes last; its failure does not fail the
 installation.
 
-## Repository Layout
-
-| Path | Contents |
-| --- | --- |
-| [`assets/wallpapers/`](./assets/wallpapers/) | Wallpapers, copied to `~/Pictures/Wallpapers` by `desktop-install.sh` |
-| [`base-install.sh`](./base-install.sh) | The base installer, described in this document |
-| [`defaults/`](./defaults/) | Files installed elsewhere: the Limine configuration, the Plymouth theme, the Snapper configuration, the system-sleep hook and the user's bashrc. The greeter configuration and the niri session entry are installed by `desktop-install.sh` |
-| [`desktop-install.sh`](./desktop-install.sh) | The desktop installer, run on the installed system |
-| [`dots/`](./dots/) | Desktop configuration under `.config/` and `.local/`, copied to the user's home directory by `desktop-install.sh` |
-| [`etc/`](./etc/) | Configuration files, installed to the same path under `/etc`. `vim/xdg.vim` is appended to `/etc/vimrc`. The `greetd`, `pam.d/greetd`, `fonts/` and `nftables.d/` files are installed by `desktop-install.sh`, and `conf.d/libvirt-guests` by `virt-install.sh` |
-| `logs/` | Installation logs, created at run time and excluded from version control |
-| [`packages/`](./packages/) | Prebuilt AUR packages; see [Prebuilt Packages](#prebuilt-packages) |
-| [`virt-install.sh`](./virt-install.sh) | The virtualization installer, run on the installed system |
-
-Files containing `@HOSTNAME@`, `@USERNAME@`, `@LOCALE@` or `@ROOT_UUID@` are
-templates; the installer substitutes the values when it installs them.
-`desktop-install.sh` fills in the placeholders in the greeter and Noctalia
-configuration in the same way.
-
-## Filesystem Layout
+### Filesystem Layout
 
 The disk receives a new GPT partition table with two partitions:
 
@@ -162,7 +165,7 @@ enough to identify the filesystem in use. The trade-off is described in
 [dm-crypt/Specialties](https://wiki.archlinux.org/title/Dm-crypt/Specialties#Discard/TRIM_support_for_solid_state_drives_(SSD));
 TRIM is enabled here deliberately.
 
-## Boot Chain
+### Boot Chain
 
 [Limine](https://wiki.archlinux.org/title/Limine) is installed from the
 official repositories, with its global settings from
@@ -223,7 +226,7 @@ enabled: nothing installed is signed, and the firmware would reject the
 bootloader. TPM2 unlocking is not used either. Both decisions are explained in
 [SECURITY.md](./SECURITY.md).
 
-### Boot Screen Colors
+#### Boot Screen Colors
 
 The Limine menu and the Plymouth splash use the Arch Linux colors on a black
 background. Arch publishes no formal color scheme; the accent is the blue of
@@ -242,7 +245,7 @@ The remaining palette slots (red, green, yellow, blue, magenta and white)
 keep Nord values. Limine draws the selected menu entry in reverse video, which
 makes the selection bar `#999999` rather than the accent color.
 
-## Initramfs
+### Initramfs
 
 `HOOKS` is set by the drop-in
 [`etc/mkinitcpio.conf.d/hooks.conf`](./etc/mkinitcpio.conf.d/hooks.conf),
@@ -291,7 +294,7 @@ directly with `--kernel` and `--uki`; `/etc/mkinitcpio.d/` is never read. The
 installer removes the preset generated by `pacstrap`, together with the plain
 initramfs images it produced.
 
-## Snapshots
+### Snapshots
 
 Snapper takes a snapshot of the root subvolume around each pacman
 transaction, and `limine-snapper-sync` gives every snapshot its own entry in
@@ -316,7 +319,7 @@ from a live image.
   `MAX_SNAPSHOT_ENTRIES=6` allows for the sixth snapshot that exists briefly
   before Snapper's cleanup removes the oldest.
 
-## Prebuilt Packages
+### Prebuilt Packages
 
 `limine-mkinitcpio-hook` and `limine-snapper-sync` are available only in the
 AUR, and both compile with GraalVM `native-image`, which requires a toolchain
@@ -353,7 +356,7 @@ be installed on the build machine but is missing on a new installation.
 The PKGBUILDs must not be edited and `pkgrel` must not be changed: the
 versions have to match the AUR for an AUR helper to offer later updates.
 
-## Hibernation
+### Hibernation
 
 - **A `/swap` Btrfs subvolume**, nested under `@` and marked `NODATACOW`
   (`chattr +C`). A Btrfs subvolume cannot be snapshotted while it holds an
@@ -392,7 +395,7 @@ The resume offset is fixed at install time. If the swapfile is recreated,
 `/etc/cmdline.d/30-resume.conf` must be regenerated and the UKI rebuilt with
 `limine-mkinitcpio`.
 
-## Plymouth
+### Plymouth
 
 The boot splash consists of:
 
@@ -444,7 +447,7 @@ white), with the trademark symbol removed. It is not recolored to `#999999`:
 the [trademark policy](https://terms.archlinux.org/docs/trademark-policy/)
 asks for the logos to be used in their standard form.
 
-## System Tuning
+### System Tuning
 
 Kernel parameters are set by drop-ins in [`etc/sysctl.d/`](./etc/sysctl.d/).
 Arch's `/usr/lib/sysctl.d/10-arch.conf` already raises the inotify limits and
@@ -496,7 +499,7 @@ Enabled services: `systemd-resolved`, `systemd-timesyncd`, zram swap, `sshd`,
 `NetworkManager`, `nftables`, `fstrim.timer`, `paccache.timer`,
 `reflector.timer`, `snapper-cleanup.timer` and `limine-snapper-sync.service`.
 
-## User Environment
+### User Environment
 
 The user is created in the `wheel` group, with bash as the login shell. Shell
 and editor configuration follows the
@@ -536,7 +539,7 @@ installed with mode 0440:
 Debian-derived systems do, for software that resolves its own name on a
 machine without a permanent IP address.
 
-## AUR Helper
+### AUR Helper
 
 [paru](https://github.com/Morganamilo/paru) is built from the AUR at the end
 of the installation, once the system is otherwise complete.
