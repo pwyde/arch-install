@@ -1,0 +1,12 @@
+# ~/.config/bash/bashrc
+#
+# Loaded by /etc/profile.d/zz-xdg-bash.sh for bash login shells, which also
+# sets the history location. Bash has no XDG Base Directory support of its own,
+# and reads ~/.bashrc otherwise.
+
+# Stops here in non-interactive shells.
+[[ $- != *i* ]] && return
+
+alias ls='ls --color=auto'
+alias grep='grep --color=auto'
+PS1='[\u@\h \W]\$ '

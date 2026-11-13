@@ -1,0 +1,55 @@
+# Rules for markdownlint, read by markdownlint-cli2 and the editor extension.
+# Rules not listed keep markdownlint's defaults.
+
+# 80 columns, as AGENTS.md sets. Tables are exempt. Stern mode reports every
+# long line that could be wrapped, so only a word that stands alone on its
+# line, such as a long URL or path, may run past 80.
+line-length:
+  line_length: 80
+  tables: false
+  stern: true
+
+heading-style:
+  style: atx
+ul-style:
+  style: dash
+ol-prefix:
+  style: ordered
+hr-style:
+  style: "---"
+code-block-style:
+  style: fenced
+code-fence-style:
+  style: backtick
+emphasis-style:
+  style: asterisk
+strong-style:
+  style: asterisk
+table-pipe-style:
+  style: leading_and_trailing
+table-column-style:
+  style: compact
+
+# Headings end without punctuation, including the "?" that the default allows.
+no-trailing-punctuation:
+  punctuation: ".,;:!?"
+
+# Two trailing spaces only where they make a hard line break.
+no-trailing-spaces:
+  strict: true
+
+# README.md repeats Features, Requirements, Instructions and Usage under each
+# installer, and the installer names under References.
+no-duplicate-heading:
+  siblings_only: true
+
+# The centered logo in README.md, and collapsible sections.
+no-inline-html:
+  allowed_elements: [div, img, details, summary]
+
+# CLAUDE.md holds only the import of AGENTS.md.
+first-line-heading:
+  allow_preamble: true
+
+# Consecutive GitHub alerts are separate blockquotes.
+no-blanks-blockquote: false

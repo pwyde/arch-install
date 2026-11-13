@@ -1,0 +1,22 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// 40 — Environment variables
+// ─────────────────────────────────────────────────────────────────────────────
+// Docs: https://niri-wm.github.io/niri/Configuration:-Miscellaneous#environment
+//
+// Set for every process that niri spawns, including spawn-at-startup entries
+// and key binding commands. TTY and SSH sessions do not inherit them, and
+// neither do programs started through systemd or D-Bus. Variables those
+// programs need are set in ~/.config/environment.d/ instead.
+// ─────────────────────────────────────────────────────────────────────────────
+
+environment {
+    // Identifies the running compositor, for xdg-desktop-portal and others.
+    XDG_CURRENT_DESKTOP "niri"
+
+    // Qt applications use Wayland natively, without an XWayland fallback.
+    QT_QPA_PLATFORM "wayland"
+
+    // Electron applications (Chrome, VS Code, Discord) select Wayland
+    // automatically.
+    ELECTRON_OZONE_PLATFORM_HINT "auto"
+}

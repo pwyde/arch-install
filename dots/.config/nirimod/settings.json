@@ -1,0 +1,8 @@
+{
+    "auto_update": true,
+    "config_path": "~/.config/niri/config.d/90-user-extra.kdl",
+    "backup_path": "~/.config/nirimod/backups",
+    "auto_backup": true,
+    "backup_limit": 10,
+    "kofi_v4_dont_show": true
+}

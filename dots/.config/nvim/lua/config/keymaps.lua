@@ -1,0 +1,2 @@
+-- Keymaps are loaded on the VeryLazy event, after LazyVim's defaults:
+-- https://github.com/LazyVim/LazyVim/blob/main/lua/lazyvim/config/keymaps.lua

@@ -1,0 +1,89 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// 30 — Window rules
+// ─────────────────────────────────────────────────────────────────────────────
+// Docs: https://niri-wm.github.io/niri/Configuration:-Window-Rules
+//
+// Rules are evaluated from top to bottom. A window can match several rules,
+// and the properties of all matching rules accumulate. `niri msg windows`
+// shows the app-id and title of running windows.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ── Global defaults ──────────────────────────────────────────────────────────
+// Rounds the corners of every window and clips the content to match. Works
+// best with prefer-no-csd, set in config.kdl.
+window-rule {
+    geometry-corner-radius 16
+    clip-to-geometry true
+}
+
+// Games: no rounding or clipping, keeping fullscreen games eligible for direct
+// scanout. All other applications keep the rounded, clipped corners.
+window-rule {
+    match app-id=r#"^(gamescope|steam_app_[0-9]+|dota2|lutris|net\.lutris\..*|heroic|com\.heroicgameslauncher\.hgl|org\.prismlauncher\.PrismLauncher|minecraft|wine|wine64)$"#
+
+    geometry-corner-radius 0
+    clip-to-geometry false
+}
+
+// Opens the Noctalia settings window as a floating window.
+window-rule {
+    match app-id="dev.noctalia.Noctalia"
+    open-floating true
+    default-column-width { fixed 1080; }
+    default-window-height { fixed 920; }
+}
+
+// Opens the KDE Wallet dialogs as floating windows. niri opens new floating
+// windows at the center of the screen.
+window-rule {
+    match app-id=r#"^org\.kde\.(ksecretd|kwalletd6)$"#
+    open-floating true
+}
+
+// Opens every dialog of the KDE portal as a floating window, whichever
+// application requests it: the application chooser for files without a
+// default application, and the file chooser.
+window-rule {
+    match app-id=r#"^org\.freedesktop\.impl\.portal\.desktop\.kde$"#
+    open-floating true
+}
+
+// Blurs the background of all applications. niri's default xray mode blurs the
+// wallpaper behind a window, not the windows below it, and keeps the blur
+// during open and close animations, which the regular mode does not.
+window-rule {
+    background-effect {
+        blur true
+    }
+}
+
+// ── Per-app fixes ────────────────────────────────────────────────────────────
+// Firefox and Zen: picture-in-picture windows open floating.
+window-rule {
+    match app-id=r#"firefox$"# title="^Picture-in-Picture$"
+    open-floating true
+}
+window-rule {
+    match app-id=r#"zen$"# title="^Picture-in-Picture$"
+    open-floating true
+}
+
+// Steam notifications: floating in the bottom-right corner, without taking
+// focus.
+window-rule {
+    match app-id="steam" title=r#"^notificationtoasts_\d+_desktop$"#
+    open-floating true
+    open-focused false
+    default-floating-position x=10 y=10 relative-to="bottom-right"
+}
+
+// ── Floating applications ────────────────────────────────────────────────────
+// Applications that work better as floating windows.
+// window-rule {
+//     match app-id="pavucontrol"
+//     open-floating true
+// }
+// window-rule {
+//     match app-id="nm-connection-editor"
+//     open-floating true
+// }

@@ -1,0 +1,7 @@
+# selene lint configuration. The vim standard library in vim.yml declares
+# Neovim's global vim table.
+std = "vim"
+
+# lazy.nvim plugin specs combine the repository name with named fields.
+[lints]
+mixed_table = "allow"

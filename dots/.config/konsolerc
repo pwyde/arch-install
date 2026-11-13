@@ -1,0 +1,21 @@
+[Desktop Entry]
+DefaultProfile=Default.profile
+
+[General]
+ConfigVersion=1
+
+[KonsoleWindow]
+ShowWindowTitleOnTitleBar=true
+
+[MainWindow][Toolbar mainToolBar]
+ToolButtonStyle=IconOnly
+
+[MainWindow][Toolbar sessionToolbar]
+ToolButtonStyle=IconOnly
+
+[TabBar]
+ExpandTabWidth=true
+NewTabBehavior=PutNewTabAfterCurrentTab
+
+[UiSettings]
+ColorScheme=

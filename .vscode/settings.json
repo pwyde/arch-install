@@ -1,0 +1,26 @@
+{
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "[fish][kdl]": {
+    "editor.tabSize": 4
+  },
+
+  "editor.guides.bracketPairs": true,
+  "editor.guides.bracketPairsHorizontal": true,
+  "editor.guides.highlightActiveBracketPair": true,
+
+  "editor.hover.delay": 1500,
+  "editor.rulers": [80],
+  "editor.semanticHighlighting.enabled": true,
+  "editor.stickyScroll.enabled": false,
+  "explorer.autoReveal": false,
+
+  "files.autoSave": "afterDelay",
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "[markdown]": {
+    "files.trimTrailingWhitespace": false
+  },
+
+  "terminal.integrated.minimumContrastRatio": 1
+}

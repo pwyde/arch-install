@@ -1,0 +1,100 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// 10 — Input devices, gestures & cursor
+// ─────────────────────────────────────────────────────────────────────────────
+// Docs: https://niri-wm.github.io/niri/Configuration:-Input
+//
+// Omitted settings keep the libinput or niri default. All values take effect
+// immediately, without a restart.
+// ─────────────────────────────────────────────────────────────────────────────
+
+input {
+    keyboard {
+        xkb {
+            // When this section is empty, niri reads the xkb settings from
+            // org.freedesktop.locale1, which `localectl` controls.
+            layout "us"
+        }
+
+        // Uncomment to enable Num Lock at login.
+        // numlock
+
+        // Delay before a held key repeats (ms), and the repeat rate (chars/s).
+        repeat-delay 250
+        repeat-rate 50
+    }
+
+    touchpad {
+        // Tap to click. Remove "tap" to require a physical click.
+        tap
+        tap-button-map "left-right-middle"
+
+        // Uncomment for natural, macOS-style scrolling.
+        // natural-scroll
+
+        // Disables the touchpad while typing (dwt), or while the trackpoint is
+        // in use (dwtp).
+        // dwt
+        // dwtp
+
+        // Disables the touchpad entirely while an external mouse is connected.
+        // disabled-on-external-mouse
+    }
+
+    mouse {
+        // "flat" applies no acceleration; "adaptive" applies a curve.
+        accel-profile "flat"
+
+        // Pointer speed: -1.0 (slowest), 0.0 (default), 1.0 (fastest).
+        // accel-speed 0.0
+    }
+
+    // Trackpoint, such as the pointing stick on ThinkPad keyboards.
+    // trackpoint {
+    //     accel-profile "flat"
+    //     accel-speed 0.0
+    // }
+
+    // Mod is Super on bare metal and Alt inside a nested niri window.
+    mod-key "Super"
+    mod-key-nested "Alt"
+
+    // Moves the cursor to the center of a newly focused window.
+    // warp-mouse-to-focus
+
+    // Focuses windows automatically when the pointer enters them.
+    // max-scroll-amount="0%" restricts this to windows already fully visible.
+    // focus-follows-mouse max-scroll-amount="0%"
+}
+
+// ── Gestures ─────────────────────────────────────────────────────────────────
+// Hot corners: moving the cursor into the top-left corner opens the overview.
+gestures {
+    hot-corners {
+        // off
+    }
+}
+
+// ── Cursor theme ─────────────────────────────────────────────────────────────
+cursor {
+    xcursor-theme "XCursor-Pro-Dark"
+    xcursor-size 24
+    hide-when-typing
+}
+
+// ── Output / monitor configuration ───────────────────────────────────────────
+// `niri msg outputs` lists the connected monitors and their available modes.
+// Uncomment and adjust the blocks below to configure specific monitors.
+//
+// output "eDP-1" {
+//     // off                           // Disable this output
+//     mode "1920x1080@60.000"          // WxH or WxH@Hz
+//     scale 1                          // Integer or fractional (1.5 = 150%)
+//     transform "normal"               // normal|90|180|270|flipped|flipped-90…
+//     position x=0 y=0                 // Global coordinate space
+// }
+//
+// output "HDMI-A-1" {
+//     mode "2560x1440@144.000"
+//     scale 1
+//     position x=1920 y=0             // Place right of eDP-1
+// }

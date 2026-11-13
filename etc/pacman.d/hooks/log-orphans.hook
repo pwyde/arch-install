@@ -1,0 +1,16 @@
+# Lists orphaned packages after every transaction: dependencies that no
+# installed package requires or optionally requires any more. pacman -Qtdq
+# exits with 1 when there are none, which prints nothing; the hook itself
+# always succeeds, so that pacman reports no failed hook.
+
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Type = Package
+Target = *
+
+[Action]
+Description = Listing orphaned packages...
+When = PostTransaction
+Exec = /bin/sh -c 'orphans=$(pacman -Qtdq) && printf "Orphaned packages, no longer required by any package:\n%s\nRemove them with: pacman -Qtdq | sudo pacman -Rns -\n" "${orphans}"; exit 0'

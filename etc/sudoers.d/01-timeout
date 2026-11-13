@@ -1,0 +1,5 @@
+# No timeout on the password prompt.
+Defaults passwd_timeout=0
+
+# Cached sudo credentials stay valid for 60 minutes.
+Defaults timestamp_timeout=60

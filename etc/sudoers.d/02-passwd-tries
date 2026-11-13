@@ -1,0 +1,2 @@
+# Incorrect password attempts allowed before sudo gives up.
+Defaults passwd_tries=10

@@ -1,0 +1,7 @@
+# Install logs, written next to the installer and copied with it to the new
+# user's home. They record the whole install and do not belong in the
+# repository.
+logs/
+
+# Claude Code settings for one machine only, such as the enabled plugins.
+.claude/settings.local.json

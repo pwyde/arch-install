@@ -1,0 +1,36 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// 90 — Personal overrides
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Local additions and overrides: extra key bindings, per-application window
+// rules, output configuration, named workspaces and similar settings.
+//
+// This file is included last, after all other config.d files. The properties
+// of all matching window rules accumulate; for single values such as gaps, the
+// last definition takes effect.
+//
+// Examples:
+//
+//   // Named workspaces, which always exist
+//   workspace "browser"
+//   workspace "code"
+//   workspace "music"
+//
+//   // Per-application workspace assignment
+//   window-rule {
+//       match app-id="firefox"
+//       open-on-workspace "browser"
+//   }
+//
+//   // Additional key binding
+//   binds {
+//       Mod+P { spawn "rofi" "-show" "drun"; }
+//   }
+//
+//   // Output configuration for a specific monitor
+//   output "DP-1" {
+//       mode "3440x1440@100.000"
+//       scale 1
+//       position x=0 y=0
+//   }
+// ─────────────────────────────────────────────────────────────────────────────

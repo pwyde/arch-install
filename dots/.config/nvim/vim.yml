@@ -1,0 +1,7 @@
+---
+# selene standard library for Neovim: Lua 5.1, as LuaJIT implements it, and
+# the global vim table with any field.
+base: lua51
+globals:
+  vim:
+    any: true

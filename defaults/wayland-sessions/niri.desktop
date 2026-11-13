@@ -1,0 +1,12 @@
+# Niri session for the greeter, installed as
+# /usr/local/share/wayland-sessions/niri.desktop. The greeter reads
+# /usr/local/share before /usr/share and keeps the first session of each name,
+# which replaces the entry from the niri package. Its only change: the output
+# of niri-session goes to the journal (journalctl -t niri-session) instead of
+# the text console, which is briefly visible before niri takes over the screen.
+[Desktop Entry]
+Name=Niri
+Comment=A scrollable-tiling Wayland compositor
+Exec=systemd-cat --identifier=niri-session niri-session
+Type=Application
+DesktopNames=niri

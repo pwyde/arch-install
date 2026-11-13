@@ -1,0 +1,29 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// 50 — Processes spawned at login
+// ─────────────────────────────────────────────────────────────────────────────
+// Docs:
+// https://niri-wm.github.io/niri/Configuration:-Miscellaneous#spawn-at-startup
+//
+// Each entry runs once when niri starts. For daemons that support it, a systemd
+// user service or an XDG autostart entry is an alternative.
+//
+// spawn-sh-at-startup supports shell pipelines and variable expansion.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Rebuilds the sycoca database, giving KDE and Qt applications the correct
+// .desktop entries. XDG_MENU_PREFIX comes from ~/.config/environment.d/.
+spawn-at-startup "kbuildsycoca6"
+
+// Starts the KDE Connect daemon at login, which lets paired devices find this
+// computer at any time. Without it, D-Bus starts the daemon only when a KDE
+// Connect feature is used, such as Send to Device in Dolphin.
+// spawn-at-startup "kdeconnectd"
+
+// Passes the session environment to the KWallet daemon that PAM started at
+// login, which completes its startup with the wallet already unlocked. Plasma
+// runs this from its own startup, which niri does not use. Listed before
+// Noctalia, which reads its storage key from the wallet.
+spawn-at-startup "/usr/lib/pam_kwallet_init"
+
+// Starts the Noctalia shell.
+spawn-at-startup "noctalia"
