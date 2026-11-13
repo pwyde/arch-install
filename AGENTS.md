@@ -154,8 +154,10 @@ The repository has no build system, CI, tests, database or migrations.
 - Scope: the installer (`base`, `desktop` or `virt`), the program or topic the
   change concerns (`niri`, `noctalia`, `xdg`) or, for a repository-wide file,
   its name without the extension (`AGENTS`, `README`).
-- Body: what changed and why, one blank line after the first line, wrapped
-  at 72 columns.
+- Body: what changed and why in at most three lines, one blank line after
+  the first line and wrapped at 72 columns. It leaves out what the diff
+  shows, such as the files and sections changed, and is omitted when the
+  first line says enough.
 
 ### Attribution
 
