@@ -4,7 +4,7 @@ Prebuilt AUR packages that `base-install.sh` installs with `pacman -U`. The
 root [AGENTS.md](../AGENTS.md) applies as well.
 
 - Never edit, rename or build these files by hand. The maintainer rebuilds
-  them with the procedure in ARCHITECTURE.md, Prebuilt Packages
+  them with the procedure in `ARCHITECTURE.md`, Prebuilt Packages
   (`pkgctl build` in a clean chroot); agents do not run it.
 - Keep exactly one file per package: remove the previous version when adding
   a new one. `base-install.sh` refuses to run otherwise.

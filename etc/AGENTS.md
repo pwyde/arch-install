@@ -11,4 +11,4 @@ applies as well.
   is added to `CMDLINE_FILES`.
 - `ssh/`, `sudoers.d/`, `pam.d/`, `sysctl.d/6*-hardening.conf`,
   `systemd/coredump.conf.d/`, `nftables.conf` and `nftables.d/` are
-  security-relevant: a change there is reflected in SECURITY.md.
+  security-relevant: a change there is reflected in `SECURITY.md`.

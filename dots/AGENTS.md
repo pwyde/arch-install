@@ -1,8 +1,7 @@
 # AGENTS.md: dots/
 
 User configuration, merged into the home directory by `copy_dotfiles` in
-`desktop-install.sh`. The root [AGENTS.md](../AGENTS.md) applies as well,
-and `.config/niri/` and `.config/noctalia/` have their own AGENTS.md.
+`desktop-install.sh`. The root [AGENTS.md](../AGENTS.md) applies as well.
 
 - On every run, a file here replaces the file of the same name in the home
   directory; every other file there is left in place.

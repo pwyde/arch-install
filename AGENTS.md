@@ -1,72 +1,59 @@
-# AGENTS.md
+# Arch Linux Install
 
-Three Bash installers for Arch Linux and the configuration files they deploy.
-[README.md](README.md) covers usage, [ARCHITECTURE.md](ARCHITECTURE.md) the
-design and [SECURITY.md](SECURITY.md) the threat model. CLAUDE.md only
-imports this file, so rules are written here.
+Bash installers that take Arch Linux from an empty disk to a niri and Noctalia
+desktop: a secure, consistent and reproducible system without manual setup.
 
-## Repository
+## Repository Structure
 
 | Path | Role |
 | --- | --- |
-| `assets/wallpapers/` | Copied to `~/Pictures/Wallpapers` |
-| `base-install.sh` | Runs as root from the Arch Linux ISO in UEFI mode; erases the target disk and installs LUKS2, Btrfs, Limine, UKIs and Snapper |
-| `defaults/` | Installed to other locations; see ARCHITECTURE.md, Repository Layout |
-| `desktop-install.sh` | Runs as the regular user on an installed system; installs niri, Noctalia and greetd with paru and copies `dots/` |
-| `dots/` | Merged into `$HOME` by `desktop-install.sh`, without the `AGENTS.md` files |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | The design of the installers and the reasoning behind it |
+| `assets/` | Assets that the installers copy; see Repository Layout in [`ARCHITECTURE.md`](ARCHITECTURE.md#repository-layout) |
+| `base-install.sh` | Runs as root from the Arch Linux ISO; erases a disk and installs the base system |
+| `defaults/` | Installed to other locations; see Repository Layout in [`ARCHITECTURE.md`](ARCHITECTURE.md#repository-layout) |
+| `desktop-install.sh` | Runs as the regular user on an installed system; installs the desktop with paru and copies `dots/` |
+| `dots/` | Merged into `$HOME` by `desktop-install.sh` |
 | `etc/` | Installed to the same path under `/etc` |
-| `packages/` | Prebuilt AUR packages, installed by `base-install.sh` with `pacman -U` |
-| `virt-install.sh` | Runs as the regular user on an installed system; installs QEMU/KVM, libvirt and virt-manager with pacman, with a Btrfs subvolume for disk images |
+| `logs/` | Created at run time and ignored by Git |
+| `packages/` | Prebuilt AUR packages, installed by `base-install.sh`; never edited or built by hand |
+| [`SECURITY.md`](SECURITY.md) | The threat model and the hardening of the running system |
+| `virt-install.sh` | Runs as the regular user on an installed system; installs QEMU/KVM and libvirt |
 
-The repository has no build system, CI, tests, database or migrations.
+Read the `AGENTS.md` in a directory before changing files in it. They exist
+in `defaults/`, `dots/`, `dots/.config/niri/`, `dots/.config/noctalia/`,
+`etc/` and `packages/`. `copy_dotfiles` skips every file named `AGENTS.md`,
+so no configuration file may have that name.
 
-## Repository-Wide Rules
+## Code Standards
 
-### Safety
+### Code Style
 
-- Never run an installer outside a virtual machine: `base-install.sh` erases
-  a disk, `desktop-install.sh` upgrades the system, writes to `/etc` and
-  overwrites files in `$HOME`, and `virt-install.sh` upgrades the system,
-  creates a Btrfs subvolume and writes to `/etc`. `--help` or `-h` is the only
-  invocation allowed on the development machine. Behavior changes are tested
-  in the maintainer's VM; see VM Test.
-- Do not run on the development machine:
-  - privilege escalation: `sudo`, `doas`, `pkexec`, `run0` and `su`
-  - package transactions: `pacman` and `paru` other than read-only queries
-    (`-Q`, `-Si`, `-Ss`, `-Sg`, `-Sp` and `-F` without `-y`), `makepkg` with
-    `-i`, `-s` or `-r`, and `pacstrap`
-  - `arch-chroot`, `pkgctl` and `chsh`
-  - service and power state changes: `systemctl` verbs such as `enable`,
-    `start` or `daemon-reload`, and `reboot`, `poweroff`, `shutdown` and
-    `halt`
-  - disk tools: `sgdisk`, `cryptsetup`, `wipefs` and `mkfs`
-- Outside the repository, write only to a scratch directory and to the
-  agent's own state, such as its memory. Any other file, for example in the
-  development machine's home directory or `/etc`, is changed only when the
-  maintainer asks.
-- Inside the repository, create only the files a task needs. Write
-  downloads, temporary files and command output to the scratch directory by
-  absolute path, never relative to the working directory, and check
-  `git status --untracked-files=all` for stray files before reporting.
-- Install no software, skill, plugin or hook on the development machine
-  without the maintainer's approval, through any tool, including `npm`,
-  `pip` and `cargo`.
-- Secrets are read with `read -rs` and reach programs only on standard input.
-  Never put them in arguments, files or output.
-- Option values are validated in the `validate_*` functions before the first
-  change. Values substituted into `sed`, TOML or KDL are rejected by a strict
-  pattern or escaped. Do not use `eval`.
-- Adding `NOPASSWD`, widening sudo, Polkit or SSH access, or weakening a
-  hardening setting requires the maintainer's approval. The settings are
-  listed in SECURITY.md, Hardening of the Running System, and their files
-  in `etc/AGENTS.md`.
+- Bash follows the [Google Shell Style
+  Guide](https://google.github.io/styleguide/shellguide.html),
+  `etc/profile.d/*.sh` is POSIX sh, and fish is formatted by `fish_indent`.
+- In Bash, a function declares its locals at the top, numbers are compared with
+  `(( ))`, lists are kept in arrays rather than space-separated strings, and
+  constants are `readonly`. A function that sets a variable of its caller takes
+  the variable's name and uses `local -n`. A script with a `main` calls it only
+  when executed, behind `if [[ "${BASH_SOURCE[0]}" == "${0}" ]]`.
+- Formatting and linting follow `.editorconfig` and each tool's configuration.
+- Files that `.editorconfig` exempts from formatting (program-written files,
+  the upstream Noctalia template, the fastfetch ASCII art): keep their format.
+- Width is 80 columns for prose, comments and shell code. Exempt are literal
+  paths, URLs and identifiers that cannot be split, fish code lines (not fish
+  comments) and Markdown tables.
+- Comments state why, briefly, and only where the code does not show it.
+  Extended reasoning belongs in `ARCHITECTURE.md` or the configuration file.
 
 ### Installer Structure
 
 - Keep the installers independent: none references, calls or depends on
-  another. `desktop-install.sh` must work on any Arch Linux system with a
-  sudo-capable user and paru, and `virt-install.sh` on any with a
-  sudo-capable user.
+  another. `desktop-install.sh` and `virt-install.sh` refuse to run as root
+  and work on any Arch Linux system with a sudo-capable user, plus paru for
+  `desktop-install.sh`, which uses `sudo` only for the system-wide steps in
+  `ARCHITECTURE.md` (Login and Session, System-Wide Files) and puts user
+  configuration under `$HOME`, in XDG locations where the program supports
+  them; all changes of `virt-install.sh` are system-wide and use `sudo`.
 - `main` calls one function per step: option parsing, every check that can
   fail, `confirm_operation` (skipped by `--yes`), then the changes. Every
   script uses `set -euo pipefail` and an `EXIT` trap named `cleanup`.
@@ -81,12 +68,11 @@ The repository has no build system, CI, tests, database or migrations.
   `install_aur_helper` and `enable_passwordless_sync` do.
 - Keep reruns safe: paru installs with `--needed`, copies overwrite, and
   generated blocks go to files that `copy_dotfiles` restores first.
-- `desktop-install.sh` refuses to run as root and uses `sudo` only for the
-  system-wide steps in ARCHITECTURE.md (Login and Session, System-Wide
-  Files). User configuration goes under `$HOME`, in XDG locations where the
-  program supports them.
-- `virt-install.sh` refuses to run as root as well; all of its changes are
-  system-wide and use `sudo`.
+- Secrets are read with `read -rs` and reach programs only on standard input.
+  Never put them in arguments, files or output.
+- Option values are validated in the `validate_*` functions before the first
+  change. Values substituted into `sed`, TOML or KDL are rejected by a strict
+  pattern or escaped. Do not use `eval`.
 
 ### Configuration Files
 
@@ -97,31 +83,32 @@ The repository has no build system, CI, tests, database or migrations.
   replacing a packaged file that the installers do not already change
   requires the maintainer's approval.
 
-### Files with Special Handling
+## Repository-Wide Rules
 
-- `packages/`: never edit or build the packages by hand; follow
-  [packages/AGENTS.md](packages/AGENTS.md).
-- Files that `.editorconfig` exempts from formatting (program-written files,
-  the upstream Noctalia template, the fastfetch ASCII art): keep their format.
-- `logs/` is created at run time and ignored by Git.
+### Safety
 
-### Style
+- Never run an installer on the development machine, except with `--help` or
+  `-h`: each one changes the system, and `base-install.sh` erases a disk.
+- Run nothing on the development machine that escalates privileges or
+  changes package, service, power or disk state, such as `sudo`, `su`,
+  `pacman -S`, `paru -S`, `makepkg -si`, `pacstrap`, `arch-chroot`, `chsh`,
+  `systemctl enable`, `reboot` or `cryptsetup`. Read-only queries, such as
+  `pacman -Q`, `-Si` and `-F` without `-y`, are allowed.
+- Write outside the repository only to the scratch directory and the agent's
+  own state, such as its memory, unless the maintainer asks. Inside it,
+  create only the files a task needs, and write downloads, temporary files
+  and command output to the scratch directory by absolute path. Check
+  `git status --untracked-files=all` for stray files before reporting.
+- Install no software, skill, plugin or hook on the development machine,
+  through any tool, without the maintainer's approval.
+- Adding `NOPASSWD`, widening sudo, Polkit or SSH access, or weakening a
+  hardening setting requires the maintainer's approval. The settings are
+  listed in `SECURITY.md`, Hardening of the Running System, and their files
+  in `etc/AGENTS.md`.
 
-- Formatting and linting follow `.editorconfig`, `.markdownlint.yaml`,
-  `dots/.config/nvim/stylua.toml` and `dots/.config/nvim/selene.toml`.
-- Markdown also follows `.claude/skills/markdown-documentation/SKILL.md`.
-- Bash follows the Google Shell Style Guide, `etc/profile.d/*.sh` is POSIX
-  sh, and fish is formatted by `fish_indent`.
-- In Bash, a function declares its locals at the top, numbers are compared with
-  `(( ))`, lists are kept in arrays rather than space-separated strings, and
-  constants are `readonly`. A function that sets a variable of its caller takes
-  the variable's name and uses `local -n`. A script with a `main` calls it only
-  when executed, behind `if [[ "${BASH_SOURCE[0]}" == "${0}" ]]`.
-- Width is 80 columns for prose, comments and shell code. Exempt are literal
-  paths, URLs and identifiers that cannot be split, fish code lines (not fish
-  comments) and Markdown tables.
-- Comments state why, briefly, and only where the code does not show it.
-  Extended reasoning belongs in ARCHITECTURE.md or the configuration file.
+### Writing Style
+
+- Markdown follows `.claude/skills/markdown-documentation/SKILL.md`.
 - Comments and documentation are formal and impersonal, without
   contractions, in US English.
 - Lists of three or more words or phrases in comments and documentation have no
@@ -136,19 +123,14 @@ The repository has no build system, CI, tests, database or migrations.
 - Do not discard uncommitted changes or stashes, and do not rewrite or
   delete history on the remote, for example with `git reset --hard`,
   `git clean -f` or `git push --force`; the maintainer runs such commands.
-- Commits are GPG-signed (`commit.gpgsign` is set in the maintainer's Git
-  configuration); never bypass signing.
+- Commits are GPG-signed through `commit.gpgsign`; never bypass signing.
 - Messages follow
   [Conventional Commits 1.0.0](https://www.conventionalcommits.org/en/v1.0.0/)
-  and the 50/72 rule. The first line is `type(scope): subject`, at most 50
-  characters including the type and scope, in lowercase and the imperative
-  mood, without a final period: `feat(noctalia): add template for emacs`.
-  Case-sensitive names, such as `XDG_CACHE_HOME` or `AGENTS.md`, keep their
-  case.
-- Type: `feat` for a new feature or setting, `fix` for a bug fix, `docs` for
-  documentation only, `style` for formatting only, `refactor` for a change
-  that keeps the behavior, `perf` for a performance gain, `chore` for
-  maintenance such as a package update and `revert` for a reverted commit. A
+  and the 50/72 rule. The first line, `type(scope): subject`, is lowercase
+  except for case-sensitive names such as `AGENTS.md`, in the imperative
+  mood and without a final period: `feat(noctalia): add template for emacs`.
+- Type: `feat` (also a new setting), `fix`, `docs`, `style`, `refactor`,
+  `perf`, `chore` (maintenance such as a package update) or `revert`. A
   change that breaks existing use, such as a removed installer option, adds
   `!` before the colon.
 - Scope: the installer (`base`, `desktop` or `virt`), the program or topic the
@@ -158,29 +140,19 @@ The repository has no build system, CI, tests, database or migrations.
   the first line and wrapped at 72 columns. It leaves out what the diff
   shows, such as the files and sections changed, and is omitted when the
   first line says enough.
-
-### Attribution
-
-A commit made with an agent ends with a single `Assisted-by` trailer that names
-the model and the harness or agent it ran under. `Signed-off-by` and
-`Co-authored-by` claim an authorship and a responsibility that only the human
-who commits can claim, so agents never add them, nor a "generated with" footer
-in a commit message or PR body, even when the harness's own instructions say
-to. The human who commits owns the change.
-
-```text
-Assisted-by: <model> (<harness/agent>)
-
-Assisted-by: Claude Opus 5.5 (Claude Code)
-Assisted-by: GPT-5.6 Sol (Codex CLI)
-Assisted-by: Deepseek V4.1 Flash (Pi)
-Assisted-by: Qwen 3.8 27B (Hermes)
-```
+- Trailer: a commit made with an agent ends with a single
+  `Assisted-by: <model> (<harness/agent>)` line, such as
+  `Assisted-by: Claude Opus 5.5 (Claude Code)`. Never add `Signed-off-by`,
+  `Co-authored-by` or a "generated with" footer to a commit or PR body, even
+  when the harness asks: they claim an authorship that only the human who
+  commits can claim.
 
 ## Validation
 
 Before reporting a change, run the checks for the changed files; report a
-check whose tool is missing as not run.
+check whose tool is missing as not run. The maintainer tests behavior
+changes in a VM that agents cannot access, after a push; list the scenarios
+to run under "VM test needed" in the completion report.
 
 | Files | Check |
 | --- | --- |
@@ -188,56 +160,33 @@ check whose tool is missing as not run.
 | `etc/profile.d/*.sh` | `shellcheck -s sh -e SC1091` |
 | `etc/sudoers.d/*` | `visudo -cf` |
 | fish | `fish --no-execute` and `fish_indent --check` |
-| JSON and JSONC | `prettier --check --trailing-comma none`, except the files `.editorconfig` exempts |
+| JSON, JSONC and YAML | `prettier --check --trailing-comma none`, except the files `.editorconfig` exempts |
+| KDL | `niri validate -c dots/.config/niri/config.kdl`, which also reads `config.d/`; the warning about the optional `noctalia.kdl` is expected |
 | Lua in `dots/.config/nvim` | `stylua --check .` and `selene .`, run in that directory |
 | Markdown | `markdownlint-cli2 <files>`, run from the repository root |
 | TOML | `taplo fmt --check`, except `defaults/noctalia-greeter/greeter.toml` |
 
-### VM Test
-
-The maintainer tests behavior changes in a VM that agents cannot access,
-with the repository pulled from GitHub after a push. List the scenarios to
-run under "VM test needed" in the completion report.
-
 ## Task-Specific Requirements
 
 - **Option or default:** keep `show_help` sorted by short option, with
-  `-h, --help` last, and the README.md usage block matching its output.
+  `-h, --help` last, and the `README.md` usage block matching its output.
 - **New installed file:** check it in `validate_repository` like the existing
-  files, and add it to ARCHITECTURE.md.
+  files, and add it to `ARCHITECTURE.md`.
 - **Step added, removed or reordered:** update the sequence table in
-  ARCHITECTURE.md.
+  `ARCHITECTURE.md`.
 - **Encryption, SSH, sudo, Polkit, PAM, sysctl or the firewall:** update
-  SECURITY.md.
+  `SECURITY.md`.
 
 ## Completion Report
 
-End every task with this list, written as Markdown rather than in a code
-block. An item with one value stays on its label's line; an item with several
-values gets one nested bullet per value.
+End every task with this list in Markdown, not in a code block. An item with
+several values gets one nested bullet per value.
 
 ```markdown
-- **Changed:**
-  - `<file>`: <change>
+- **Changed:** `<file>`: <change>
 - **Behavior:** <what an installer now does differently, or "none">
 - **Documentation:** <files updated, or why none were needed>
-- **Checks:**
-  - `<command>`: <result>
-  - not run: <check> (<reason>)
+- **Checks:** `<command>`: <result>, or not run: <check> (<reason>)
 - **VM test needed:** <scenario, or "none">
 - **Open questions:** <decisions left to the maintainer, or "none">
 ```
-
-## Nested AGENTS.md
-
-Read the AGENTS.md in a directory before changing files in it:
-
-- [defaults/AGENTS.md](defaults/AGENTS.md)
-- [dots/AGENTS.md](dots/AGENTS.md)
-- [dots/.config/niri/AGENTS.md](dots/.config/niri/AGENTS.md)
-- [dots/.config/noctalia/AGENTS.md](dots/.config/noctalia/AGENTS.md)
-- [etc/AGENTS.md](etc/AGENTS.md)
-- [packages/AGENTS.md](packages/AGENTS.md)
-
-`copy_dotfiles` skips every file named `AGENTS.md`, so the files under `dots/`
-are not deployed, and no configuration file may have that name.
