@@ -362,6 +362,11 @@ versions have to match the AUR for an AUR helper to offer later updates.
 
 ### Hibernation
 
+Hibernation is set up only where the kernel of the live system supports it,
+which it shows with `/sys/power/image_size`; elsewhere the installer skips the
+subvolume, the swapfile, its fstab entry, the resume parameters and the
+keyboard-backlight hook.
+
 - **A `/swap` Btrfs subvolume**, nested under `@` and marked `NODATACOW`
   (`chattr +C`). A Btrfs subvolume cannot be snapshotted while it holds an
   active swapfile, which is why the swapfile has a subvolume of its own. As a
@@ -681,8 +686,8 @@ does not support.
 - **The systemd user manager receives its own environment** from
   [`dots/.config/environment.d/`](./dots/.config/environment.d/). Programs
   started through D-Bus, such as the KDE Wallet dialogs and the KDE portal's
-  file dialogs, do not inherit niri's environment and take the Qt theme and
-  the VSCodium data location from there.
+  file dialogs, do not inherit niri's environment and read it from there
+  instead, for example the Qt theme and the VSCodium data location.
 - **Appearance sync needs no password.** `noctalia-greeter passwordless-sync`
   adds a Polkit rule that lets the user copy the desktop appearance to the
   greeter. The rule covers only that action.
@@ -891,9 +896,9 @@ repositories, so it uses pacman rather than paru.
   [`etc/conf.d/libvirt-guests`](./etc/conf.d/libvirt-guests): no guest is
   started at boot beyond those marked for autostart, and each guest has the
   seconds of `--shutdown-timeout`, 120 by default, to shut down. The package
-  default would suspend guests, which writes their memory to disk. The service
-  has no stop timeout of its own, so the shortened default stop timeout of the
-  system does not end the guests early.
+  default would suspend guests, which writes their memory to disk. The unit
+  sets `TimeoutStopSec=0`, no limit, so the shortened default stop timeout of
+  the system does not end the guests early.
 - **Managing virtual machines requires authentication by default.** The
   libvirt package's Polkit rule lets members of the `libvirt` group manage the
   system's virtual machines without a password. Without `--group`, the
