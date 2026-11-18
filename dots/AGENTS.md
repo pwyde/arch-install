@@ -5,6 +5,9 @@ User configuration, merged into the home directory by `copy_dotfiles` in
 
 - On every run, a file here replaces the file of the same name in the home
   directory; every other file there is left in place.
+- The configuration in the home directory differs from `dots/` on purpose:
+  a file there that `dots/` lacks is not a gap, and a difference is not a
+  change to copy back unless the maintainer asks.
 - Each copied file that `desktop-install.sh` reads or edits after the copy
   has a constant under `# Destinations`; moving or renaming the file
   requires changing that constant.

@@ -87,6 +87,8 @@ so no configuration file may have that name.
 
 ### Safety
 
+`.claude/settings.json` enforces part of this list in Claude Code.
+
 - Never run an installer on the development machine, except with `--help` or
   `-h`: each one changes the system, and `base-install.sh` erases a disk.
 - Run nothing on the development machine that escalates privileges or
@@ -99,6 +101,10 @@ so no configuration file may have that name.
   create only the files a task needs, and write downloads, temporary files
   and command output to the scratch directory by absolute path. Check
   `git status --untracked-files=all` for stray files before reporting.
+- Copy nothing from the maintainer's home directory into the repository
+  unless asked: it holds personal configuration that a push would publish.
+  Never read private keys or credential stores, such as `~/.ssh`, `~/.gnupg`,
+  `~/.pki` and `~/.local/share/kwalletd`.
 - Install no software, skill, plugin or hook on the development machine,
   through any tool, without the maintainer's approval.
 - Adding `NOPASSWD`, widening sudo, Polkit or SSH access, or weakening a
