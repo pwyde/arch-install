@@ -59,7 +59,7 @@ in `defaults/`, `dots/`, `dots/.config/niri/`, `dots/.config/noctalia/`,
   `cleanup`. A function that calls steps of its own, such as `configure_system`,
   comes before them; a helper used by one function comes right before it, and
   helpers that several functions share stay together near their first use.
-- Install files with `install` and an explicit `-m` mode; sudoers drop-ins
+- Write new files with `install` and an explicit `-m` mode; sudoers drop-ins
   use `0440`. Create temporary files with `mktemp` and let `cleanup` remove
   them on failure.
 - Steps whose failure leaves a working system warn and continue, as

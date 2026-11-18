@@ -1112,7 +1112,7 @@ EOF
 
 configure_hostname() {
   print_msg "Setting hostname to ${HOSTNAME}"
-  echo "${HOSTNAME}" >/mnt/etc/hostname
+  echo "${HOSTNAME}" | install -D -m 0644 /dev/stdin /mnt/etc/hostname
   sed "s|@HOSTNAME@|${HOSTNAME}|g" "${HOSTS_SRC}" \
     | install -D -m 0644 /dev/stdin /mnt/etc/hosts
 }
