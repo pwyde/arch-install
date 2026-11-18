@@ -38,6 +38,8 @@
       "Bash(git push * -f)",
       "Bash(git push * -f *)",
       "Bash(git commit *--no-gpg-sign*)",
+      "Bash(git -c commit.gpgsign*)",
+      "Bash(git config *commit.gpgsign*)",
       "Read(~/.ssh/**)",
       "Read(~/.gnupg/**)",
       "Read(~/.pki/**)",
@@ -50,6 +52,10 @@
       "Bash(./virt-install.sh *)",
       "Bash(bash ./virt-install.sh *)",
       "Bash(bash virt-install.sh *)",
+      "Bash(git restore *)",
+      "Bash(git checkout -- *)",
+      "Bash(git stash drop*)",
+      "Bash(git stash clear*)",
       "Edit(/.claude/settings.json)",
       "Edit(/.claude/settings.local.json)"
     ]
