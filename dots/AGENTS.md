@@ -16,9 +16,9 @@ User configuration, merged into the home directory by `copy_dotfiles` in
   the program's order.
 - Noctalia writes its theme files at run time, from its own templates and
   those in `.config/noctalia/templates/`; such a file is never committed.
-  Keep the lines that its scripts add: `include themes/noctalia.conf` in
-  `.config/kitty/kitty.conf` and `color_theme = "noctalia"` in
-  `.config/btop/btop.conf`.
+  Keep the lines that its template scripts add to files here, such as
+  `include themes/noctalia.conf` in `.config/kitty/kitty.conf`; the scripts
+  are the `apply.sh` files of the `noctalia` package.
 - Each copied file that `desktop-install.sh` reads or edits after the copy
   has a constant under `# Destinations`; moving or renaming the file
   requires changing that constant.
