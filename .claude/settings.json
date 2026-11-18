@@ -1,0 +1,50 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(sudo *)",
+      "Bash(su *)",
+      "Bash(pacman -S *)",
+      "Bash(pacman -Sy*)",
+      "Bash(pacman -Su*)",
+      "Bash(pacman -U *)",
+      "Bash(pacman -R*)",
+      "Bash(paru)",
+      "Bash(paru -S *)",
+      "Bash(paru -Sy*)",
+      "Bash(paru -Su*)",
+      "Bash(paru -U *)",
+      "Bash(paru -R*)",
+      "Bash(makepkg *)",
+      "Bash(pacstrap *)",
+      "Bash(arch-chroot *)",
+      "Bash(chsh *)",
+      "Bash(systemctl enable *)",
+      "Bash(systemctl --user enable *)",
+      "Bash(reboot *)",
+      "Bash(poweroff *)",
+      "Bash(shutdown *)",
+      "Bash(systemctl reboot *)",
+      "Bash(systemctl poweroff *)",
+      "Bash(cryptsetup *)",
+      "Bash(git reset --hard *)",
+      "Bash(git clean *)",
+      "Bash(git push *--force*)",
+      "Bash(git push -f *)",
+      "Bash(git push * -f)",
+      "Bash(git push * -f *)",
+      "Bash(git commit *--no-gpg-sign*)",
+      "Read(~/.ssh/**)",
+      "Read(~/.gnupg/**)",
+      "Read(~/.pki/**)",
+      "Read(~/.local/share/kwalletd/**)"
+    ],
+    "ask": [
+      "Bash(./desktop-install.sh *)",
+      "Bash(bash ./desktop-install.sh *)",
+      "Bash(bash desktop-install.sh *)",
+      "Bash(./virt-install.sh *)",
+      "Bash(bash ./virt-install.sh *)",
+      "Bash(bash virt-install.sh *)"
+    ]
+  }
+}
