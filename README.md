@@ -99,7 +99,7 @@ passwords.
 Usage: base-install.sh [options]
 
 Options:
-  -d, --disk DISK            Specify disk (default: /dev/sda)
+  -d, --disk DISK            Specify disk (default: /dev/nvme0n1)
   -k, --keymap KEYMAP        Set keymap (default: uk)
   -l, --locale LOCALE        Set locale (default: en_GB.UTF-8)
   -n, --hostname HOSTNAME    Set hostname (default: arch-linux)
