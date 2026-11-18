@@ -45,7 +45,7 @@ in `defaults/`, `dots/`, `dots/.config/niri/`, `dots/.config/noctalia/`,
 
 ### Installer Structure
 
-- Keep the installers independent: none references, calls or depends on
+- Keep the installers independent: none sources, calls or depends on
   another. `desktop-install.sh` and `virt-install.sh` refuse to run as root
   and work on any Arch Linux system with a sudo-capable user, plus paru for
   `desktop-install.sh`, which uses `sudo` only for the system-wide steps in
