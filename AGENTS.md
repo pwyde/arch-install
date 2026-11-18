@@ -37,8 +37,6 @@ so no configuration file may have that name.
   the variable's name and uses `local -n`. A script with a `main` calls it only
   when executed, behind `if [[ "${BASH_SOURCE[0]}" == "${0}" ]]`.
 - Formatting and linting follow `.editorconfig` and each tool's configuration.
-- Files that `.editorconfig` exempts from formatting (program-written files,
-  the upstream Noctalia template, the fastfetch ASCII art): keep their format.
 - Width is 80 columns for prose, comments and shell code. Exempt are literal
   paths, URLs and identifiers that cannot be split, fish code lines (not fish
   comments) and Markdown tables.
