@@ -172,7 +172,8 @@ to run under "VM test needed" in the completion report.
 ## Task-Specific Requirements
 
 - **Option or default:** keep `show_help` sorted by short option, with
-  `-h, --help` last, and the `README.md` usage block matching its output.
+  `-h, --help` last, and its output from `Usage:` to the last option equal
+  to the `README.md` usage block.
 - **New installed file:** check it in `validate_repository` like the existing
   files, and add it to `ARCHITECTURE.md`.
 - **Step added, removed or reordered:** update the sequence table in
