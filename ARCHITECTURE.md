@@ -197,12 +197,15 @@ the same FAT partition, and there is no separate `/efi`.
   applies on a normal filesystem, where it builds images under `umask 077`
   because an initramfs can carry secrets such as a LUKS keyfile.
 - **The kernel command line is embedded in the UKI.** It is assembled from
-  every file in [`etc/cmdline.d/`](./etc/cmdline.d/):
+  every file in `/etc/cmdline.d/`:
   [`10-root.conf`](./etc/cmdline.d/10-root.conf) for the root and LUKS
-  parameters, and the remaining files for hibernation, the console and the
-  splash. Limine chainloads the UKI with `protocol: efi` and supplies no
-  command line of its own to the default entries. Without Secure Boot, the UKI
-  would accept one; see [SECURITY.md](./SECURITY.md#limitations).
+  parameters and `zswap.enabled=0`, as zram already compresses swap in RAM;
+  `30-resume.conf`, which the installer writes, for hibernation; and the
+  remaining files from [`etc/cmdline.d/`](./etc/cmdline.d/) for the RTC alarm,
+  the console and the splash. Limine chainloads the UKI with `protocol: efi`
+  and supplies no command line of its own to the default entries. Without
+  Secure Boot, the UKI would accept one; see
+  [SECURITY.md](./SECURITY.md#limitations).
 - **The paths are those `limine-entry-tool` uses.** It derives
   `${ESP_PATH}/EFI/limine/limine_x64.efi`, `${ESP_PATH}/EFI/BOOT/BOOTX64.EFI`
   and `${ESP_PATH}/limine.conf`, none of which is configurable. UKI names
@@ -388,7 +391,7 @@ Three deliberate departures from common practice:
 
 | Common approach | This installer | Reason |
 | --- | --- | --- |
-| `HOOKS+=(resume)` | No `resume` hook | Only a busybox initramfs requires it. The `systemd` hook ships `systemd-hibernate-resume`, which reads the same parameters. |
+| `HOOKS+=(resume)` | No `resume` hook | The `systemd` hook resumes on its own; see [Initramfs](#initramfs). |
 | `resume=` in a `limine-entry-tool` drop-in | `resume=` in `/etc/cmdline.d/` | `/etc/cmdline.d/` is the single source of the command line. The installer mirrors it into `/etc/default/limine`, and a second copy of the parameters would drift. |
 | `swapon` after creating the file | No `swapon` | In the installer, it would activate swap on the live image's kernel and keep `/mnt` busy. The fstab entry activates the swapfile on first boot. |
 
@@ -443,7 +446,7 @@ The theme's images were recolored by giving every pixel the new color while
 keeping its transparency. `preview-unlock.png`, which is not shown at boot,
 is a 1920×1080 screenshot of the passphrase prompt. `logo.png` is the official
 Arch Linux logo for dark backgrounds, `archlinux-logo-light-90dpi.png` from
-[archlinux.org/art](https://archlinux.org/art/) (600×199, blue `#1793D1` and
+[archlinux.org/art](https://archlinux.org/art/) (600×200, blue `#1793D1` and
 white), with the trademark symbol removed. It is not recolored to `#999999`:
 the [trademark policy](https://terms.archlinux.org/docs/trademark-policy/)
 asks for the logos to be used in their standard form.
@@ -614,15 +617,15 @@ does not support.
 | Array | Contents |
 | --- | --- |
 | `DEFAULT_BROWSER_PACKAGES` | Firefox, Chromium, Zen Browser and Pywalfox |
-| `DEFAULT_CLI_PACKAGES` | bat, duf, dust, eza, fd, fzf, glow, procs, ripgrep and zoxide |
+| `DEFAULT_CLI_PACKAGES` | bat with bat-extras, duf, dust, eza, fd, fzf, glow, procs, ripgrep and zoxide |
 | `DEFAULT_COMPOSITOR_PACKAGES` | niri, nirimod, PipeWire, WirePlumber, BlueZ, `power-profiles-daemon`, the XDG desktop portals, `xwayland-satellite`, and tools for brightness, media keys and the clipboard |
 | `DEFAULT_DEVELOPMENT_PACKAGES` | VSCodium with the Visual Studio Marketplace |
 | `DEFAULT_FONT_PACKAGES` | JetBrains Mono Nerd Font, Inter, Noto and Liberation |
-| `DEFAULT_KDE_PACKAGES` | Dolphin, Kate, Konsole, Ark, Gwenview, Okular and Haruna, and the KDE services and integration they require outside Plasma |
+| `DEFAULT_KDE_PACKAGES` | Dolphin, Kate, Konsole, Ark, Gwenview, Okular, Haruna and KDE Connect, and the KDE services and integration they require outside Plasma |
 | `DEFAULT_NEOVIM_PACKAGES` | Neovim and the tools LazyVim's plugins require |
 | `DEFAULT_NOCTALIA_PACKAGES` | The Noctalia shell and greeter |
 | `DEFAULT_OFFICE_PACKAGES` | LibreOffice with English spelling dictionaries, GIMP and Inkscape |
-| `DEFAULT_TERMINAL_PACKAGES` | kitty, fish, Starship, fastfetch, btop and superfile |
+| `DEFAULT_TERMINAL_PACKAGES` | kitty, fish, Starship, fastfetch, btop and superfile, with ExifTool for superfile's metadata and jq for the VSCodium extension list |
 | `DEFAULT_THEME_PACKAGES` | Qt and GTK themes, Papirus icons, `nwg-look` and the cursor theme |
 
 - **One transaction for the desktop.** The Noctalia, terminal, KDE, browser,
@@ -717,11 +720,10 @@ directories.
   environment, startup, animations, key bindings, layer rules and
   `90-user-extra.kdl` for local additions. niri starts Noctalia, the KWallet
   initialization and the KDE service cache rebuild at login.
-- **Noctalia** reads `10-default.toml` and `20-lockscreen-widgets.toml`.
-  Its templates color fzf, eza, VSCodium, Claude Code, Chromium and, through
-  Pywalfox, Firefox from the current color scheme. The community plugin Keybind
-  Cheatsheet, which Noctalia fetches from its Git source, lists niri's bindings
-  in a panel that `Mod+F1` opens.
+- **Noctalia** reads `10-default.toml` and `20-lockscreen-widgets.toml`. The
+  first enables the templates that color the desktop and its programs from the
+  current color scheme, including the repository's own in `templates/`, and
+  the plugins that Noctalia fetches from their Git sources to extend the shell.
 - **GTK settings are stored in GSettings.** On Wayland, GTK 3 takes the
   theme, icons, cursor and fonts from GSettings, and its values replace those
   in `settings.ini`. The installer copies the values from
@@ -730,7 +732,8 @@ directories.
 - **XDG desktop portals** are assigned per interface in
   [`niri-portals.conf`](./dots/.config/xdg-desktop-portal/niri-portals.conf):
   GNOME for screen capture, KDE for file dialogs and settings, KWallet for
-  secrets, and GNOME, then GTK, for the rest.
+  secrets, GTK for permission dialogs and notifications, and GNOME, then GTK,
+  for the rest.
 - **Default applications** are set in
   [`mimeapps.list`](./dots/.config/mimeapps.list): Firefox for the web,
   Gwenview for images, Haruna for video, Okular for PDF, LibreOffice for
@@ -756,10 +759,8 @@ directories.
   `DISABLE_FEEDBACK_COMMAND` and `CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY`, which
   turn off usage metrics, error reports, `/feedback` reports and session
   surveys. Without telemetry, Claude Code fetches no feature flags, so the
-  features that depend on them, such as `claude import` and the advisor tool,
-  are unavailable. The VSCodium extension sets `DISABLE_TELEMETRY` on its own
-  while VSCodium's telemetry is off, which is VSCodium's default. Other
-  command-line tools honor `DO_NOT_TRACK` as well.
+  features that depend on them are unavailable. Other command-line tools honor
+  `DO_NOT_TRACK` as well.
 - **fish's line editing** is set in
   [`10-editing.fish`](./dots/.config/fish/conf.d/10-editing.fish):
   Ctrl+Backspace, Ctrl+Left and Ctrl+Right work on path components, Ctrl+Delete
@@ -778,9 +779,9 @@ directories.
   recursively. A later `-f`, as in `rm -rf`, removes without asking.
 - **Web apps** are managed by the commands in
   [`dots/.local/bin/`](./dots/.local/bin/). `webapp-install` creates a
-  desktop entry that opens a site in a Chromium window without tabs or
-  address bar, with the site's icon; `webapp-remove` deletes one.
-  [`05-path.fish`](./dots/.config/fish/conf.d/05-path.fish) adds
+  desktop entry that opens a site through `webapp-launch`, in a Chromium window
+  without tabs or address bar, with the site's icon; `webapp-remove` deletes
+  one. [`05-path.fish`](./dots/.config/fish/conf.d/05-path.fish) adds
   `~/.local/bin` to `PATH`.
 
 ### Keyboard and Displays
