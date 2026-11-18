@@ -94,10 +94,11 @@ in `defaults/`, `dots/`, `dots/.config/niri/`, `dots/.config/noctalia/`,
   `pacman -S`, `paru -S`, `makepkg -si`, `pacstrap`, `arch-chroot`, `chsh`,
   `systemctl enable`, `reboot` or `cryptsetup`. Read-only queries, such as
   `pacman -Q`, `-Si` and `-F` without `-y`, are allowed.
-- Write outside the repository only to the scratch directory and the agent's
-  own state, such as its memory, unless the maintainer asks. Inside it,
-  create only the files a task needs, and write downloads, temporary files
-  and command output to the scratch directory by absolute path. Check
+- Write outside the repository only to the agent's scratch directory (the
+  session scratchpad in Claude Code; ask if there is none) and its own state,
+  such as its memory, unless the maintainer asks. In the repository, create
+  only the files a task needs; downloads, temporary files and command output
+  go to the scratch directory by absolute path. Check
   `git status --untracked-files=all` for stray files before reporting.
 - Copy nothing from the maintainer's home directory into the repository
   unless asked: it holds personal configuration that a push would publish.
