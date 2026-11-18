@@ -54,7 +54,7 @@ so no configuration file may have that name.
   them; all changes of `virt-install.sh` are system-wide and use `sudo`.
 - `main` calls one function per step: option parsing, every check that can
   fail, `confirm_operation` (skipped by `--yes`), then the changes. Every
-  script uses `set -euo pipefail` and an `EXIT` trap named `cleanup`.
+  installer uses `set -euo pipefail` and an `EXIT` trap named `cleanup`.
 - Define functions in the order `main` calls them, after the print helpers and
   `cleanup`. A function that calls steps of its own, such as `configure_system`,
   comes before them; a helper used by one function comes right before it, and
