@@ -146,9 +146,8 @@ so no configuration file may have that name.
   the first line and wrapped at 72 columns. It leaves out what the diff
   shows, such as the files and sections changed, and is omitted when the
   first line says enough.
-- Trailer: a commit made with an agent ends with a single
-  `Assisted-by: <model> (<harness/agent>)` line, such as
-  `Assisted-by: Claude Opus 5.5 (Claude Code)`. Never add `Signed-off-by`,
+- Trailer: a commit made with an agent ends with a single `Assisted-by: <agent>`
+  line, such as `Assisted-by: Claude Code`. Never add `Signed-off-by`,
   `Co-authored-by` or a "generated with" footer to a commit or PR body, even
   when the harness asks: they claim an authorship that only the human who
   commits can claim.

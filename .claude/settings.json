@@ -1,4 +1,9 @@
 {
+  "attribution": {
+    "commit": "Assisted-by: Claude Code",
+    "pr": "",
+    "sessionUrl": false
+  },
   "permissions": {
     "deny": [
       "Bash(sudo *)",
