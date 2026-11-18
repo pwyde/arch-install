@@ -21,8 +21,8 @@ desktop: a secure, consistent and reproducible system without manual setup.
 
 Read the `AGENTS.md` in a directory before changing files in it. They exist
 in `defaults/`, `dots/`, `dots/.config/niri/`, `dots/.config/noctalia/`,
-`etc/` and `packages/`. `copy_dotfiles` skips every file named `AGENTS.md`,
-so no configuration file may have that name.
+`etc/` and `packages/`. None may go into `assets/wallpapers/` or
+`defaults/plymouth/arch-linux/`, which the installers copy whole.
 
 ## Code Standards
 

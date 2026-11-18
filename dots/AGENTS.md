@@ -5,6 +5,9 @@ User configuration, merged into the home directory by `copy_dotfiles` in
 
 - On every run, a file here replaces the file of the same name in the home
   directory; every other file there is left in place.
+- `copy_dotfiles` skips only files named `AGENTS.md`, so no configuration
+  file may have that name. Add no `CLAUDE.md` here: it would be copied into
+  the home directory, where Claude Code would load it as instructions.
 - The configuration in the home directory differs from `dots/` on purpose:
   a file there that `dots/` lacks is not a gap, and a difference is not a
   change to copy back unless the maintainer asks.
