@@ -64,10 +64,10 @@ so no configuration file may have that name.
   them on failure.
 - Steps whose failure leaves a working system warn and continue, as
   `install_aur_helper` and `enable_passwordless_sync` do.
-- Keep reruns safe: paru installs with `--needed`, copies overwrite, and
+- Keep reruns safe: package installs use `--needed`, copies overwrite, and
   generated blocks go to files that `copy_dotfiles` restores first.
-- Secrets are read with `read -rs` and reach programs only on standard input.
-  Never put them in arguments, files or output.
+- Secrets that an installer reads itself use `read -rs` and reach programs
+  only on standard input. Never put them in arguments, files or output.
 - Option values are validated in the `validate_*` functions before the first
   change. Values substituted into `sed`, TOML or KDL are rejected by a strict
   pattern or escaped. Do not use `eval`.
