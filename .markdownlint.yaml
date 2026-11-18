@@ -47,9 +47,5 @@ no-duplicate-heading:
 no-inline-html:
   allowed_elements: [div, img, details, summary]
 
-# CLAUDE.md holds only the import of AGENTS.md.
-first-line-heading:
-  allow_preamble: true
-
 # Consecutive GitHub alerts are separate blockquotes.
 no-blanks-blockquote: false

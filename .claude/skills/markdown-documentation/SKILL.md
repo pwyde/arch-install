@@ -63,8 +63,7 @@ Markdown file, including agent instruction files (`AGENTS.md`, `CLAUDE.md`,
 
 - ATX headings (`#`), with blank lines around headings, lists, code blocks and
   tables.
-- One H1 per document, as its first heading; CLAUDE.md, which only imports
-  AGENTS.md, has none.
+- One H1 per document, as its first heading.
 - Heading levels go down one at a time, and a heading does not end with `.`,
   `,`, `;`, `:`, `!` or `?`.
 - Title Case for headings: capitalize every word except articles,
