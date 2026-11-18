@@ -37,9 +37,9 @@ so no configuration file may have that name.
   the variable's name and uses `local -n`. A script with a `main` calls it only
   when executed, behind `if [[ "${BASH_SOURCE[0]}" == "${0}" ]]`.
 - Formatting and linting follow `.editorconfig` and each tool's configuration.
-- Width is 80 columns for prose, comments and shell code. Exempt are literal
-  paths, URLs and identifiers that cannot be split, fish code lines (not fish
-  comments) and Markdown tables.
+- Width is 80 columns for prose, comments and shell code. Exempt are fish
+  code lines (not fish comments) and lines that hold a literal path, URL or
+  identifier that cannot be split.
 - Comments state why, briefly, and only where the code does not show it.
   Extended reasoning belongs in `ARCHITECTURE.md` or the configuration file.
 
