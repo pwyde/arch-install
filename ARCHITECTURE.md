@@ -470,7 +470,7 @@ defaults; only settings those files omit are included.
 | `45-bbr.conf` | BBR congestion control, paced through `fq` |
 | `50-vm.conf` | Reclaim tuned for swap on zram, bounded writeback |
 | `60-net-hardening.conf` | SYN cookies, strict reverse path filtering, no ICMP redirects |
-| `61-kernel-hardening.conf` | Restricted dmesg, kernel pointers and ptrace; no set-user-ID dumps |
+| `61-kernel-hardening.conf` | Restricted dmesg, kernel pointers and ptrace; no set-user-ID dumps; kernel messages kept off the console after boot |
 
 - **BBR requires its module first.** sysctl cannot select a congestion
   control algorithm the kernel has not registered;
