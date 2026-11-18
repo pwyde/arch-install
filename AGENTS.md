@@ -85,7 +85,7 @@ in `defaults/`, `dots/`, `dots/.config/niri/`, `dots/.config/noctalia/`,
 
 ### Safety
 
-`.claude/settings.json` enforces part of this list in Claude Code.
+`.claude/settings.json` enforces some Safety and Git rules in Claude Code.
 
 - Never run an installer on the development machine, except with `--help` or
   `-h`: each one changes the system, and `base-install.sh` erases a disk.
