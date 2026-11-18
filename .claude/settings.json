@@ -49,7 +49,9 @@
       "Bash(bash desktop-install.sh *)",
       "Bash(./virt-install.sh *)",
       "Bash(bash ./virt-install.sh *)",
-      "Bash(bash virt-install.sh *)"
+      "Bash(bash virt-install.sh *)",
+      "Edit(/.claude/settings.json)",
+      "Edit(/.claude/settings.local.json)"
     ]
   }
 }

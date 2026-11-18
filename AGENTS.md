@@ -104,8 +104,8 @@ in `defaults/`, `dots/`, `dots/.config/niri/`, `dots/.config/noctalia/`,
   unless asked: it holds personal configuration that a push would publish.
   Never read private keys or credential stores, such as `~/.ssh`, `~/.gnupg`,
   `~/.pki` and `~/.local/share/kwalletd`.
-- Install no software, skill, plugin or hook on the development machine,
-  through any tool, without the maintainer's approval.
+- Install no software, skill, plugin or hook on the development machine, and
+  change no agent setting, through any tool, without the maintainer's approval.
 - Adding `NOPASSWD`, widening sudo, Polkit or SSH access, or weakening a
   hardening setting requires the maintainer's approval. The settings are
   listed in `SECURITY.md`, Hardening of the Running System, and their files
