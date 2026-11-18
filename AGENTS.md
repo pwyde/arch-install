@@ -163,6 +163,7 @@ to run under "VM test needed" in the completion report.
 | `etc/profile.d/*.sh` | `shellcheck -s sh -e SC1091` |
 | `etc/sudoers.d/*` | `visudo -cf` |
 | fish | `fish --no-execute <file>`, once per file, and `fish_indent --check <files>` |
+| Installers | every `*_SRC` constant appears in `validate_repository`, and `grep -nw eval` finds nothing |
 | JSON, JSONC and YAML | `prettier --check --trailing-comma none`, except the files `.editorconfig` exempts |
 | KDL | `niri validate -c dots/.config/niri/config.kdl`, which also reads `config.d/`; the warning about the optional `noctalia.kdl` is expected |
 | Lua in `dots/.config/nvim` | `stylua --check .` and `selene .`, run in that directory |
