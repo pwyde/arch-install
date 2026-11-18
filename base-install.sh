@@ -1421,9 +1421,8 @@ resume_device=$(findmnt -no SOURCE --first-only -T "${SWAP_FILE}" \
   | sed 's/\[.*\]//')
 resume_offset=$(btrfs inspect-internal map-swapfile -r "${SWAP_FILE}")
 if [[ -n "${resume_offset}" ]]; then
-  mkdir -p /etc/cmdline.d
-  echo "resume=${resume_device}" \
-    "resume_offset=${resume_offset}" >/etc/cmdline.d/30-resume.conf
+  echo "resume=${resume_device}" "resume_offset=${resume_offset}" \
+    | install -D -m 0644 /dev/stdin /etc/cmdline.d/30-resume.conf
   echo "Resume device: ${resume_device}, offset: ${resume_offset}"
 else
   echo "WARNING: Could not determine resume offset for ${SWAP_FILE};" \
