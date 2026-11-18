@@ -48,10 +48,11 @@ machines and the reasoning behind the design decisions of each.
 | [`packages/`](./packages/) | Prebuilt AUR packages; see [Prebuilt Packages](#prebuilt-packages) |
 | [`virt-install.sh`](./virt-install.sh) | The virtualization installer, run on the installed system |
 
-Files containing `@HOSTNAME@`, `@USERNAME@`, `@LOCALE@` or `@ROOT_UUID@` are
-templates; the installer substitutes the values when it installs them.
-`desktop-install.sh` fills in the placeholders in the greeter and Noctalia
-configuration in the same way.
+Files containing `@HOSTNAME@`, `@USERNAME@`, `@LOCALE@`, `@ROOT_UUID@` or
+`@REFLECTOR_COUNTRY@` are templates; `base-install.sh` substitutes the values
+when it installs them. `desktop-install.sh` fills in the placeholders in the
+greeter and Noctalia configuration in the same way, and `virt-install.sh`
+fills in `@SHUTDOWN_TIMEOUT@` in `conf.d/libvirt-guests`.
 
 ## Base Installation
 
